@@ -1,0 +1,42 @@
+import db from '../../database/models/index.js';
+
+const { Department } = db;
+
+class DepartmentRepository {
+  // Fetch all departments ordered by creation date (newest first)
+  async findAll() {
+    return Department.findAll({ order: [['createdAt', 'DESC']] });
+  }
+
+  // Find a department by its UUID
+  async findByUuid(uuid) {
+    return Department.findOne({ where: { uuid } });
+  }
+
+  // Find a department by its unique code
+  async findByCode(code) {
+    return Department.findOne({ where: { code } });
+  }
+
+  // Create a new department record
+  async create(data) {
+    return Department.create(data);
+  }
+
+  // Update a department by UUID — returns null if not found
+  async update(uuid, data) {
+    const department = await Department.findOne({ where: { uuid } });
+    if (!department) return null;
+    return department.update(data);
+  }
+
+  // Soft delete a department by UUID — returns false if not found
+  async delete(uuid) {
+    const department = await Department.findOne({ where: { uuid } });
+    if (!department) return false;
+    await department.destroy();
+    return true;
+  }
+}
+
+export default new DepartmentRepository();

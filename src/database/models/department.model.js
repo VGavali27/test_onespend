@@ -47,9 +47,9 @@ export default (sequelize, DataTypes) => {
   );
 
   Department.associate = (models) => {
-    Department.hasMany(models.UserEmployment, {
+    Department.hasMany(models.User, {
       foreignKey: 'department_id',
-      as: 'employments',
+      as: 'users',
     });
   };
 

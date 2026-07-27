@@ -13,4 +13,5 @@ export const HTTP_STATUS = Object.freeze({
 
 export const DB_TABLES = Object.freeze({
   USERS: 'users',
+  COMPANIES: 'companies',
 });

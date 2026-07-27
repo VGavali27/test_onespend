@@ -18,6 +18,8 @@ export default (sequelize, DataTypes) => {
         allowNull: false,
       },
 
+      department_id: DataTypes.BIGINT.UNSIGNED,
+
       first_name: DataTypes.STRING(100),
       middle_name: DataTypes.STRING(100),
       last_name: DataTypes.STRING(100),
@@ -60,6 +62,11 @@ export default (sequelize, DataTypes) => {
     User.belongsTo(models.Role, {
       foreignKey: 'role_id',
       as: 'role',
+    });
+
+    User.belongsTo(models.Department, {
+      foreignKey: 'department_id',
+      as: 'department',
     });
 
     User.hasMany(models.UserEmployment, {

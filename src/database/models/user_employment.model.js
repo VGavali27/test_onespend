@@ -15,7 +15,6 @@ export default (sequelize, DataTypes) => {
 
       user_id: DataTypes.BIGINT.UNSIGNED,
       company_id: DataTypes.BIGINT.UNSIGNED,
-      department_id: DataTypes.BIGINT.UNSIGNED,
 
       employee_code: DataTypes.STRING(50),
       designation: DataTypes.STRING(150),
@@ -50,11 +49,6 @@ export default (sequelize, DataTypes) => {
     UserEmployment.belongsTo(models.Company, {
       foreignKey: 'company_id',
       as: 'company',
-    });
-
-    UserEmployment.belongsTo(models.Department, {
-      foreignKey: 'department_id',
-      as: 'department',
     });
 
     UserEmployment.belongsTo(models.UserEmployment, {

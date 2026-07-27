@@ -5,10 +5,19 @@ import { createUserSchema, updateUserSchema } from './user.validation.js';
 
 const router = Router();
 
+// List all users
 router.get('/', userController.getAllUsers);
-router.get('/:id', userController.getUserById);
+
+// Get a single user by UUID
+router.get('/:uuid', userController.getUserByUuid);
+
+// Create a new user (validate body first)
 router.post('/', validate(createUserSchema), userController.createUser);
-router.put('/:id', validate(updateUserSchema), userController.updateUser);
-router.delete('/:id', userController.deleteUser);
+
+// Update an existing user by UUID (validate body first)
+router.put('/:uuid', validate(updateUserSchema), userController.updateUser);
+
+// Soft delete a user by UUID
+router.delete('/:uuid', userController.deleteUser);
 
 export default router;
