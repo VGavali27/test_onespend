@@ -28,9 +28,9 @@ export default (sequelize, DataTypes) => {
       first_receiver_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       final_approver_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'ACTIVE' },
-      created_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
-      updated_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
-      deleted_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
+      created_by: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
+      updated_by: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
+      deleted_by: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
     },
     {
       tableName: 'expense_categories',

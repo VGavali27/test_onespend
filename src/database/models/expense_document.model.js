@@ -19,9 +19,9 @@ export default (sequelize, DataTypes) => {
       file_extension: { type: DataTypes.STRING(20), allowNull: true },
       file_size: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       uploaded_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
-      created_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      updated_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      deleted_by_employment_id: DataTypes.BIGINT.UNSIGNED,
+      created_by: DataTypes.BIGINT.UNSIGNED,
+      updated_by: DataTypes.BIGINT.UNSIGNED,
+      deleted_by: DataTypes.BIGINT.UNSIGNED,
     },
     {
       tableName: 'expense_documents',

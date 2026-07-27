@@ -8,9 +8,9 @@ export async function up(queryInterface, Sequelize) {
     action_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
     action_type: { type: Sequelize.STRING(30), allowNull: false },
     remarks: { type: Sequelize.TEXT, allowNull: true },
-    created_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
-    updated_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
-    deleted_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    created_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    updated_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    deleted_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     created_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') },
     deleted_at: { type: Sequelize.DATE, allowNull: true },
@@ -41,7 +41,7 @@ export async function up(queryInterface, Sequelize) {
     onDelete: 'RESTRICT',
   });
   await queryInterface.addConstraint('expense_handovers', {
-    fields: ['action_by_employment_id'],
+    fields: ['action_by'],
     type: 'foreign key',
     name: 'fk_eh_action_by_emp',
     references: { table: 'user_employments', field: 'id' },

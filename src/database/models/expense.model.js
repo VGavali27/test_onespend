@@ -1,3 +1,5 @@
+import { encryptAmounts, decryptAmounts } from '../../utils/encryption.js';
+
 export default (sequelize, DataTypes) => {
   const Expense = sequelize.define(
     'Expense',
@@ -29,21 +31,31 @@ export default (sequelize, DataTypes) => {
       requested_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       current_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       current_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
-      estimated_amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0.0 },
-      final_amount: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
-      paid_amount: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
+      estimated_amount: { type: DataTypes.TEXT, allowNull: true },
+      final_amount: { type: DataTypes.TEXT, allowNull: true },
+      paid_amount: { type: DataTypes.TEXT, allowNull: true },
       status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'DRAFT' },
       submitted_at: { type: DataTypes.DATE, allowNull: true },
       closed_at: { type: DataTypes.DATE, allowNull: true },
-      created_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
-      updated_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
-      deleted_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
+      created_by: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
+      updated_by: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
+      deleted_by: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
     },
     {
       tableName: 'expenses',
       timestamps: true,
       paranoid: true,
       underscored: true,
+      hooks: {
+        beforeCreate: (instance) => { encryptAmounts(instance.dataValues); },
+        beforeUpdate: (instance) => { encryptAmounts(instance.dataValues); },
+        afterFind: (result) => {
+          if (result) {
+            const rows = Array.isArray(result) ? result : [result];
+            rows.forEach((row) => decryptAmounts(row.dataValues));
+          }
+        },
+      },
     },
   );
 

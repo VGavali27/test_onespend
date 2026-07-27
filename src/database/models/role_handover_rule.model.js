@@ -12,9 +12,9 @@ export default (sequelize, DataTypes) => {
       from_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       to_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       status: { type: DataTypes.STRING(20), defaultValue: 'ACTIVE' },
-      created_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      updated_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      deleted_by_employment_id: DataTypes.BIGINT.UNSIGNED,
+      created_by: DataTypes.BIGINT.UNSIGNED,
+      updated_by: DataTypes.BIGINT.UNSIGNED,
+      deleted_by: DataTypes.BIGINT.UNSIGNED,
     },
     {
       tableName: 'role_handover_rules',

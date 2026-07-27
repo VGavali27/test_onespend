@@ -1,3 +1,5 @@
+import { encryptAmounts, decryptAmounts } from '../../utils/encryption.js';
+
 export default (sequelize, DataTypes) => {
   const TravelExpenseMiscExpense = sequelize.define(
     'TravelExpenseMiscExpense',
@@ -12,20 +14,30 @@ export default (sequelize, DataTypes) => {
       expense_type: { type: DataTypes.STRING(100), allowNull: false },
       expense_date: { type: DataTypes.DATEONLY, allowNull: false },
       vendor_name: { type: DataTypes.STRING(255), allowNull: true },
-      estimated_amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false, defaultValue: 0.0 },
-      final_amount: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
-      paid_amount: { type: DataTypes.DECIMAL(15, 2), allowNull: true },
+      estimated_amount: { type: DataTypes.TEXT, allowNull: true },
+      final_amount: { type: DataTypes.TEXT, allowNull: true },
+      paid_amount: { type: DataTypes.TEXT, allowNull: true },
       status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'ACTIVE' },
       remarks: { type: DataTypes.TEXT, allowNull: true },
-      created_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      updated_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      deleted_by_employment_id: DataTypes.BIGINT.UNSIGNED,
+      created_by: DataTypes.BIGINT.UNSIGNED,
+      updated_by: DataTypes.BIGINT.UNSIGNED,
+      deleted_by: DataTypes.BIGINT.UNSIGNED,
     },
     {
       tableName: 'travel_expense_misc_expenses',
       timestamps: true,
       paranoid: true,
       underscored: true,
+      hooks: {
+        beforeCreate: (instance) => { encryptAmounts(instance.dataValues); },
+        beforeUpdate: (instance) => { encryptAmounts(instance.dataValues); },
+        afterFind: (result) => {
+          if (result) {
+            const rows = Array.isArray(result) ? result : [result];
+            rows.forEach((row) => decryptAmounts(row.dataValues));
+          }
+        },
+      },
     },
   );
 

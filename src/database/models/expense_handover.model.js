@@ -14,9 +14,9 @@ export default (sequelize, DataTypes) => {
       action_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       action_type: { type: DataTypes.STRING(30), allowNull: false },
       remarks: { type: DataTypes.TEXT, allowNull: true },
-      created_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      updated_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      deleted_by_employment_id: DataTypes.BIGINT.UNSIGNED,
+      created_by: DataTypes.BIGINT.UNSIGNED,
+      updated_by: DataTypes.BIGINT.UNSIGNED,
+      deleted_by: DataTypes.BIGINT.UNSIGNED,
     },
     {
       tableName: 'expense_handovers',

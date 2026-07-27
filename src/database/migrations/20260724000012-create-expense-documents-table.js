@@ -13,9 +13,9 @@ export async function up(queryInterface, Sequelize) {
     file_extension: { type: Sequelize.STRING(20), allowNull: true },
     file_size: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
     uploaded_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
-    created_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
-    updated_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
-    deleted_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    created_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    updated_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    deleted_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     created_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP') },
     updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') },
     deleted_at: { type: Sequelize.DATE, allowNull: true },
@@ -30,7 +30,7 @@ export async function up(queryInterface, Sequelize) {
     onDelete: 'CASCADE',
   });
   await queryInterface.addConstraint('expense_documents', {
-    fields: ['uploaded_by_employment_id'],
+    fields: ['uploaded_by'],
     type: 'foreign key',
     name: 'fk_ed_uploaded_by_emp',
     references: { table: 'user_employments', field: 'id' },

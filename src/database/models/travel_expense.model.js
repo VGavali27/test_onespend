@@ -15,9 +15,9 @@ export default (sequelize, DataTypes) => {
       travel_end_date: { type: DataTypes.DATEONLY, allowNull: false },
       total_travellers: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 1 },
       notes: { type: DataTypes.TEXT, allowNull: true },
-      created_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      updated_by_employment_id: DataTypes.BIGINT.UNSIGNED,
-      deleted_by_employment_id: DataTypes.BIGINT.UNSIGNED,
+      created_by: DataTypes.BIGINT.UNSIGNED,
+      updated_by: DataTypes.BIGINT.UNSIGNED,
+      deleted_by: DataTypes.BIGINT.UNSIGNED,
     },
     {
       tableName: 'travel_expenses',
