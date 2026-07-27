@@ -14,6 +14,22 @@ export async function up(queryInterface, Sequelize) {
     deleted_at: { type: Sequelize.DATE, allowNull: true },
   });
   await queryInterface.addIndex('role_handover_rules', ['module'], { name: 'idx_rhr_module' });
+  await queryInterface.addConstraint('role_handover_rules', {
+    fields: ['from_role_id'],
+    type: 'foreign key',
+    name: 'fk_rhr_from_role_id',
+    references: { table: 'roles', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+  });
+  await queryInterface.addConstraint('role_handover_rules', {
+    fields: ['to_role_id'],
+    type: 'foreign key',
+    name: 'fk_rhr_to_role_id',
+    references: { table: 'roles', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+  });
 }
 export async function down(queryInterface, _Sequelize) {
   await queryInterface.dropTable('role_handover_rules');

@@ -6,7 +6,7 @@ export async function up(queryInterface, Sequelize) {
       autoIncrement: true,
       primaryKey: true,
     },
-    uuid: { type: Sequelize.UUID, unique: true, allowNull: true },
+    uuid: { type: Sequelize.UUID, allowNull: false, unique: true },
     resource: { type: Sequelize.STRING, allowNull: true },
     action: { type: Sequelize.STRING, allowNull: true },
     permission_key: { type: Sequelize.STRING, allowNull: true },

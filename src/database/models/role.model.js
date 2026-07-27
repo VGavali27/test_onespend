@@ -66,6 +66,41 @@ export default (sequelize, DataTypes) => {
       otherKey: 'permission_id',
       as: 'permissions',
     });
+
+    Role.hasMany(models.Expense, {
+      foreignKey: 'current_role_id',
+      as: 'expenses',
+    });
+
+    Role.hasMany(models.ExpenseCategory, {
+      foreignKey: 'first_receiver_role_id',
+      as: 'firstReceiverCategories',
+    });
+
+    Role.hasMany(models.ExpenseCategory, {
+      foreignKey: 'final_approver_role_id',
+      as: 'finalApproverCategories',
+    });
+
+    Role.hasMany(models.RoleHandoverRule, {
+      foreignKey: 'from_role_id',
+      as: 'fromHandoverRules',
+    });
+
+    Role.hasMany(models.RoleHandoverRule, {
+      foreignKey: 'to_role_id',
+      as: 'toHandoverRules',
+    });
+
+    Role.hasMany(models.ExpenseHandover, {
+      foreignKey: 'from_role_id',
+      as: 'fromExpenseHandovers',
+    });
+
+    Role.hasMany(models.ExpenseHandover, {
+      foreignKey: 'to_role_id',
+      as: 'toExpenseHandovers',
+    });
   };
 
   return Role;

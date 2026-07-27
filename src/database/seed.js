@@ -1,4 +1,4 @@
-import { Umzug } from 'umzug';
+import { Umzug, SequelizeStorage } from 'umzug';
 import sequelize from '../config/database.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -9,8 +9,7 @@ const __dirname = path.dirname(__filename);
 const umzug = new Umzug({
   migrations: { glob: path.join(__dirname, 'seeders', '*.js') },
   context: sequelize.getQueryInterface(),
-  storage: 'sequelize',
-  storageOptions: { sequelize, modelName: 'SequelizeData' },
+  storage: new SequelizeStorage({ sequelize, modelName: 'SequelizeData' }),
   logger: console,
 });
 

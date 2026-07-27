@@ -1,7 +1,7 @@
 /**
  * Rollback the last batch of migrations
  */
-import { Umzug } from 'umzug';
+import { Umzug, SequelizeStorage } from 'umzug';
 import sequelize from '../config/database.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -12,8 +12,7 @@ const __dirname = path.dirname(__filename);
 const umzug = new Umzug({
   migrations: { glob: path.join(__dirname, 'migrations', '*.js') },
   context: sequelize.getQueryInterface(),
-  storage: 'sequelize',
-  storageOptions: { sequelize },
+  storage: new SequelizeStorage({ sequelize }),
   logger: console,
 });
 

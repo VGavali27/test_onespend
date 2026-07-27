@@ -27,6 +27,46 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.addIndex('expenses', ['category_id'], { name: 'idx_exp_category' });
   await queryInterface.addIndex('expenses', ['company_id'], { name: 'idx_exp_company' });
   await queryInterface.addIndex('expenses', ['status'], { name: 'idx_exp_status' });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['category_id'],
+    type: 'foreign key',
+    name: 'fk_exp_category_id',
+    references: { table: 'expense_categories', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['company_id'],
+    type: 'foreign key',
+    name: 'fk_exp_company_id',
+    references: { table: 'companies', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['requested_by_employment_id'],
+    type: 'foreign key',
+    name: 'fk_exp_requested_by_emp',
+    references: { table: 'user_employments', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['current_role_id'],
+    type: 'foreign key',
+    name: 'fk_exp_current_role_id',
+    references: { table: 'roles', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL',
+  });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['current_employment_id'],
+    type: 'foreign key',
+    name: 'fk_exp_current_employment_id',
+    references: { table: 'user_employments', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL',
+  });
 }
 export async function down(queryInterface, _Sequelize) {
   await queryInterface.dropTable('expenses');

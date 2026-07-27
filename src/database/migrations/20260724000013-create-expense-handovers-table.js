@@ -16,6 +16,38 @@ export async function up(queryInterface, Sequelize) {
     deleted_at: { type: Sequelize.DATE, allowNull: true },
   });
   await queryInterface.addIndex('expense_handovers', ['expense_id'], { name: 'idx_eh_expense' });
+  await queryInterface.addConstraint('expense_handovers', {
+    fields: ['expense_id'],
+    type: 'foreign key',
+    name: 'fk_eh_expense_id',
+    references: { table: 'expenses', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+  });
+  await queryInterface.addConstraint('expense_handovers', {
+    fields: ['from_role_id'],
+    type: 'foreign key',
+    name: 'fk_eh_from_role_id',
+    references: { table: 'roles', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
+  await queryInterface.addConstraint('expense_handovers', {
+    fields: ['to_role_id'],
+    type: 'foreign key',
+    name: 'fk_eh_to_role_id',
+    references: { table: 'roles', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
+  await queryInterface.addConstraint('expense_handovers', {
+    fields: ['action_by_employment_id'],
+    type: 'foreign key',
+    name: 'fk_eh_action_by_emp',
+    references: { table: 'user_employments', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
 }
 export async function down(queryInterface, _Sequelize) {
   await queryInterface.dropTable('expense_handovers');

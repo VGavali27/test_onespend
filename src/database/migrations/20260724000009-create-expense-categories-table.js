@@ -18,6 +18,22 @@ export async function up(queryInterface, Sequelize) {
   });
   await queryInterface.addIndex('expense_categories', ['code'], { unique: true, name: 'idx_ec_code' });
   await queryInterface.addIndex('expense_categories', ['module'], { name: 'idx_ec_module' });
+  await queryInterface.addConstraint('expense_categories', {
+    fields: ['first_receiver_role_id'],
+    type: 'foreign key',
+    name: 'fk_ec_first_receiver_role_id',
+    references: { table: 'roles', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
+  await queryInterface.addConstraint('expense_categories', {
+    fields: ['final_approver_role_id'],
+    type: 'foreign key',
+    name: 'fk_ec_final_approver_role_id',
+    references: { table: 'roles', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
 }
 export async function down(queryInterface, _Sequelize) {
   await queryInterface.dropTable('expense_categories');

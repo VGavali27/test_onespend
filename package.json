@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/VGavali27/test_onespend#readme",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",

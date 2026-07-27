@@ -24,12 +24,6 @@ const errorHandler = (err, req, res, _next) => {
     return ApiResponse.error(res, 'Related record not found', 409);
   }
 
-  // Joi validation errors (if thrown manually)
-  if (err.isJoi) {
-    const messages = err.details?.map((d) => ({ field: d.path?.join('.'), message: d.message })) || [];
-    return ApiResponse.validationError(res, messages);
-  }
-
   // Unknown / programming errors — don't leak details in production
   const message = env.isProd ? 'Internal Server Error' : err.message;
   return ApiResponse.error(res, message, 500);

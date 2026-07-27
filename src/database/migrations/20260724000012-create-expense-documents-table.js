@@ -21,6 +21,22 @@ export async function up(queryInterface, Sequelize) {
     deleted_at: { type: Sequelize.DATE, allowNull: true },
   });
   await queryInterface.addIndex('expense_documents', ['expense_id'], { name: 'idx_ed_expense' });
+  await queryInterface.addConstraint('expense_documents', {
+    fields: ['expense_id'],
+    type: 'foreign key',
+    name: 'fk_ed_expense_id',
+    references: { table: 'expenses', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+  });
+  await queryInterface.addConstraint('expense_documents', {
+    fields: ['uploaded_by_employment_id'],
+    type: 'foreign key',
+    name: 'fk_ed_uploaded_by_emp',
+    references: { table: 'user_employments', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'RESTRICT',
+  });
 }
 export async function down(queryInterface, _Sequelize) {
   await queryInterface.dropTable('expense_documents');

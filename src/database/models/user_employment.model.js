@@ -66,6 +66,26 @@ export default (sequelize, DataTypes) => {
       foreignKey: 'reporting_manager_employment_id',
       as: 'subordinates',
     });
+
+    UserEmployment.hasMany(models.Expense, {
+      foreignKey: 'requested_by_employment_id',
+      as: 'requestedExpenses',
+    });
+
+    UserEmployment.hasMany(models.Expense, {
+      foreignKey: 'current_employment_id',
+      as: 'currentProcessingExpenses',
+    });
+
+    UserEmployment.hasMany(models.ExpenseDocument, {
+      foreignKey: 'uploaded_by_employment_id',
+      as: 'uploadedDocuments',
+    });
+
+    UserEmployment.hasMany(models.ExpenseHandover, {
+      foreignKey: 'action_by_employment_id',
+      as: 'actionedHandovers',
+    });
   };
 
   return UserEmployment;
