@@ -7,6 +7,8 @@ import userEmploymentRoutes from '../modules/user_employment/user_employment.rou
 import permissionRoutes from '../modules/permission/permission.routes.js';
 import rolePermissionRoutes from '../modules/role_permission/role_permission.routes.js';
 import expenseCategoryRoutes from '../modules/expense_category/expense_category.routes.js';
+import expenseRoutes from '../modules/expense/expense.routes.js';
+import travelExpenseRoutes from '../modules/travel_expense/travel_expense.routes.js';
 
 const router = Router();
 
@@ -18,5 +20,7 @@ router.use('/user-employments', userEmploymentRoutes);
 router.use('/permissions', permissionRoutes);
 router.use('/role-permissions', rolePermissionRoutes);
 router.use('/expense-categories', expenseCategoryRoutes);
+router.use('/expenses', expenseRoutes);
+router.use('/travel-expenses', travelExpenseRoutes);
 
 export default router;

@@ -1,0 +1,34 @@
+import Joi from 'joi';
+
+// Schema for creating an expense
+export const createExpenseSchema = Joi.object({
+  category_uuid: Joi.string().uuid().required().messages({
+    'string.guid': 'Category UUID must be a valid UUID',
+    'any.required': 'Category UUID is required',
+  }),
+  company_uuid: Joi.string().uuid().required().messages({
+    'string.guid': 'Company UUID must be a valid UUID',
+    'any.required': 'Company UUID is required',
+  }),
+  requested_by_user_uuid: Joi.string().uuid().required().messages({
+    'string.guid': 'User UUID must be a valid UUID',
+    'any.required': 'User UUID is required',
+  }),
+  title: Joi.string().max(255).required().messages({
+    'string.empty': 'Title is required',
+    'string.max': 'Title must be at most 255 characters',
+  }),
+  remarks: Joi.string().allow(null, ''),
+  estimated_amount: Joi.string().required().messages({
+    'string.empty': 'Estimated amount is required',
+  }),
+});
+
+// Schema for updating an expense — all fields optional
+export const updateExpenseSchema = Joi.object({
+  category_uuid: Joi.string().uuid(),
+  company_uuid: Joi.string().uuid(),
+  title: Joi.string().max(255),
+  remarks: Joi.string().allow(null, ''),
+  estimated_amount: Joi.string(),
+}).min(1).messages({ 'object.min': 'At least one field is required' });
