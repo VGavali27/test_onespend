@@ -1,1 +1,19 @@
-import Joi from 'joi';export const createMiscExpenseSchema = Joi.object({  travel_expense_uuid: Joi.string().uuid().required(),  expense_type: Joi.string().max(100).required(),  expense_date: Joi.date().iso().required(),  vendor_name: Joi.string().max(255).allow(null, ''),  estimated_amount: Joi.string().required(),  remarks: Joi.string().allow(null, ''),});export const updateMiscExpenseSchema = Joi.object({  expense_type: Joi.string().max(100),  expense_date: Joi.date().iso(),  vendor_name: Joi.string().max(255).allow(null, ''),  estimated_amount: Joi.string(),  final_amount: Joi.string().allow(null, ''),  paid_amount: Joi.string().allow(null, ''),  status: Joi.string().valid('ACTIVE', 'INACTIVE'),  remarks: Joi.string().allow(null, ''),}).min(1);
+import Joi from 'joi';
+export const createMiscExpenseSchema = Joi.object({
+  travel_expense_uuid: Joi.string().uuid().required(),
+  expense_type: Joi.string().max(100).required(),
+  expense_date: Joi.date().iso().required(),
+  vendor_name: Joi.string().max(255).allow(null, ''),
+  estimated_amount: Joi.string().required(),
+  remarks: Joi.string().allow(null, ''),
+});
+export const updateMiscExpenseSchema = Joi.object({
+  expense_type: Joi.string().max(100),
+  expense_date: Joi.date().iso(),
+  vendor_name: Joi.string().max(255).allow(null, ''),
+  estimated_amount: Joi.string(),
+  final_amount: Joi.string().allow(null, ''),
+  paid_amount: Joi.string().allow(null, ''),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE'),
+  remarks: Joi.string().allow(null, ''),
+}).min(1);

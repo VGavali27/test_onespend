@@ -1,1 +1,26 @@
-import { Router } from 'express';import * as controller from './travel_forex.controller.js';import validate from '../../middleware/validate.js';import { createForexSchema, updateForexSchema } from './travel_forex.validation.js';const router = Router();router.get('/', controller.getAll);router.get('/:uuid', controller.getByUuid);router.post('/', validate(createForexSchema), controller.create);router.put('/:uuid', validate(updateForexSchema), controller.update);router.delete('/:uuid', controller.deleteRecord);export default router;
+import { Router } from 'express';
+
+import * as travelForexController from './travel_forex.controller.js';
+
+import validate from '../../middleware/validate.js';
+
+import { createForexSchema, updateForexSchema } from './travel_forex.validation.js';
+
+const router = Router();
+
+// List all forex entries
+router.get('/', travelForexController.getAll);
+
+// Get a single forex entry by UUID
+router.get('/:uuid', travelForexController.getByUuid);
+
+// Create a new forex entry (validate body first)
+router.post('/', validate(createForexSchema), travelForexController.create);
+
+// Update an existing forex entry by UUID (validate body first)
+router.put('/:uuid', validate(updateForexSchema), travelForexController.update);
+
+// Soft delete a forex entry by UUID
+router.delete('/:uuid', travelForexController.deleteRecord);
+
+export default router;

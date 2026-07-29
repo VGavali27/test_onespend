@@ -1,1 +1,53 @@
-import service from './travel_accommodation.service.js';import ApiResponse from '../../utils/apiResponse.js';export const getAll = async (_req, res, next) => { try { const d = await service.getAll(); return ApiResponse.success(res, d, 'Accommodations fetched'); } catch (e) { next(e); } };export const getByUuid = async (req, res, next) => { try { const d = await service.getByUuid(req.params.uuid); return ApiResponse.success(res, d, 'Accommodation fetched'); } catch (e) { next(e); } };export const create = async (req, res, next) => { try { const d = await service.create(req.body); return ApiResponse.created(res, d, 'Accommodation created'); } catch (e) { next(e); } };export const update = async (req, res, next) => { try { const d = await service.update(req.params.uuid, req.body); return ApiResponse.success(res, d, 'Accommodation updated'); } catch (e) { next(e); } };export const deleteRecord = async (req, res, next) => { try { const r = await service.delete(req.params.uuid); return ApiResponse.success(res, null, r.message); } catch (e) { next(e); } };
+import accommodationService from './travel_accommodation.service.js';
+
+import ApiResponse from '../../utils/apiResponse.js';
+
+// Fetch all accommodations
+export const getAll = async (_req, res, next) => {
+  try {
+    const data = await accommodationService.getAll();
+    return ApiResponse.success(res, data, 'Accommodations fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Fetch a single accommodation by UUID
+export const getByUuid = async (req, res, next) => {
+  try {
+    const data = await accommodationService.getByUuid(req.params.uuid);
+    return ApiResponse.success(res, data, 'Accommodation fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Create a new accommodation
+export const create = async (req, res, next) => {
+  try {
+    const data = await accommodationService.create(req.body);
+    return ApiResponse.created(res, data, 'Accommodation created successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update an existing accommodation by UUID
+export const update = async (req, res, next) => {
+  try {
+    const data = await accommodationService.update(req.params.uuid, req.body);
+    return ApiResponse.success(res, data, 'Accommodation updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Soft delete an accommodation by UUID
+export const deleteRecord = async (req, res, next) => {
+  try {
+    const result = await accommodationService.delete(req.params.uuid);
+    return ApiResponse.success(res, null, result.message);
+  } catch (error) {
+    next(error);
+  }
+};

@@ -1,1 +1,33 @@
-import Joi from 'joi';// Schema for creating a travel segmentexport const createSegmentSchema = Joi.object({  travel_expense_uuid: Joi.string().uuid().required(),  travel_mode: Joi.string().max(30).required(),  from_location: Joi.string().max(255).required(),  to_location: Joi.string().max(255).required(),  departure_datetime: Joi.date().iso().required(),  arrival_datetime: Joi.date().iso().required(),  preferred_vendor: Joi.string().max(255).allow(null, ''),  preferred_number: Joi.string().max(100).allow(null, ''),  seat_preference: Joi.string().max(50).allow(null, ''),  meal_preference: Joi.string().max(50).allow(null, ''),  estimated_amount: Joi.string().required(),  remarks: Joi.string().allow(null, ''),});// Schema for updating a segmentexport const updateSegmentSchema = Joi.object({  travel_mode: Joi.string().max(30),  from_location: Joi.string().max(255),  to_location: Joi.string().max(255),  departure_datetime: Joi.date().iso(),  arrival_datetime: Joi.date().iso(),  preferred_vendor: Joi.string().max(255).allow(null, ''),  preferred_number: Joi.string().max(100).allow(null, ''),  seat_preference: Joi.string().max(50).allow(null, ''),  meal_preference: Joi.string().max(50).allow(null, ''),  estimated_amount: Joi.string(),  final_amount: Joi.string().allow(null, ''),  paid_amount: Joi.string().allow(null, ''),  status: Joi.string().valid('ACTIVE', 'INACTIVE'),  remarks: Joi.string().allow(null, ''),}).min(1).messages({ 'object.min': 'At least one field is required' });
+import Joi from 'joi'; // Schema for creating a travel segment
+export const createSegmentSchema = Joi.object({
+  travel_expense_uuid: Joi.string().uuid().required(),
+  travel_mode: Joi.string().max(30).required(),
+  from_location: Joi.string().max(255).required(),
+  to_location: Joi.string().max(255).required(),
+  departure_datetime: Joi.date().iso().required(),
+  arrival_datetime: Joi.date().iso().required(),
+  preferred_vendor: Joi.string().max(255).allow(null, ''),
+  preferred_number: Joi.string().max(100).allow(null, ''),
+  seat_preference: Joi.string().max(50).allow(null, ''),
+  meal_preference: Joi.string().max(50).allow(null, ''),
+  estimated_amount: Joi.string().required(),
+  remarks: Joi.string().allow(null, ''),
+}); // Schema for updating a segment
+export const updateSegmentSchema = Joi.object({
+  travel_mode: Joi.string().max(30),
+  from_location: Joi.string().max(255),
+  to_location: Joi.string().max(255),
+  departure_datetime: Joi.date().iso(),
+  arrival_datetime: Joi.date().iso(),
+  preferred_vendor: Joi.string().max(255).allow(null, ''),
+  preferred_number: Joi.string().max(100).allow(null, ''),
+  seat_preference: Joi.string().max(50).allow(null, ''),
+  meal_preference: Joi.string().max(50).allow(null, ''),
+  estimated_amount: Joi.string(),
+  final_amount: Joi.string().allow(null, ''),
+  paid_amount: Joi.string().allow(null, ''),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE'),
+  remarks: Joi.string().allow(null, ''),
+})
+  .min(1)
+  .messages({ 'object.min': 'At least one field is required' });

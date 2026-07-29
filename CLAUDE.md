@@ -126,11 +126,48 @@ npm run seed              # run seeders
 ```
 
 ## What's Built / What's Pending
-- [x] All 19 models + migrations
-- [x] User API module (CRUD)
-- [x] Reusable ApiError + ApiResponse + errorHandler
-- [x] Validation middleware (Joi)
-- [ ] API modules for Group, Company, Department, Role, Permission, UserEmployment
-- [ ] API modules for Expense, ExpenseCategory, TravelExpense, etc.
+
+### API Modules (8 complete)
+- [x] User API — CRUD by UUID, create with nested employments
+- [x] Company API — CRUD by UUID
+- [x] Department API — CRUD by UUID
+- [x] Role API — CRUD by UUID
+- [x] Permission API — CRUD by UUID
+- [x] UserEmployment API — CRUD by UUID
+- [x] Expense API — CRUD by UUID, combined create with travel support
+- [x] ExpenseCategory API — CRUD by UUID
+- [x] TravelExpense API — combined create with-travel endpoint
+- [x] TravelSegment API — CRUD by UUID
+- [x] TravelAccommodation API — CRUD by UUID
+- [x] TravelLocalTransport API — CRUD by UUID
+- [x] TravelForex API — CRUD by UUID
+- [x] TravelMiscExpense API — CRUD by UUID
+- [x] RolePermission API — sync permissions for a role
+- [ ] ExpenseDocument API
+- [ ] ExpenseHandover API
 - [ ] Authentication / Authorization
-- [ ] Seeders for all tables
+
+### Seeders (10 files)
+- [x] Groups — Kings Group Ventures (KGV)
+- [x] Roles — 13 roles (SUPER_ADMIN → EMPLOYEE)
+- [x] Departments — 10 departments
+- [x] Companies — 28 companies under KGV
+- [x] Permissions — 35 permissions across 9 modules
+- [x] RolePermissions — role-permission assignments
+- [x] ExpenseCategories — Travel category
+- [x] Users — one user per role (12 users + SUPER_ADMIN)
+- [x] RoleHandoverRules — travel module approval chain
+- [ ] RoleHandoverRules for other modules
+
+### Infrastructure
+- [x] Reusable ApiError + ApiResponse + errorHandler
+- [x] Validation middleware (Joi) with field-level errors
+- [x] AES-256-CBC encryption utility with model hooks
+- [x] Umzug v3 migration/seed scripts (migrate, rollback, seed)
+
+### Key Implementation Details
+- **UUID-based lookups** — all APIs use UUID, not auto-increment ID
+- **UUID resolution** — API accepts `*_uuid` in body, service resolves to internal ID
+- **Encrypted amounts** — all `*_amount` and `exchange_rate` fields auto-encrypted via Sequelize hooks
+- **Combined endpoints** — `POST /api/expenses` creates expense + travel + child items in one transaction
+- **Approval chain** — `expense_categories` define first/final approver roles, `role_handover_rules` define handover paths

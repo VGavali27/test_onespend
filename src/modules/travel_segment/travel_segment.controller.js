@@ -1,1 +1,53 @@
-import segmentService from './travel_segment.service.js';import ApiResponse from '../../utils/apiResponse.js';export const getAll = async (_req, res, next) => {  try {    const data = await segmentService.getAll();    return ApiResponse.success(res, data, 'Segments fetched successfully');  } catch (error) { next(error); }};export const getByUuid = async (req, res, next) => {  try {    const data = await segmentService.getByUuid(req.params.uuid);    return ApiResponse.success(res, data, 'Segment fetched successfully');  } catch (error) { next(error); }};export const create = async (req, res, next) => {  try {    const data = await segmentService.create(req.body);    return ApiResponse.created(res, data, 'Segment created successfully');  } catch (error) { next(error); }};export const update = async (req, res, next) => {  try {    const data = await segmentService.update(req.params.uuid, req.body);    return ApiResponse.success(res, data, 'Segment updated successfully');  } catch (error) { next(error); }};export const deleteRecord = async (req, res, next) => {  try {    const result = await segmentService.delete(req.params.uuid);    return ApiResponse.success(res, null, result.message);  } catch (error) { next(error); }};
+import segmentService from './travel_segment.service.js';
+
+import ApiResponse from '../../utils/apiResponse.js';
+
+// Fetch all segments
+export const getAll = async (_req, res, next) => {
+  try {
+    const data = await segmentService.getAll();
+    return ApiResponse.success(res, data, 'Segments fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Fetch a single segment by UUID
+export const getByUuid = async (req, res, next) => {
+  try {
+    const data = await segmentService.getByUuid(req.params.uuid);
+    return ApiResponse.success(res, data, 'Segment fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Create a new segment
+export const create = async (req, res, next) => {
+  try {
+    const data = await segmentService.create(req.body);
+    return ApiResponse.created(res, data, 'Segment created successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update an existing segment by UUID
+export const update = async (req, res, next) => {
+  try {
+    const data = await segmentService.update(req.params.uuid, req.body);
+    return ApiResponse.success(res, data, 'Segment updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Soft delete a segment by UUID
+export const deleteRecord = async (req, res, next) => {
+  try {
+    const result = await segmentService.delete(req.params.uuid);
+    return ApiResponse.success(res, null, result.message);
+  } catch (error) {
+    next(error);
+  }
+};

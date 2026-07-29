@@ -1,1 +1,26 @@
-import { Router } from 'express';import * as controller from './travel_misc_expense.controller.js';import validate from '../../middleware/validate.js';import { createMiscExpenseSchema, updateMiscExpenseSchema } from './travel_misc_expense.validation.js';const router = Router();router.get('/', controller.getAll);router.get('/:uuid', controller.getByUuid);router.post('/', validate(createMiscExpenseSchema), controller.create);router.put('/:uuid', validate(updateMiscExpenseSchema), controller.update);router.delete('/:uuid', controller.deleteRecord);export default router;
+import { Router } from 'express';
+
+import * as travelMiscExpenseController from './travel_misc_expense.controller.js';
+
+import validate from '../../middleware/validate.js';
+
+import { createMiscExpenseSchema, updateMiscExpenseSchema } from './travel_misc_expense.validation.js';
+
+const router = Router();
+
+// List all misc expenses
+router.get('/', travelMiscExpenseController.getAll);
+
+// Get a single misc expense by UUID
+router.get('/:uuid', travelMiscExpenseController.getByUuid);
+
+// Create a new misc expense (validate body first)
+router.post('/', validate(createMiscExpenseSchema), travelMiscExpenseController.create);
+
+// Update an existing misc expense by UUID (validate body first)
+router.put('/:uuid', validate(updateMiscExpenseSchema), travelMiscExpenseController.update);
+
+// Soft delete a misc expense by UUID
+router.delete('/:uuid', travelMiscExpenseController.deleteRecord);
+
+export default router;
