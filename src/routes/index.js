@@ -9,6 +9,11 @@ import rolePermissionRoutes from '../modules/role_permission/role_permission.rou
 import expenseCategoryRoutes from '../modules/expense_category/expense_category.routes.js';
 import expenseRoutes from '../modules/expense/expense.routes.js';
 import travelExpenseRoutes from '../modules/travel_expense/travel_expense.routes.js';
+import travelSegmentRoutes from '../modules/travel_segment/travel_segment.routes.js';
+import travelAccommodationRoutes from '../modules/travel_accommodation/travel_accommodation.routes.js';
+import travelLocalTransportRoutes from '../modules/travel_local_transport/travel_local_transport.routes.js';
+import travelForexRoutes from '../modules/travel_forex/travel_forex.routes.js';
+import travelMiscExpenseRoutes from '../modules/travel_misc_expense/travel_misc_expense.routes.js';
 
 const router = Router();
 
@@ -22,5 +27,10 @@ router.use('/role-permissions', rolePermissionRoutes);
 router.use('/expense-categories', expenseCategoryRoutes);
 router.use('/expenses', expenseRoutes);
 router.use('/travel-expenses', travelExpenseRoutes);
+router.use('/travel-segments', travelSegmentRoutes);
+router.use('/travel-accommodations', travelAccommodationRoutes);
+router.use('/travel-local-transports', travelLocalTransportRoutes);
+router.use('/travel-forex', travelForexRoutes);
+router.use('/travel-misc-expenses', travelMiscExpenseRoutes);
 
 export default router;
