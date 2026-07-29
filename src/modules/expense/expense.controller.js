@@ -1,4 +1,4 @@
-import expenseService from './expense.service.js';
+import * as expenseService from './expense.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
 // Fetch all expenses
 export const getAllExpenses = async (_req, res, next) => {

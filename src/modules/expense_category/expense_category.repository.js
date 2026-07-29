@@ -1,36 +1,18 @@
 import db from '../../database/models/index.js';
 const { ExpenseCategory } = db;
 
-class ExpenseCategoryRepository {
-  // Fetch all categories ordered by name
-  async findAll() {
-    return ExpenseCategory.findAll({ order: [['name', 'ASC']] });
-  }
-  // Find a category by its UUID
-  async findByUuid(uuid) {
-    return ExpenseCategory.findOne({ where: { uuid } });
-  }
-  // Find a category by its code
-  async findByCode(code) {
-    return ExpenseCategory.findOne({ where: { code } });
-  }
-  // Create a new category record
-  async create(data) {
-    return ExpenseCategory.create(data);
-  }
-  // Update a category by UUID — returns null if not found
-  async update(uuid, data) {
-    const category = await ExpenseCategory.findOne({ where: { uuid } });
-    if (!category) return null;
-    return category.update(data);
-  }
-  // Soft delete a category by UUID — returns false if not found
-  async delete(uuid) {
-    const category = await ExpenseCategory.findOne({ where: { uuid } });
-    if (!category) return false;
-    await category.destroy();
-    return true;
-  }
-}
-
-export default new ExpenseCategoryRepository();
+export const findAll = async () => ExpenseCategory.findAll({ order: [['name', 'ASC']] });
+export const findByUuid = async (uuid) => ExpenseCategory.findOne({ where: { uuid } });
+export const findByCode = async (code) => ExpenseCategory.findOne({ where: { code } });
+export const create = async (data) => ExpenseCategory.create(data);
+export const update = async (uuid, data) => {
+  const category = await ExpenseCategory.findOne({ where: { uuid } });
+  if (!category) return null;
+  return category.update(data);
+};
+export const deleteRecord = async (uuid) => {
+  const category = await ExpenseCategory.findOne({ where: { uuid } });
+  if (!category) return false;
+  await category.destroy();
+  return true;
+};

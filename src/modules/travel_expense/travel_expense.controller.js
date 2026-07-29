@@ -1,4 +1,4 @@
-import travelExpenseService from './travel_expense.service.js';
+import * as travelExpenseService from './travel_expense.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
 // Get travel expense by expense UUID
 export const getTravelByExpense = async (req, res, next) => {

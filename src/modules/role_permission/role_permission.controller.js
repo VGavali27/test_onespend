@@ -1,4 +1,4 @@
-import rolePermissionService from './role_permission.service.js';
+import * as rolePermissionService from './role_permission.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
 // Get all permissions assigned to a role
 export const getPermissionsByRole = async (req, res, next) => {

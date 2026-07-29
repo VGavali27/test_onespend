@@ -1,4 +1,4 @@
-import expenseCategoryService from './expense_category.service.js';
+import * as expenseCategoryService from './expense_category.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
 // Fetch all expense categories
 export const getAllCategories = async (_req, res, next) => {

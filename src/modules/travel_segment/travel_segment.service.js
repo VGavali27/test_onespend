@@ -1,33 +1,27 @@
-import segmentRepository from './travel_segment.repository.js';
+import * as segmentRepository from './travel_segment.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 const { TravelExpense } = db;
 
-class TravelExpenseSegmentService {
-  async getAll() {
-    return segmentRepository.findAll();
-  }
-  async getByUuid(uuid) {
-    const record = await segmentRepository.findByUuid(uuid);
-    if (!record) throw ApiError.notFound('Segment not found');
-    return record;
-  }
-  async create(data) {
-    const travelExpense = await TravelExpense.findOne({ where: { uuid: data.travel_expense_uuid } });
-    if (!travelExpense) throw ApiError.notFound('Referenced travel expense not found');
-    const { travel_expense_uuid, ...cleanData } = data;
-    return segmentRepository.create({ ...cleanData, travel_expense_id: travelExpense.id });
-  }
-  async update(uuid, data) {
-    const updated = await segmentRepository.update(uuid, data);
-    if (!updated) throw ApiError.notFound('Segment not found');
-    return updated;
-  }
-  async delete(uuid) {
-    const deleted = await segmentRepository.delete(uuid);
-    if (!deleted) throw ApiError.notFound('Segment not found');
-    return { message: 'Segment deleted successfully' };
-  }
-}
-
-export default new TravelExpenseSegmentService();
+export const getAll = async () => segmentRepository.findAll();
+export const getByUuid = async (uuid) => {
+  const r = await segmentRepository.findByUuid(uuid);
+  if (!r) throw ApiError.notFound('Segment not found');
+  return r;
+};
+export const create = async (data) => {
+  const te = await TravelExpense.findOne({ where: { uuid: data.travel_expense_uuid } });
+  if (!te) throw ApiError.notFound('Referenced travel expense not found');
+  const { travel_expense_uuid, ...clean } = data;
+  return segmentRepository.create({ ...clean, travel_expense_id: te.id });
+};
+export const update = async (uuid, data) => {
+  const r = await segmentRepository.update(uuid, data);
+  if (!r) throw ApiError.notFound('Segment not found');
+  return r;
+};
+export const deleteRecord = async (uuid) => {
+  const d = await segmentRepository.deleteRecord(uuid);
+  if (!d) throw ApiError.notFound('Segment not found');
+  return { message: 'Segment deleted successfully' };
+};

@@ -1,4 +1,4 @@
-import permissionService from './permission.service.js';
+import * as permissionService from './permission.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
 // Fetch all permissions
 export const getAllPermissions = async (_req, res, next) => {

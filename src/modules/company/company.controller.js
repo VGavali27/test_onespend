@@ -1,5 +1,6 @@
-import companyService from './company.service.js';
+import * as companyService from './company.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
+
 // Fetch all companies
 export const getAllCompanies = async (_req, res, next) => {
   try {
@@ -43,7 +44,7 @@ export const updateCompany = async (req, res, next) => {
 // Soft delete a company by UUID
 export const deleteCompany = async (req, res, next) => {
   try {
-    const result = await companyService.delete(req.params.uuid);
+    const result = await companyService.deleteRecord(req.params.uuid);
     return ApiResponse.success(res, null, result.message);
   } catch (error) {
     next(error);

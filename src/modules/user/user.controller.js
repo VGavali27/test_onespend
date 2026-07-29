@@ -1,4 +1,4 @@
-import userService from './user.service.js';
+import * as userService from './user.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
 // Fetch all users
 export const getAllUsers = async (_req, res, next) => {

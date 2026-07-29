@@ -1,4 +1,4 @@
-import userEmploymentService from './user_employment.service.js';
+import * as userEmploymentService from './user_employment.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
 // Fetch all employments
 export const getAllEmployments = async (_req, res, next) => {

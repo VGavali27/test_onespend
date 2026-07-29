@@ -1,40 +1,19 @@
 import db from '../../database/models/index.js';
 const { User } = db;
 
-class UserRepository {
-  // Fetch all users ordered by creation date (newest first)
-  async findAll() {
-    return User.findAll({ order: [['createdAt', 'DESC']] });
-  }
-  // Find a user by their UUID
-  async findByUuid(uuid) {
-    return User.findOne({ where: { uuid } });
-  }
-  // Find a user by their primary key ID (internal use)
-  async findById(id) {
-    return User.findByPk(id);
-  }
-  // Find a user by email
-  async findByEmail(email) {
-    return User.scope('withPassword').findOne({ where: { email } });
-  }
-  // Create a new user record
-  async create(data) {
-    return User.create(data);
-  }
-  // Update a user by UUID — returns null if not found
-  async update(uuid, data) {
-    const user = await User.findOne({ where: { uuid } });
-    if (!user) return null;
-    return user.update(data);
-  }
-  // Soft delete a user by UUID — returns false if not found
-  async delete(uuid) {
-    const user = await User.findOne({ where: { uuid } });
-    if (!user) return false;
-    await user.destroy();
-    return true;
-  }
-}
-
-export default new UserRepository();
+export const findAll = async () => User.findAll({ order: [['createdAt', 'DESC']] });
+export const findByUuid = async (uuid) => User.findOne({ where: { uuid } });
+export const findById = async (id) => User.findByPk(id);
+export const findByEmail = async (email) => User.scope('withPassword').findOne({ where: { email } });
+export const create = async (data) => User.create(data);
+export const update = async (uuid, data) => {
+  const user = await User.findOne({ where: { uuid } });
+  if (!user) return null;
+  return user.update(data);
+};
+export const deleteRecord = async (uuid) => {
+  const user = await User.findOne({ where: { uuid } });
+  if (!user) return false;
+  await user.destroy();
+  return true;
+};

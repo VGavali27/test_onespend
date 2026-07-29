@@ -1,55 +1,22 @@
 import db from '../../database/models/index.js';
-const {
-  TravelExpense,
-  TravelExpenseSegment,
-  TravelExpenseAccommodation,
-  TravelExpenseLocalTransport,
-  TravelExpenseForex,
-  TravelExpenseMiscExpense,
-} = db;
+const { TravelExpense, TravelExpenseSegment, TravelExpenseAccommodation,
+  TravelExpenseLocalTransport, TravelExpenseForex, TravelExpenseMiscExpense } = db;
 
-class TravelExpenseRepository {
-  // Find travel expense by expense UUID (via join)
-  async findByExpenseUuid(expenseUuid) {
-    return TravelExpense.findOne({
-      include: [{ model: db.Expense, as: 'expense', where: { uuid: expenseUuid }, required: true }],
-    });
-  }
-  // Find travel expense by its own UUID
-  async findByUuid(uuid) {
-    return TravelExpense.findOne({ where: { uuid } });
-  }
-  // Create travel expense
-  async create(data) {
-    return TravelExpense.create(data);
-  }
-  // Update travel expense by UUID
-  async update(uuid, data) {
-    const travelExpense = await TravelExpense.findOne({ where: { uuid } });
-    if (!travelExpense) return null;
-    return travelExpense.update(data);
-  }
-  // Bulk create child items
-  async bulkCreateSegments(travelExpenseId, items) {
-    const data = items.map((item) => ({ ...item, travel_expense_id: travelExpenseId }));
-    return TravelExpenseSegment.bulkCreate(data);
-  }
-  async bulkCreateAccommodations(travelExpenseId, items) {
-    const data = items.map((item) => ({ ...item, travel_expense_id: travelExpenseId }));
-    return TravelExpenseAccommodation.bulkCreate(data);
-  }
-  async bulkCreateLocalTransports(travelExpenseId, items) {
-    const data = items.map((item) => ({ ...item, travel_expense_id: travelExpenseId }));
-    return TravelExpenseLocalTransport.bulkCreate(data);
-  }
-  async bulkCreateForex(travelExpenseId, items) {
-    const data = items.map((item) => ({ ...item, travel_expense_id: travelExpenseId }));
-    return TravelExpenseForex.bulkCreate(data);
-  }
-  async bulkCreateMiscExpenses(travelExpenseId, items) {
-    const data = items.map((item) => ({ ...item, travel_expense_id: travelExpenseId }));
-    return TravelExpenseMiscExpense.bulkCreate(data);
-  }
-}
+export const findByExpenseUuid = async (expenseUuid) => {
+  return TravelExpense.findOne({
+    include: [{ model: db.Expense, as: 'expense', where: { uuid: expenseUuid }, required: true }],
+  });
+};
 
-export default new TravelExpenseRepository();
+export const findByUuid = async (uuid) => TravelExpense.findOne({ where: { uuid } });
+export const create = async (data) => TravelExpense.create(data);
+export const update = async (uuid, data) => {
+  const te = await TravelExpense.findOne({ where: { uuid } });
+  if (!te) return null;
+  return te.update(data);
+};
+export const bulkCreateSegments = async (id, items) => TravelExpenseSegment.bulkCreate(items.map((i) => ({ ...i, travel_expense_id: id })));
+export const bulkCreateAccommodations = async (id, items) => TravelExpenseAccommodation.bulkCreate(items.map((i) => ({ ...i, travel_expense_id: id })));
+export const bulkCreateLocalTransports = async (id, items) => TravelExpenseLocalTransport.bulkCreate(items.map((i) => ({ ...i, travel_expense_id: id })));
+export const bulkCreateForex = async (id, items) => TravelExpenseForex.bulkCreate(items.map((i) => ({ ...i, travel_expense_id: id })));
+export const bulkCreateMiscExpenses = async (id, items) => TravelExpenseMiscExpense.bulkCreate(items.map((i) => ({ ...i, travel_expense_id: id })));

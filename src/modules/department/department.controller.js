@@ -1,4 +1,4 @@
-import departmentService from './department.service.js';
+import * as departmentService from './department.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
 // Fetch all departments
 export const getAllDepartments = async (_req, res, next) => {
