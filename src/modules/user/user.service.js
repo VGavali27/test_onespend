@@ -3,14 +3,17 @@ import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 const { Role, Company, Department, sequelize } = db;
 
+// Fetch all users
 export const getAll = async () => userRepository.findAll();
 
+// Fetch a single user by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {
   const user = await userRepository.findByUuid(uuid);
   if (!user) throw ApiError.notFound('User not found');
   return user;
 };
 
+// Create a new user with optional employments — all in a transaction
 export const create = async (data) => {
   const role = await Role.findOne({ where: { uuid: data.role_uuid } });
   if (!role) throw ApiError.notFound('Referenced role not found');
@@ -49,6 +52,7 @@ export const create = async (data) => {
   });
 };
 
+// Update a user by UUID — resolves role_uuid / department_uuid if provided
 export const update = async (uuid, data) => {
   const user = await userRepository.findByUuid(uuid);
   if (!user) throw ApiError.notFound('User not found');
@@ -78,6 +82,7 @@ export const update = async (uuid, data) => {
   return user.update(data);
 };
 
+// Soft delete a user by UUID — throws 404 if missing
 export const deleteRecord = async (uuid) => {
   const deleted = await userRepository.deleteRecord(uuid);
   if (!deleted) throw ApiError.notFound('User not found');

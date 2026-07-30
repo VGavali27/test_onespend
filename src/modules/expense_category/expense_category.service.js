@@ -3,14 +3,17 @@ import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 const { Role } = db;
 
+// Fetch all expense categories
 export const getAll = async () => expenseCategoryRepository.findAll();
 
+// Fetch a single category by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {
   const category = await expenseCategoryRepository.findByUuid(uuid);
   if (!category) throw ApiError.notFound('Expense category not found');
   return category;
 };
 
+// Create a new category — resolves role UUIDs, checks code uniqueness
 export const create = async (data) => {
   const firstReceiver = await Role.findOne({ where: { uuid: data.first_receiver_role_uuid } });
   if (!firstReceiver) throw ApiError.notFound('Referenced first receiver role not found');
@@ -26,6 +29,7 @@ export const create = async (data) => {
   });
 };
 
+// Update a category by UUID — resolves role UUIDs if provided
 export const update = async (uuid, data) => {
   const category = await expenseCategoryRepository.findByUuid(uuid);
   if (!category) throw ApiError.notFound('Expense category not found');
@@ -48,6 +52,7 @@ export const update = async (uuid, data) => {
   return category.update(data);
 };
 
+// Soft delete a category by UUID
 export const deleteRecord = async (uuid) => {
   const deleted = await expenseCategoryRepository.deleteRecord(uuid);
   if (!deleted) throw ApiError.notFound('Expense category not found');

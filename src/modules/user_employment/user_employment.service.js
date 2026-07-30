@@ -3,20 +3,24 @@ import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 const { User, Company, UserEmployment } = db;
 
+// Fetch all employments
 export const getAll = async () => userEmploymentRepository.findAll();
 
+// Fetch employments for a specific user by user UUID
 export const getByUserUuid = async (userUuid) => {
   const user = await User.findOne({ where: { uuid: userUuid } });
   if (!user) throw ApiError.notFound('User not found');
   return userEmploymentRepository.findByUserId(user.id);
 };
 
+// Fetch a single employment by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {
   const employment = await userEmploymentRepository.findByUuid(uuid);
   if (!employment) throw ApiError.notFound('Employment not found');
   return employment;
 };
 
+// Create a new employment — resolves UUIDs to IDs, checks employee_code uniqueness
 export const create = async (data) => {
   const user = await User.findOne({ where: { uuid: data.user_uuid } });
   if (!user) throw ApiError.notFound('Referenced user not found');
@@ -37,13 +41,12 @@ export const create = async (data) => {
 
   const { user_uuid, company_uuid, reporting_manager_employment_uuid, ...cleanData } = data;
   return userEmploymentRepository.create({
-    ...cleanData,
-    user_id: user.id,
-    company_id: company.id,
+    ...cleanData, user_id: user.id, company_id: company.id,
     reporting_manager_employment_id: reportingManagerId,
   });
 };
 
+// Update an employment by UUID — resolves UUIDs if provided
 export const update = async (uuid, data) => {
   const employment = await userEmploymentRepository.findByUuid(uuid);
   if (!employment) throw ApiError.notFound('Employment not found');
@@ -73,6 +76,7 @@ export const update = async (uuid, data) => {
   return employment.update(data);
 };
 
+// Soft delete an employment by UUID — throws 404 if missing
 export const deleteRecord = async (uuid) => {
   const deleted = await userEmploymentRepository.deleteRecord(uuid);
   if (!deleted) throw ApiError.notFound('Employment not found');
