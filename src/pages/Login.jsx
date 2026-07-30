@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { auth } from '../services/api';
 import { DollarSign, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
@@ -16,8 +15,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await auth.login(email, password);
-      login(data.data.token, data.data.user);
+      await login(email, password);
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
@@ -86,11 +84,13 @@ export default function Login() {
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
-        </form>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Demo: superadmin@kingsgroup.com / Admin@123
-        </p>
+          <div className="text-center text-xs text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-800">
+            <p className="mb-1 font-medium text-gray-500 dark:text-gray-400">Demo credentials:</p>
+            <p>superadmin@kingsgroup.com / Admin@123</p>
+            <p className="mt-1">cfo@kingsgroup.com / Admin@123</p>
+          </div>
+        </form>
       </div>
     </div>
   );

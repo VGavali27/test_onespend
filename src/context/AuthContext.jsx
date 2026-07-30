@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { mockLogin } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -9,15 +10,16 @@ export function AuthProvider({ children }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    if (token && savedUser) {
+    if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
     setLoading(false);
   }, []);
 
-  const login = (token, userData) => {
+  const login = async (email, password) => {
+    const { data } = await mockLogin(email, password);
+    const { token, user: userData } = data.data;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
