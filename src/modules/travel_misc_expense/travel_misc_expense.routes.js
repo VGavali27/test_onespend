@@ -1,10 +1,11 @@
 import { Router } from 'express';
-
 import * as travelMiscExpenseController from './travel_misc_expense.controller.js';
-
 import validate from '../../middleware/validate.js';
-
+import { authMiddleware } from '../../middleware/auth.js';
 import { createMiscExpenseSchema, updateMiscExpenseSchema } from './travel_misc_expense.validation.js';
+
+const router = Router();
+router.use(authMiddleware);
 
 const router = Router();
 

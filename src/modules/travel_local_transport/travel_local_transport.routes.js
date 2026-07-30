@@ -1,10 +1,11 @@
 import { Router } from 'express';
-
 import * as travelLocalTransportController from './travel_local_transport.controller.js';
-
 import validate from '../../middleware/validate.js';
-
+import { authMiddleware } from '../../middleware/auth.js';
 import { createLocalTransportSchema, updateLocalTransportSchema } from './travel_local_transport.validation.js';
+
+const router = Router();
+router.use(authMiddleware);
 
 const router = Router();
 

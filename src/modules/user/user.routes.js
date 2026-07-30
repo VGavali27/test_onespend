@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import * as userController from './user.controller.js';
 import validate from '../../middleware/validate.js';
+import { authMiddleware } from '../../middleware/auth.js';
 import { createUserSchema, updateUserSchema } from './user.validation.js';
+
 const router = Router();
+router.use(authMiddleware);
 // List all users
 router.get('/', userController.getAllUsers);
 // Get a single user by UUID

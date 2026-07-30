@@ -1,10 +1,11 @@
 import { Router } from 'express';
-
 import * as travelSegmentController from './travel_segment.controller.js';
-
 import validate from '../../middleware/validate.js';
-
+import { authMiddleware } from '../../middleware/auth.js';
 import { createSegmentSchema, updateSegmentSchema } from './travel_segment.validation.js';
+
+const router = Router();
+router.use(authMiddleware);
 
 const router = Router();
 

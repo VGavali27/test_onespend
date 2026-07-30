@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import * as departmentController from './department.controller.js';
 import validate from '../../middleware/validate.js';
+import { authMiddleware } from '../../middleware/auth.js';
 import { createDepartmentSchema, updateDepartmentSchema } from './department.validation.js';
 const router = Router();
+router.use(authMiddleware);
 // List all departments
 router.get('/', departmentController.getAllDepartments);
 // Get a single department by UUID

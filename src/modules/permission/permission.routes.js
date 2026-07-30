@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import * as permissionController from './permission.controller.js';
 import validate from '../../middleware/validate.js';
+import { authMiddleware } from '../../middleware/auth.js';
 import { createPermissionSchema, updatePermissionSchema } from './permission.validation.js';
 const router = Router();
+router.use(authMiddleware);
 // List all permissions
 router.get('/', permissionController.getAllPermissions);
 // Get a single permission by UUID

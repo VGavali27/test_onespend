@@ -1,10 +1,11 @@
 import { Router } from 'express';
-
 import * as travelAccommodationController from './travel_accommodation.controller.js';
-
 import validate from '../../middleware/validate.js';
-
+import { authMiddleware } from '../../middleware/auth.js';
 import { createAccommodationSchema, updateAccommodationSchema } from './travel_accommodation.validation.js';
+
+const router = Router();
+router.use(authMiddleware);
 
 const router = Router();
 

@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import * as expenseCategoryController from './expense_category.controller.js';
 import validate from '../../middleware/validate.js';
+import { authMiddleware } from '../../middleware/auth.js';
 import { createExpenseCategorySchema, updateExpenseCategorySchema } from './expense_category.validation.js';
 const router = Router();
+router.use(authMiddleware);
 // List all expense categories
 router.get('/', expenseCategoryController.getAllCategories);
 // Get a single category by UUID

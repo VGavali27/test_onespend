@@ -1,10 +1,11 @@
 import { Router } from 'express';
-
 import * as travelForexController from './travel_forex.controller.js';
-
 import validate from '../../middleware/validate.js';
-
+import { authMiddleware } from '../../middleware/auth.js';
 import { createForexSchema, updateForexSchema } from './travel_forex.validation.js';
+
+const router = Router();
+router.use(authMiddleware);
 
 const router = Router();
 
