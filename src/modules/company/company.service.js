@@ -4,6 +4,7 @@ import ApiError from '../../utils/ApiError.js';
 const { Group } = db;
 
 // Fetch all companies
+// Fetch all companies
 export const getAll = async () => companyRepository.findAll();
 
 // Fetch a single company by UUID — throws 404 if missing

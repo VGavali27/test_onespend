@@ -4,12 +4,14 @@ import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 const { ExpenseCategory, Company, User, UserEmployment, sequelize } = db;
 
+// Get travel expense by associated expense UUID
 export const getByExpenseUuid = async (expenseUuid) => {
   const te = await travelExpenseRepository.findByExpenseUuid(expenseUuid);
   if (!te) throw ApiError.notFound('Travel expense not found');
   return te;
 };
 
+// Create expense with travel and all child items in one transaction
 export const createWithTravel = async (data) => {
   const category = await ExpenseCategory.findOne({ where: { uuid: data.category_uuid } });
   if (!category) throw ApiError.notFound('Referenced expense category not found');
@@ -69,6 +71,7 @@ export const createWithTravel = async (data) => {
   });
 };
 
+// Update travel expense by UUID
 export const update = async (uuid, data) => {
   const updated = await travelExpenseRepository.update(uuid, data);
   if (!updated) throw ApiError.notFound('Travel expense not found');

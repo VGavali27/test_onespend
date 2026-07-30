@@ -18,7 +18,10 @@ export const assign = async (roleId, permissionIds) => {
   const newIds = permissionIds.filter((pid) => !existing.includes(pid));
   if (newIds.length === 0) return [];
   const records = newIds.map((permissionId) => ({
-    role_id: roleId, permission_id: permissionId, created_at: new Date(), updated_at: new Date(),
+    role_id: roleId,
+    permission_id: permissionId,
+    created_at: new Date(),
+    updated_at: new Date(),
   }));
   await RolePermission.bulkCreate(records);
   return newIds;
@@ -38,7 +41,10 @@ export const sync = async (roleId, permissionIds) => {
   }
   if (toAdd.length > 0) {
     const records = toAdd.map((permissionId) => ({
-      role_id: roleId, permission_id: permissionId, created_at: new Date(), updated_at: new Date(),
+      role_id: roleId,
+      permission_id: permissionId,
+      created_at: new Date(),
+      updated_at: new Date(),
     }));
     await RolePermission.bulkCreate(records);
   }

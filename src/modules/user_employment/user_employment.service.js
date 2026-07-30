@@ -37,7 +37,9 @@ export const create = async (data) => {
 
   const { user_uuid, company_uuid, reporting_manager_employment_uuid, ...cleanData } = data;
   return userEmploymentRepository.create({
-    ...cleanData, user_id: user.id, company_id: company.id,
+    ...cleanData,
+    user_id: user.id,
+    company_id: company.id,
     reporting_manager_employment_id: reportingManagerId,
   });
 };

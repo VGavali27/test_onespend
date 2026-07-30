@@ -19,7 +19,11 @@ export const create = async (data) => {
   const existing = await expenseCategoryRepository.findByCode(data.code);
   if (existing) throw ApiError.conflict('Category code already exists');
   const { first_receiver_role_uuid, final_approver_role_uuid, ...cleanData } = data;
-  return expenseCategoryRepository.create({ ...cleanData, first_receiver_role_id: firstReceiver.id, final_approver_role_id: finalApprover.id });
+  return expenseCategoryRepository.create({
+    ...cleanData,
+    first_receiver_role_id: firstReceiver.id,
+    final_approver_role_id: finalApprover.id,
+  });
 };
 
 export const update = async (uuid, data) => {

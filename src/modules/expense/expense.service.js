@@ -3,6 +3,7 @@ import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 const { ExpenseCategory, Company, User, UserEmployment, sequelize } = db;
 
+// Generate expense number: EXP-YYYYMMDD-XXXX
 const generateExpenseNumber = async () => {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -16,14 +17,17 @@ const generateExpenseNumber = async () => {
   return `EXP-${dateStr}-${String(seq).padStart(4, '0')}`;
 };
 
+// Fetch all expenses
 export const getAll = async () => expenseRepository.findAll();
 
+// Fetch a single expense by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {
   const expense = await expenseRepository.findByUuid(uuid);
   if (!expense) throw ApiError.notFound('Expense not found');
   return expense;
 };
 
+// Create an expense — handles nested module data based on category (travel, etc.)
 export const create = async (data) => {
   const category = await ExpenseCategory.findOne({ where: { uuid: data.category_uuid } });
   if (!category) throw ApiError.notFound('Referenced expense category not found');
@@ -93,6 +97,7 @@ export const create = async (data) => {
   });
 };
 
+// Update an expense by UUID — only allowed in DRAFT status
 export const update = async (uuid, data) => {
   const expense = await expenseRepository.findByUuid(uuid);
   if (!expense) throw ApiError.notFound('Expense not found');
@@ -110,6 +115,7 @@ export const update = async (uuid, data) => {
   return expense.update(data);
 };
 
+// Soft delete an expense by UUID
 export const deleteRecord = async (uuid) => {
   const deleted = await expenseRepository.deleteRecord(uuid);
   if (!deleted) throw ApiError.notFound('Expense not found');

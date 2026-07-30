@@ -1,7 +1,13 @@
 import db from '../../database/models/index.js';
 const { Role } = db;
 
-export const findAll = async () => Role.findAll({ order: [['level', 'ASC'], ['createdAt', 'DESC']] });
+export const findAll = async () =>
+  Role.findAll({
+    order: [
+      ['level', 'ASC'],
+      ['createdAt', 'DESC'],
+    ],
+  });
 export const findByUuid = async (uuid) => Role.findOne({ where: { uuid } });
 export const findByCode = async (code) => Role.findOne({ where: { code } });
 export const create = async (data) => Role.create(data);

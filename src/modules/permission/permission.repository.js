@@ -1,7 +1,13 @@
 import db from '../../database/models/index.js';
 const { Permission } = db;
 
-export const findAll = async () => Permission.findAll({ order: [['resource', 'ASC'], ['action', 'ASC']] });
+export const findAll = async () =>
+  Permission.findAll({
+    order: [
+      ['resource', 'ASC'],
+      ['action', 'ASC'],
+    ],
+  });
 export const findByUuid = async (uuid) => Permission.findOne({ where: { uuid } });
 export const findByKey = async (permissionKey) => Permission.findOne({ where: { permission_key: permissionKey } });
 export const create = async (data) => Permission.create(data);
