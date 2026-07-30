@@ -1,19 +1,21 @@
 import * as expenseService from './expense.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
-// Fetch all expenses
-export const getAllExpenses = async (_req, res, next) => {
+// Fetch all expenses — add ?decrypt=true to decrypt amounts
+export const getAllExpenses = async (req, res, next) => {
   try {
-    const expenses = await expenseService.getAll();
+    const decrypt = req.query.decrypt === 'true';
+    const expenses = await expenseService.getAll(decrypt);
     return ApiResponse.success(res, expenses, 'Expenses fetched successfully');
   } catch (error) {
     next(error);
   }
 };
 
-// Fetch a single expense by UUID
+// Fetch a single expense by UUID — add ?decrypt=true to decrypt amounts
 export const getExpenseByUuid = async (req, res, next) => {
   try {
-    const expense = await expenseService.getByUuid(req.params.uuid);
+    const decrypt = req.query.decrypt === 'true';
+    const expense = await expenseService.getByUuid(req.params.uuid, decrypt);
     return ApiResponse.success(res, expense, 'Expense fetched successfully');
   } catch (error) {
     next(error);

@@ -1,4 +1,4 @@
-import { encryptAmounts, decryptAmounts } from '../../utils/encryption.js';
+import { encryptAmounts } from '../../utils/encryption.js';
 
 export default (sequelize, DataTypes) => {
   const TravelExpenseSegment = sequelize.define(
@@ -37,12 +37,6 @@ export default (sequelize, DataTypes) => {
       hooks: {
         beforeCreate: (instance) => { encryptAmounts(instance.dataValues); },
         beforeUpdate: (instance) => { encryptAmounts(instance.dataValues); },
-        afterFind: (result) => {
-          if (result) {
-            const rows = Array.isArray(result) ? result : [result];
-            rows.forEach((row) => decryptAmounts(row.dataValues));
-          }
-        },
       },
     },
   );

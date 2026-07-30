@@ -1,6 +1,7 @@
 import * as expenseRepository from './expense.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
+import { decryptAmounts } from '../../utils/encryption.js';
 const { ExpenseCategory, Company, User, UserEmployment, sequelize } = db;
 
 // Generate expense number: EXP-YYYYMMDD-XXXX
@@ -17,14 +18,28 @@ const generateExpenseNumber = async () => {
   return `EXP-${dateStr}-${String(seq).padStart(4, '0')}`;
 };
 
-// Fetch all expenses
-export const getAll = async () => expenseRepository.findAll();
+// Decrypt amount fields in an expense object or array (mutates in place)
+export const decryptResults = (data) => {
+  if (!data) return data;
+  const items = Array.isArray(data) ? data : [data];
+  items.forEach((item) => {
+    if (item?.dataValues) decryptAmounts(item.dataValues);
+    else if (item) decryptAmounts(item);
+  });
+  return data;
+};
 
-// Fetch a single expense by UUID — throws 404 if missing
-export const getByUuid = async (uuid) => {
+// Fetch all expenses — pass decrypt=true to decrypt amounts
+export const getAll = async (decrypt = false) => {
+  const results = await expenseRepository.findAll();
+  return decrypt ? decryptResults(results) : results;
+};
+
+// Fetch a single expense by UUID — pass decrypt=true to decrypt amounts
+export const getByUuid = async (uuid, decrypt = false) => {
   const expense = await expenseRepository.findByUuid(uuid);
   if (!expense) throw ApiError.notFound('Expense not found');
-  return expense;
+  return decrypt ? decryptResults(expense) : expense;
 };
 
 // Create an expense — handles nested module data based on category (travel, etc.)
@@ -55,42 +70,75 @@ export const create = async (data) => {
     travelChildFields.misc_expenses = data.misc_expenses || [];
   }
 
-  const { category_uuid, company_uuid, requested_by_user_uuid,
-    travel_type, purpose, travel_start_date, travel_end_date, total_travellers, notes,
-    segments, accommodations, local_transports, forex, misc_expenses,
-    ...expenseData } = data;
+  const {
+    category_uuid,
+    company_uuid,
+    requested_by_user_uuid,
+    travel_type,
+    purpose,
+    travel_start_date,
+    travel_end_date,
+    total_travellers,
+    notes,
+    segments,
+    accommodations,
+    local_transports,
+    forex,
+    misc_expenses,
+    ...expenseData
+  } = data;
 
   return sequelize.transaction(async (t) => {
-    const expense = await db.Expense.create({
-      ...expenseData, expense_number: expenseNumber,
-      category_id: category.id, company_id: company.id,
-      requested_by_employment_id: employment.id, status: 'DRAFT',
-    }, { transaction: t });
+    const expense = await db.Expense.create(
+      {
+        ...expenseData,
+        expense_number: expenseNumber,
+        category_id: category.id,
+        company_id: company.id,
+        requested_by_employment_id: employment.id,
+        status: 'DRAFT',
+      },
+      { transaction: t },
+    );
 
     if (category.module === 'travel' && travelFields.travel_type) {
-      const travelExpense = await db.TravelExpense.create({
-        expense_id: expense.id, ...travelFields,
-      }, { transaction: t });
+      const travelExpense = await db.TravelExpense.create(
+        {
+          expense_id: expense.id,
+          ...travelFields,
+        },
+        { transaction: t },
+      );
 
       if (travelChildFields.segments.length > 0) {
         await db.TravelExpenseSegment.bulkCreate(
-          travelChildFields.segments.map((s) => ({ ...s, travel_expense_id: travelExpense.id })), { transaction: t });
+          travelChildFields.segments.map((s) => ({ ...s, travel_expense_id: travelExpense.id })),
+          { transaction: t },
+        );
       }
       if (travelChildFields.accommodations.length > 0) {
         await db.TravelExpenseAccommodation.bulkCreate(
-          travelChildFields.accommodations.map((a) => ({ ...a, travel_expense_id: travelExpense.id })), { transaction: t });
+          travelChildFields.accommodations.map((a) => ({ ...a, travel_expense_id: travelExpense.id })),
+          { transaction: t },
+        );
       }
       if (travelChildFields.local_transports.length > 0) {
         await db.TravelExpenseLocalTransport.bulkCreate(
-          travelChildFields.local_transports.map((lt) => ({ ...lt, travel_expense_id: travelExpense.id })), { transaction: t });
+          travelChildFields.local_transports.map((lt) => ({ ...lt, travel_expense_id: travelExpense.id })),
+          { transaction: t },
+        );
       }
       if (travelChildFields.forex.length > 0) {
         await db.TravelExpenseForex.bulkCreate(
-          travelChildFields.forex.map((f) => ({ ...f, travel_expense_id: travelExpense.id })), { transaction: t });
+          travelChildFields.forex.map((f) => ({ ...f, travel_expense_id: travelExpense.id })),
+          { transaction: t },
+        );
       }
       if (travelChildFields.misc_expenses.length > 0) {
         await db.TravelExpenseMiscExpense.bulkCreate(
-          travelChildFields.misc_expenses.map((m) => ({ ...m, travel_expense_id: travelExpense.id })), { transaction: t });
+          travelChildFields.misc_expenses.map((m) => ({ ...m, travel_expense_id: travelExpense.id })),
+          { transaction: t },
+        );
       }
     }
     return expense;
@@ -105,12 +153,14 @@ export const update = async (uuid, data) => {
   if (data.category_uuid) {
     const category = await ExpenseCategory.findOne({ where: { uuid: data.category_uuid } });
     if (!category) throw ApiError.notFound('Referenced expense category not found');
-    data.category_id = category.id; delete data.category_uuid;
+    data.category_id = category.id;
+    delete data.category_uuid;
   }
   if (data.company_uuid) {
     const company = await Company.findOne({ where: { uuid: data.company_uuid } });
     if (!company) throw ApiError.notFound('Referenced company not found');
-    data.company_id = company.id; delete data.company_uuid;
+    data.company_id = company.id;
+    delete data.company_uuid;
   }
   return expense.update(data);
 };
