@@ -14,9 +14,11 @@ import travelAccommodationRoutes from '../modules/travel_accommodation/travel_ac
 import travelLocalTransportRoutes from '../modules/travel_local_transport/travel_local_transport.routes.js';
 import travelForexRoutes from '../modules/travel_forex/travel_forex.routes.js';
 import travelMiscExpenseRoutes from '../modules/travel_misc_expense/travel_misc_expense.routes.js';
+import authRoutes from '../modules/auth/auth.routes.js';
 
 const router = Router();
 
+router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/companies', companyRoutes);
 router.use('/departments', departmentRoutes);

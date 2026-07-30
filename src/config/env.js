@@ -16,8 +16,13 @@ const env = {
 
   corsOrigin: process.env.CORS_ORIGIN || '*',
 
-  // 64-char hex key for AES-256-CBC encryption (generate with: crypto.randomBytes(32).toString('hex'))
+  // 64-char hex key for AES-256-CBC encryption
   encryptionKey: process.env.ENCRYPTION_KEY,
+
+  jwt: {
+    secret: process.env.JWT_SECRET || 'default-jwt-secret-change-me',
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+  },
 
   get isDev() {
     return this.nodeEnv === 'development';
