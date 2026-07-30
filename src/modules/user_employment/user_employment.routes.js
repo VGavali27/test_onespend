@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import * as userEmploymentController from './user_employment.controller.js';
 import validate from '../../middleware/validate.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authMiddleware, requireRole } from '../../middleware/auth.js';
 import { createUserEmploymentSchema, updateUserEmploymentSchema } from './user_employment.validation.js';
 
 const router = Router();
 router.use(authMiddleware);
+router.use(requireRole('SUPER_ADMIN', 'ADMIN_MGR'));
 // List all employments
 router.get('/', userEmploymentController.getAllEmployments);
 // List employments for a specific user by user UUID
