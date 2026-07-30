@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { DollarSign, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Wallet, Loader2, Eye, EyeOff, Sparkles, Shield } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
@@ -17,80 +17,144 @@ export default function Login() {
     try {
       await login(email, password);
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      setError(err.response?.data?.message || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-blue-600 mb-4">
-            <DollarSign className="h-7 w-7 text-white" />
+    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-950">
+      {/* Left — Brand Panel */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500">
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: `radial-gradient(circle at 25% 25%, white 1px, transparent 1px),
+                            radial-gradient(circle at 75% 75%, white 1px, transparent 1px)`,
+          backgroundSize: '60px 60px'
+        }} />
+        <div className="absolute top-20 -left-20 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -right-20 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
+        <div className="relative z-10 flex flex-col justify-center px-16">
+          <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center mb-8 border border-white/10">
+            <Wallet className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">ExpensePro</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Sign in to your account</p>
+          <h1 className="text-4xl font-bold text-white leading-tight mb-4">
+            Enterprise<br />Expense Management
+          </h1>
+          <p className="text-lg text-white/70 leading-relaxed max-w-md">
+            Streamline your organization's expense tracking, approvals, and reporting all in one place.
+          </p>
+          <div className="flex items-center gap-6 mt-10">
+            <div className="flex items-center gap-2 text-white/60 text-sm">
+              <Shield className="h-4 w-4" />
+              <span>Enterprise Grade</span>
+            </div>
+            <div className="flex items-center gap-2 text-white/60 text-sm">
+              <Sparkles className="h-4 w-4" />
+              <span>AI Powered</span>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
-          {error && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400">
-              {error}
+      {/* Right — Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm animate-fade-in">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="inline-flex w-14 h-14 rounded-2xl gradient-brand items-center justify-center mb-4 shadow-lg shadow-indigo-500/20">
+              <Wallet className="h-7 w-7 text-white" />
             </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-              required
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
-            />
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">ExpensePro</h1>
+            <p className="text-sm text-gray-400 mt-1">Sign in to your account</p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
-            <div className="relative">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="text-center lg:text-left">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Welcome back</h2>
+              <p className="text-sm text-gray-400 mt-1">Enter your credentials to continue</p>
+            </div>
+
+            {error && (
+              <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 flex items-start gap-2.5 animate-scale-in">
+                <div className="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-red-500 text-[10px] font-bold">!</span>
+                </div>
+                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email address</label>
               <input
-                type={showPw ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@company.com"
                 required
-                className="w-full px-3 py-2.5 pr-10 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                className="w-full px-3.5 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-all text-sm"
               />
-              <button
-                type="button"
-                onClick={() => setShowPw(!showPw)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                <button type="button" className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400">
+                  Forgot?
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  className="w-full px-3.5 py-3 pr-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-all text-sm"
+                />
+                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
 
-          <div className="text-center text-xs text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-800">
-            <p className="mb-1 font-medium text-gray-500 dark:text-gray-400">Demo credentials:</p>
-            <p>superadmin@kingsgroup.com / Admin@123</p>
-            <p className="mt-1">cfo@kingsgroup.com / Admin@123</p>
-          </div>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 px-4 gradient-brand hover:opacity-90 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2.5"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100 dark:border-gray-800" /></div>
+              <div className="relative flex justify-center"><span className="px-3 text-xs text-gray-400 bg-white dark:bg-gray-900">Demo Credentials</span></div>
+            </div>
+
+            <div className="space-y-2">
+              {[
+                { role: 'Super Admin', email: 'superadmin@kingsgroup.com' },
+                { role: 'CFO', email: 'cfo@kingsgroup.com' },
+              ].map(({ role, email: e }) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => { setEmail(e); setPassword('Admin@123'); }}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{role[0]}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{role}</p>
+                    <p className="text-xs text-gray-400">{e}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
