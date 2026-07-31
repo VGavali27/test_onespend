@@ -4,7 +4,7 @@ import db from '../../database/models/index.js';
 import env from '../../config/env.js';
 import ApiError from '../../utils/ApiError.js';
 
-const { User, Role, UserEmployment } = db;
+const { User, Role } = db;
 
 // Login — verify credentials, generate JWT
 export const login = async (email, password) => {
@@ -17,13 +17,6 @@ export const login = async (email, password) => {
   // Get role info
   const role = await Role.findByPk(user.role_id);
   if (!role) throw ApiError.unauthorized('User role not found');
-
-  // Get all active employments (user may belong to multiple companies)
-  const employments = await UserEmployment.findAll({
-    where: { user_id: user.id, status: 'ACTIVE' },
-    attributes: ['id', 'uuid', 'company_id', 'employee_code', 'designation'],
-    raw: true,
-  });
 
   // JWT contains only identity — employment/company context is resolved per-request
   const payload = {
@@ -45,6 +38,5 @@ export const login = async (email, password) => {
       department_id: user.department_id,
       role: role.code,
     },
-    employments,
   };
 };
