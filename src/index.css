@@ -94,6 +94,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Interactive elements show pointer cursor */
+button, a, [role="button"], label, input[type="checkbox"], input[type="radio"], select {
+  cursor: pointer;
+}
+input[type="text"], input[type="email"], input[type="password"], input[type="search"], textarea {
+  cursor: text;
+}
+
 /* ── Utilities ── */
 .gradient-brand {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);

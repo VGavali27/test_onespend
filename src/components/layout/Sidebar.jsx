@@ -1,49 +1,92 @@
-import { NavLink } from 'react-router-dom';
-import {
-  LayoutDashboard, Wallet, Building2, Users, Settings, LogOut,
-  Menu, X, BarChart3, HelpCircle, ChevronDown, Shield,
-} from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { Wallet, LogOut, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useState } from 'react';
+import { menuConfig } from '../../data/menuConfig';
 
-const navSections = [
-  {
-    label: 'Overview',
-    items: [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/expenses', icon: Wallet, label: 'Expenses' },
-      { to: '/reports', icon: BarChart3, label: 'Reports' },
-    ],
-  },
-  {
-    label: 'Management',
-    items: [
-      { to: '/companies', icon: Building2, label: 'Companies' },
-      { to: '/users', icon: Users, label: 'Users' },
-    ],
-  },
-  {
-    label: 'Settings',
-    items: [
-      { to: '/settings', icon: Settings, label: 'Settings' },
-      { to: '/help', icon: HelpCircle, label: 'Help' },
-    ],
-  },
-];
+const hasAccess = (roles, userRole) => {
+  if (!userRole) return false;
+  if (roles.includes('*') || roles.includes(userRole)) return true;
+  return false;
+};
+
+// Single leaf nav link
+function LeafItem({ item, onNavigate }) {
+  const Icon = item.icon;
+  return (
+    <NavLink to={item.to} onClick={onNavigate} className="block">
+      {({ isActive }) => (
+        <span
+          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+            isActive
+              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800'
+          }`}
+        >
+          <Icon className="h-4.5 w-4.5 flex-shrink-0" />
+          <span className="truncate">{item.label}</span>
+          {isActive && <span className="ml-auto w-1 h-4 bg-indigo-500 rounded-full" />}
+        </span>
+      )}
+    </NavLink>
+  );
+}
+
+// Parent item with collapsible children
+function ParentItem({ item, onNavigate, openMenus, toggleMenu }) {
+  const Icon = item.icon;
+  const isOpen = openMenus.includes(item.id);
+  const location = useLocation();
+  const hasActiveChild = item.children?.some((c) => location.pathname.startsWith(c.to));
+
+  return (
+    <div>
+      <button
+        onClick={() => toggleMenu(item.id)}
+        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+          hasActiveChild
+            ? 'text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
+            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800'
+        }`}
+      >
+        <Icon className="h-4.5 w-4.5 flex-shrink-0" />
+        <span className="flex-1 text-left truncate">{item.label}</span>
+        <ChevronDown
+          className={`h-4 w-4 transition-transform duration-200 ${isOpen || hasActiveChild ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {(isOpen || hasActiveChild) && (
+        <div className="mt-1 ml-4 pl-3 border-l border-slate-200 dark:border-gray-700 space-y-0.5 animate-slide-in">
+          {item.children.map((child) => (
+            <LeafItem key={child.id} item={{ ...child, icon: ChevronRight }} onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openMenus, setOpenMenus] = useState([]);
+
+  const toggleMenu = (id) => {
+    setOpenMenus((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
+  };
+
+  const visibleMenus = menuConfig.filter((item) => hasAccess(item.roles, user?.role));
 
   return (
     <>
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="fixed top-4 left-4 z-50 lg:hidden p-2 rounded-lg bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700"
+        className="fixed top-4 left-4 z-50 lg:hidden p-2 rounded-lg bg-white dark:bg-gray-800 shadow-sm border border-slate-200 dark:border-gray-700"
         aria-label="Toggle menu"
       >
-        {mobileOpen ? <X className="h-5 w-5 text-gray-600 dark:text-gray-300" /> : <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />}
+        {mobileOpen ? <X className="h-5 w-5 text-slate-600 dark:text-gray-300" /> : <Menu className="h-5 w-5 text-slate-600 dark:text-gray-300" />}
       </button>
 
       {mobileOpen && (
@@ -54,66 +97,52 @@ export default function Sidebar() {
       <aside
         className={`
           fixed top-0 left-0 z-40 h-full w-64
-          bg-[#0f172a] dark:bg-gray-950
-          border-r border-[#1e293b]
+          bg-white dark:bg-gray-900
+          border-r border-slate-200 dark:border-gray-800
           transform transition-transform duration-300
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
           flex flex-col
         `}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 h-16 border-b border-[#1e293b]">
-          <div className="w-8 h-8 rounded-lg bg-[#6366f1] flex items-center justify-center">
+        <div className="flex items-center gap-3 px-5 h-16 border-b border-slate-200 dark:border-gray-800">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
             <Wallet className="h-4.5 w-4.5 text-white" />
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-[15px] text-white tracking-tight">FinTrack</span>
-            <span className="px-1.5 py-0.5 text-[9px] font-medium text-[#818cf8] bg-[#6366f1]/10 rounded">PRO</span>
+            <span className="font-semibold text-[15px] text-slate-900 dark:text-white tracking-tight">FinTrack</span>
+            <span className="px-1.5 py-0.5 text-[9px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded">PRO</span>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
-          {navSections.map((section) => (
-            <div key={section.label}>
-              <p className="px-3 mb-2 text-[10px] font-semibold text-[#64748b] uppercase tracking-[0.12em]">
-                {section.label}
-              </p>
-              <div className="space-y-0.5">
-                {section.items.map(({ to, icon: Icon, label }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    onClick={() => setMobileOpen(false)}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-colors ${
-                        isActive
-                          ? 'bg-[#6366f1]/10 text-[#a5b4fc]'
-                          : 'text-[#94a3b8] hover:text-white hover:bg-white/5'
-                      }`
-                    }
-                  >
-                    <Icon className="h-4.5 w-4.5" />
-                    <span>{label}</span>
-                    {isActive && <span className="ml-auto w-1 h-4 bg-[#6366f1] rounded-full" />}
-                  </NavLink>
-                ))}
-              </div>
-            </div>
-          ))}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {visibleMenus.map((item) =>
+            item.children ? (
+              <ParentItem
+                key={item.id}
+                item={item}
+                onNavigate={() => setMobileOpen(false)}
+                openMenus={openMenus}
+                toggleMenu={toggleMenu}
+              />
+            ) : (
+              <LeafItem key={item.id} item={item} onNavigate={() => setMobileOpen(false)} />
+            ),
+          )}
         </nav>
 
         {/* User */}
-        <div className="px-3 py-4 border-t border-[#1e293b]">
+        <div className="px-3 py-4 border-t border-slate-200 dark:border-gray-800">
           <div className="flex items-center gap-3 px-2">
-            <div className="w-9 h-9 rounded-full bg-[#334155] flex items-center justify-center text-sm font-medium text-white">
+            <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-gray-700 flex items-center justify-center text-sm font-medium text-slate-700 dark:text-white">
               {user?.first_name?.[0] || 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-white truncate">{user?.first_name} {user?.last_name}</p>
-              <p className="text-[11px] text-[#64748b] truncate">{user?.role || 'Administrator'}</p>
+              <p className="text-[13px] font-medium text-slate-900 dark:text-white truncate">{user?.first_name} {user?.last_name}</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{user?.role || 'Administrator'}</p>
             </div>
-            <button onClick={logout} className="text-[#64748b] hover:text-white transition-colors" title="Sign out">
+            <button onClick={logout} className="text-slate-400 dark:text-slate-500 hover:text-red-500 transition-colors" title="Sign out">
               <LogOut className="h-4 w-4" />
             </button>
           </div>

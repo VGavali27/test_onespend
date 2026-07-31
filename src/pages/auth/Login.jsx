@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { Wallet, Loader2, Eye, EyeOff, Sparkles, Shield } from 'lucide-react';
 
 export default function Login() {
