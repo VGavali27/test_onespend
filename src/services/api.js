@@ -1,6 +1,6 @@
 // Mock API service — replace with real API calls when backend is ready
 // import axios from 'axios';
-// const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api' });
+// const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1' });
 
 const MOCK_USERS = [
   { email: 'superadmin@kingsgroup.com', password: 'Admin@123', role: 'SUPER_ADMIN', first_name: 'Super', last_name: 'Admin' },
