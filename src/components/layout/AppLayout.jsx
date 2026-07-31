@@ -5,9 +5,11 @@ import Navbar from './Navbar';
 const pageTitles = {
   '/dashboard': 'Dashboard',
   '/expenses': 'Expenses',
+  '/reports': 'Reports',
   '/companies': 'Companies',
   '/users': 'Users',
   '/settings': 'Settings',
+  '/help': 'Help',
 };
 
 export default function AppLayout() {
@@ -15,7 +17,7 @@ export default function AppLayout() {
   const title = pageTitles[path] || 'Overview';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-gray-950">
       <Sidebar />
       <div className="lg:pl-64">
         <Navbar title={title} />
