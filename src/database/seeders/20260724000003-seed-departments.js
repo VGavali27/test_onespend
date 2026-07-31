@@ -1,8 +1,8 @@
 /**
  * Seeder: Insert demo departments
  */
-export async function up(queryInterface, Sequelize) {
-  return queryInterface.bulkInsert('departments', [
+export async function up({ context }) {
+  return context.bulkInsert('departments', [
     {
       id: 100,
       uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567801',
@@ -106,8 +106,8 @@ export async function up(queryInterface, Sequelize) {
   ]);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  return queryInterface.bulkDelete('departments', {
+export async function down({ context }) {
+  return context.bulkDelete('departments', {
     id: [100, 101, 102, 103, 104, 105, 106, 107, 108, 109],
   }, {});
 }

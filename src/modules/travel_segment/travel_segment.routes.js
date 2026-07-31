@@ -7,7 +7,6 @@ import { createSegmentSchema, updateSegmentSchema } from './travel_segment.valid
 const router = Router();
 router.use(authMiddleware);
 
-const router = Router();
 
 // List all segments
 router.get('/', travelSegmentController.getAll);

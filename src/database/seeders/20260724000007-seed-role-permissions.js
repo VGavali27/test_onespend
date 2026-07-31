@@ -9,7 +9,7 @@
  * 104 FINANCE_MGR, 105 FINANCE_JR, 106 ADMIN_MGR, 107 ADMIN_JR,
  * 108 TRAVEL_MGR, 109 TRAVEL_JR, 110 HOD, 111 EMP_MGR, 112 EMPLOYEE
  */
-export async function up(queryInterface, Sequelize) {
+export async function up({ context }) {
   const allPermissionIds = [];
   for (let i = 100; i <= 134; i++) allPermissionIds.push(i);
 
@@ -148,7 +148,7 @@ export async function up(queryInterface, Sequelize) {
     { role_id: 112, permission_id: 125, created_at: new Date(), updated_at: new Date() }, // expenses: submit
   ];
 
-  await queryInterface.bulkInsert('role_permissions', [
+  await context.bulkInsert('role_permissions', [
     ...superAdminRows,
     ...cfoRows,
     ...paymentMgrRows,
@@ -165,8 +165,8 @@ export async function up(queryInterface, Sequelize) {
   ]);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  return queryInterface.bulkDelete('role_permissions', {
+export async function down({ context }) {
+  return context.bulkDelete('role_permissions', {
     role_id: [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112],
   }, {});
 }

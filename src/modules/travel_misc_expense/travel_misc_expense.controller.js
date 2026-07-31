@@ -1,4 +1,4 @@
-import miscExpenseService from './travel_misc_expense.service.js';
+import * as miscExpenseService from './travel_misc_expense.service.js';
 
 import ApiResponse from '../../utils/apiResponse.js';
 

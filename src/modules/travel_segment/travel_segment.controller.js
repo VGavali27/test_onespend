@@ -1,4 +1,4 @@
-import segmentService from './travel_segment.service.js';
+import * as segmentService from './travel_segment.service.js';
 
 import ApiResponse from '../../utils/apiResponse.js';
 

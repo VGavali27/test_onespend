@@ -7,7 +7,6 @@ import { createMiscExpenseSchema, updateMiscExpenseSchema } from './travel_misc_
 const router = Router();
 router.use(authMiddleware);
 
-const router = Router();
 
 // List all misc expenses
 router.get('/', travelMiscExpenseController.getAll);

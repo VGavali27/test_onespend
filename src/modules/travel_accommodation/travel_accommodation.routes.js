@@ -7,7 +7,6 @@ import { createAccommodationSchema, updateAccommodationSchema } from './travel_a
 const router = Router();
 router.use(authMiddleware);
 
-const router = Router();
 
 // List all accommodations
 router.get('/', travelAccommodationController.getAll);

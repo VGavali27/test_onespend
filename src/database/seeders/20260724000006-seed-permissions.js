@@ -1,8 +1,8 @@
 /**
  * Seeder: Insert demo permissions
  */
-export async function up(queryInterface, Sequelize) {
-  return queryInterface.bulkInsert('permissions', [
+export async function up({ context }) {
+  return context.bulkInsert('permissions', [
     // ── Users Module ──
     { id: 100, uuid: 'f1a2b3c4-d5e6-7890-fabc-123456789001', resource: 'users', action: 'create', permission_key: 'users:create', description: 'Create users', status: 'ACTIVE', created_at: new Date(), updated_at: new Date() },
     { id: 101, uuid: 'f1a2b3c4-d5e6-7890-fabc-123456789002', resource: 'users', action: 'read', permission_key: 'users:read', description: 'View users', status: 'ACTIVE', created_at: new Date(), updated_at: new Date() },
@@ -58,8 +58,8 @@ export async function up(queryInterface, Sequelize) {
   ]);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  return queryInterface.bulkDelete('permissions', {
+export async function down({ context }) {
+  return context.bulkDelete('permissions', {
     id: Array.from({ length: 35 }, (_, i) => 100 + i),
   }, {});
 }

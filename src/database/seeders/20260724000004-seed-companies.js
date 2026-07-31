@@ -1,8 +1,8 @@
 /**
  * Seeder: Insert demo companies — all under Kings Group Ventures
  */
-export async function up(queryInterface, Sequelize) {
-  return queryInterface.bulkInsert('companies', [
+export async function up({ context }) {
+  return context.bulkInsert('companies', [
     {
       id: 100, uuid: 'c1d2e3f4-a5b6-7890-cdef-123456780001',
       group_id: 100, name: 'XPONENTIAL DATA AND BUSINESS SERVICES PVT. LTD.', code: 'XDBSPL',
@@ -146,8 +146,8 @@ export async function up(queryInterface, Sequelize) {
   ]);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  return queryInterface.bulkDelete('companies', {
+export async function down({ context }) {
+  return context.bulkDelete('companies', {
     group_id: 100,
   }, {});
 }

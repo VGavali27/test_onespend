@@ -18,19 +18,19 @@ export const login = async (email, password) => {
   const role = await Role.findByPk(user.role_id);
   if (!role) throw ApiError.unauthorized('User role not found');
 
-  // Get primary employment
-  const employment = await UserEmployment.findOne({
+  // Get all active employments (user may belong to multiple companies)
+  const employments = await UserEmployment.findAll({
     where: { user_id: user.id, status: 'ACTIVE' },
+    attributes: ['id', 'uuid', 'company_id', 'employee_code', 'designation'],
+    raw: true,
   });
 
-  // Generate JWT
+  // JWT contains only identity — employment/company context is resolved per-request
   const payload = {
     userUuid: user.uuid,
     userId: user.id,
     roleId: role.id,
     roleCode: role.code,
-    employmentId: employment?.id || null,
-    companyId: employment?.company_id || null,
   };
 
   const token = jwt.sign(payload, env.jwt.secret, { expiresIn: env.jwt.expiresIn });
@@ -42,7 +42,9 @@ export const login = async (email, password) => {
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
+      department_id: user.department_id,
       role: role.code,
     },
+    employments,
   };
 };

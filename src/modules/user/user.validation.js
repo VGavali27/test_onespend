@@ -1,13 +1,27 @@
-import Joi from 'joi'; // Schema for a single employment entry within user creationconst employmentSchema = Joi.object({  company_uuid: Joi.string().uuid().required().messages({    'string.guid': 'Company UUID must be a valid UUID',    'any.required': 'Company UUID is required',  }),  employee_code: Joi.string().max(50).required().messages({    'string.empty': 'Employee code is required',  }),  designation: Joi.string().max(150).allow(null, ''),  employment_type: Joi.string().valid('PERMANENT', 'CONTRACT', 'INTERN', 'CONSULTANT').required().messages({    'any.only': 'Employment type must be PERMANENT, CONTRACT, INTERN, or CONSULTANT',  }),  joining_date: Joi.date().iso().allow(null, ''),});// Schema for creating a user — role_uuid required, employments optional
+import Joi from 'joi';
+
+// Schema for a single employment entry within user creation
+const employmentSchema = Joi.object({
+  company_uuid: Joi.string()
+    .uuid()
+    .required()
+    .messages({ 'string.guid': 'Company UUID must be a valid UUID', 'any.required': 'Company UUID is required' }),
+  employee_code: Joi.string().max(50).required().messages({ 'string.empty': 'Employee code is required' }),
+  designation: Joi.string().max(150).allow(null, ''),
+  employment_type: Joi.string()
+    .valid('PERMANENT', 'CONTRACT', 'INTERN', 'CONSULTANT')
+    .required()
+    .messages({ 'any.only': 'Employment type must be PERMANENT, CONTRACT, INTERN, or CONSULTANT' }),
+  joining_date: Joi.date().iso().allow(null, ''),
+});
+
+// Schema for creating a user — role_uuid required, employments optional
 export const createUserSchema = Joi.object({
   role_uuid: Joi.string()
     .uuid()
     .required()
     .messages({ 'string.guid': 'Role UUID must be a valid UUID', 'any.required': 'Role UUID is required' }),
-  department_uuid: Joi.string()
-    .uuid()
-    .allow(null, '')
-    .messages({ 'string.guid': 'Department UUID must be a valid UUID' }),
+  department_uuid: Joi.string().uuid().allow(null, '').messages({ 'string.guid': 'Department UUID must be a valid UUID' }),
   first_name: Joi.string()
     .max(100)
     .required()
@@ -27,13 +41,12 @@ export const createUserSchema = Joi.object({
     .min(1)
     .allow(null)
     .messages({ 'array.min': 'At least one employment is required' }),
-}); // Schema for updating a user — all fields optional, at least one required
+});
+
+// Schema for updating a user — all fields optional, at least one required
 export const updateUserSchema = Joi.object({
   role_uuid: Joi.string().uuid().messages({ 'string.guid': 'Role UUID must be a valid UUID' }),
-  department_uuid: Joi.string()
-    .uuid()
-    .allow(null, '')
-    .messages({ 'string.guid': 'Department UUID must be a valid UUID' }),
+  department_uuid: Joi.string().uuid().allow(null, '').messages({ 'string.guid': 'Department UUID must be a valid UUID' }),
   first_name: Joi.string().max(100),
   middle_name: Joi.string().max(100).allow(null, ''),
   last_name: Joi.string().max(100).allow(null, ''),

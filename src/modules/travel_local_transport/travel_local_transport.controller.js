@@ -1,4 +1,4 @@
-import localTransportService from './travel_local_transport.service.js';
+import * as localTransportService from './travel_local_transport.service.js';
 
 import ApiResponse from '../../utils/apiResponse.js';
 

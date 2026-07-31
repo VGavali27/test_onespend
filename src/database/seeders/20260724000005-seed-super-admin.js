@@ -1,13 +1,14 @@
 /**
  * Seeder: Insert SUPER_ADMIN user with employments across all companies
  */
-export async function up(queryInterface, Sequelize) {
+export async function up({ context }) {
   // ── 1. Create SUPER_ADMIN user ──────────────────────────────
-  await queryInterface.bulkInsert('users', [
+  await context.bulkInsert('users', [
     {
       id: 100,
       uuid: 'e1f2a3b4-c5d6-7890-efab-123456789001',
       role_id: 100,
+      department_id: 101, // Admin
       first_name: 'Super',
       last_name: 'Admin',
       email: 'superadmin@kingsgroup.com',
@@ -31,7 +32,6 @@ export async function up(queryInterface, Sequelize) {
       uuid: `e1f2a3b4-c5d6-7890-efab-12345679${seq}`,
       user_id: 100,
       company_id: companyId,
-      department_id: null,
       employee_code: `KGV-EMP-${seq}`,
       designation: 'Super Administrator',
       employment_type: 'PERMANENT',
@@ -41,10 +41,10 @@ export async function up(queryInterface, Sequelize) {
     });
   });
 
-  await queryInterface.bulkInsert('user_employments', employments);
+  await context.bulkInsert('user_employments', employments);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  await queryInterface.bulkDelete('user_employments', { user_id: 100 }, {});
-  await queryInterface.bulkDelete('users', { id: [100] }, {});
+export async function down({ context }) {
+  await context.bulkDelete('user_employments', { user_id: 100 }, {});
+  await context.bulkDelete('users', { id: [100] }, {});
 }

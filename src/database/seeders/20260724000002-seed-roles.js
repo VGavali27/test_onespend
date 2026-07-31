@@ -1,8 +1,8 @@
 /**
  * Seeder: Insert demo roles
  */
-export async function up(queryInterface, Sequelize) {
-  return queryInterface.bulkInsert('roles', [
+export async function up({ context }) {
+  return context.bulkInsert('roles', [
     {
       id: 100,
       uuid: 'd1e2f3a4-b5c6-7890-defa-123456789001',
@@ -162,8 +162,8 @@ export async function up(queryInterface, Sequelize) {
   ]);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  return queryInterface.bulkDelete('roles', {
+export async function down({ context }) {
+  return context.bulkDelete('roles', {
     id: [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112],
   }, {});
 }

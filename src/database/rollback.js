@@ -9,8 +9,11 @@ import path from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Use forward slashes for glob (required on Windows)
+const migrationsGlob = path.join(__dirname, 'migrations', '*.js').replace(/\\/g, '/');
+
 const umzug = new Umzug({
-  migrations: { glob: path.join(__dirname, 'migrations', '*.js') },
+  migrations: { glob: migrationsGlob },
   context: sequelize.getQueryInterface(),
   storage: new SequelizeStorage({ sequelize }),
   logger: console,

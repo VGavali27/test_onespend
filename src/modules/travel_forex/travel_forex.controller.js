@@ -1,4 +1,4 @@
-import forexService from './travel_forex.service.js';
+import * as forexService from './travel_forex.service.js';
 
 import ApiResponse from '../../utils/apiResponse.js';
 

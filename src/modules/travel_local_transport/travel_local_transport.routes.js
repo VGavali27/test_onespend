@@ -7,7 +7,6 @@ import { createLocalTransportSchema, updateLocalTransportSchema } from './travel
 const router = Router();
 router.use(authMiddleware);
 
-const router = Router();
 
 // List all local transports
 router.get('/', travelLocalTransportController.getAll);

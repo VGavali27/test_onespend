@@ -1,8 +1,8 @@
 /**
  * Seeder: Insert demo group — Kings Group Ventures
  */
-export async function up(queryInterface, Sequelize) {
-  return queryInterface.bulkInsert('groups', [
+export async function up({ context }) {
+  return context.bulkInsert('groups', [
     {
       id: 100,
       uuid: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -16,6 +16,6 @@ export async function up(queryInterface, Sequelize) {
   ]);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  return queryInterface.bulkDelete('groups', { id: [100] }, {});
+export async function down({ context }) {
+  return context.bulkDelete('groups', { id: [100] }, {});
 }

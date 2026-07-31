@@ -7,12 +7,23 @@
  * 104 FINANCE_MGR, 105 FINANCE_JR, 106 ADMIN_MGR, 107 ADMIN_JR,
  * 108 TRAVEL_MGR, 109 TRAVEL_JR, 110 HOD, 111 EMP_MGR, 112 EMPLOYEE
  */
-export async function up(queryInterface, Sequelize) {
+export async function up({ context }) {
   const module = 'travel';
   const rows = [];
 
+  let ruleSeq = 0;
   const addRule = (fromRoleId, toRoleId) => {
-    rows.push({ module, from_role_id: fromRoleId, to_role_id: toRoleId, status: 'ACTIVE', created_at: new Date(), updated_at: new Date() });
+    ruleSeq += 1;
+    const seq = String(ruleSeq).padStart(3, '0');
+    rows.push({
+      uuid: `d2e3f4a5-b6c7-8901-cdef-12345678${seq}`,
+      module,
+      from_role_id: fromRoleId,
+      to_role_id: toRoleId,
+      status: 'ACTIVE',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
   };
 
   // Manager role IDs for "all mgr" references
@@ -63,9 +74,9 @@ export async function up(queryInterface, Sequelize) {
   // ── TRAVEL_JR (109) → TRAVEL_MGR (108) ──
   addRule(109, 108);
 
-  await queryInterface.bulkInsert('role_handover_rules', rows);
+  await context.bulkInsert('role_handover_rules', rows);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  return queryInterface.bulkDelete('role_handover_rules', { module: 'travel' }, {});
+export async function down({ context }) {
+  return context.bulkDelete('role_handover_rules', { module: 'travel' }, {});
 }

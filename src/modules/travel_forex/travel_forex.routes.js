@@ -7,7 +7,6 @@ import { createForexSchema, updateForexSchema } from './travel_forex.validation.
 const router = Router();
 router.use(authMiddleware);
 
-const router = Router();
 
 // List all forex entries
 router.get('/', travelForexController.getAll);

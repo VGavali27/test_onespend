@@ -1,4 +1,4 @@
-import accommodationService from './travel_accommodation.service.js';
+import * as accommodationService from './travel_accommodation.service.js';
 
 import ApiResponse from '../../utils/apiResponse.js';
 

@@ -6,8 +6,8 @@
  * Note: Travel sub-types (domestic/international) are handled by
  * travel_expenses.travel_type, child tables handle line items.
  */
-export async function up(queryInterface, Sequelize) {
-  return queryInterface.bulkInsert('expense_categories', [
+export async function up({ context }) {
+  return context.bulkInsert('expense_categories', [
     {
       id: 100,
       uuid: 'a2b3c4d5-e6f7-8901-abcd-ef1234567801',
@@ -24,6 +24,6 @@ export async function up(queryInterface, Sequelize) {
   ]);
 }
 
-export async function down(queryInterface, _Sequelize) {
-  return queryInterface.bulkDelete('expense_categories', { id: [100] }, {});
+export async function down({ context }) {
+  return context.bulkDelete('expense_categories', { id: [100] }, {});
 }
