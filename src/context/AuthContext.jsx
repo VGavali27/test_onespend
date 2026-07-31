@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mockLogin } from '../services/api';
+import { mockLogin } from '@/services/api';
 
 const AuthContext = createContext(null);
 

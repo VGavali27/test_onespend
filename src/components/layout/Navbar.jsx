@@ -1,6 +1,6 @@
 import { Moon, Sun, Bell, Search, ChevronDown, User, LogOut, Settings, HelpCircle } from 'lucide-react';
-import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
 
 export default function Navbar({ title }) {

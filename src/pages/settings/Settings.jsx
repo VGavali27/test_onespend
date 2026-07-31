@@ -1,5 +1,5 @@
 import { Type, MousePointerClick, Check, Monitor, Palette, Sun, Moon } from 'lucide-react';
-import { useTheme, fontOptions, fontSizeOptions } from '../../context/ThemeContext';
+import { useTheme, fontOptions, fontSizeOptions } from '@/context/ThemeContext';
 
 export default function Settings() {
   const { theme, toggleTheme, fontFamily, setFontFamily, fontSize, setFontSize } = useTheme();

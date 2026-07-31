@@ -1,8 +1,8 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { Wallet, LogOut, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
-import { menuConfig } from '../../data/menuConfig';
+import { menuConfig } from '@/data/menuConfig';
 
 const hasAccess = (roles, userRole) => {
   if (!userRole) return false;
