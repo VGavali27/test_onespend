@@ -6,6 +6,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import Login from '@/pages/auth/Login';
 import Dashboard from '@/pages/dashboard/Dashboard';
 import Settings from '@/pages/settings/Settings';
+import Users from '@/pages/master/Users';
 
 function App() {
   return (
@@ -25,8 +26,10 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="expenses" element={<Dashboard />} />
-              <Route path="companies" element={<Dashboard />} />
-              <Route path="users" element={<Dashboard />} />
+              <Route path="master/companies" element={<Dashboard />} />
+              <Route path="master/departments" element={<Dashboard />} />
+              <Route path="master/users" element={<Users />} />
+              <Route path="master/employments" element={<Dashboard />} />
               <Route path="settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
