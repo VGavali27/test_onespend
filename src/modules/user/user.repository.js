@@ -40,7 +40,7 @@ export const findAll = async (params = {}) => {
 export const findByUuid = async (uuid) => User.findOne({ where: { uuid } });
 
 // Find a user's full profile — role, department, and employments (with company)
-export const findProfileByUuid = async (uuid) =>
+export const findProfileByUuid = async (uuid, transaction) =>
   User.findOne({
     where: { uuid },
     include: [
@@ -53,6 +53,7 @@ export const findProfileByUuid = async (uuid) =>
         order: [['createdAt', 'DESC']],
       },
     ],
+    ...(transaction ? { transaction } : {}),
   });
 
 // Find a user by primary key ID (internal use)

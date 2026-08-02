@@ -111,7 +111,7 @@ export const update = async (uuid, data) => {
       }
     }
 
-    return userRepository.findProfileByUuid(uuid);
+    return userRepository.findProfileByUuid(uuid, t);
   });
 };
 

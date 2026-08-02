@@ -55,7 +55,7 @@ export const updateUser = async (req, res, next) => {
 // Soft delete a user by UUID
 export const deleteUser = async (req, res, next) => {
   try {
-    const result = await userService.delete(req.params.uuid);
+    const result = await userService.deleteRecord(req.params.uuid);
     return ApiResponse.success(res, null, result.message);
   } catch (error) {
     next(error);
