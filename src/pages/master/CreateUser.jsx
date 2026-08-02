@@ -143,10 +143,8 @@ export default function CreateUser() {
         </div>
       )}
 
-      {/* Main layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
-        {/* ── Form sections ── */}
-        <form id="create-user-form" onSubmit={handleSubmit} className="space-y-6">
+      {/* Form — full width */}
+      <form id="create-user-form" onSubmit={handleSubmit} className="space-y-6">
           {/* Personal Information */}
           <SectionCard icon={UserRound} title="Personal Information" subtitle="Basic identity and contact details">
             <div className="flex flex-col sm:flex-row gap-6">
@@ -327,30 +325,26 @@ export default function CreateUser() {
               </div>
             )}
           </SectionCard>
-        </form>
+      </form>
 
-        {/* ── Sticky side panel: live preview + actions ── */}
-        <div className="space-y-6 lg:sticky lg:top-6">
-          {/* Actions */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-5 space-y-2.5">
-            <button
-              type="submit"
-              form="create-user-form"
-              disabled={saving}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 shadow-sm shadow-indigo-600/20 transition-colors"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? 'Creating...' : 'Create User'}
-            </button>
-            <button
-              type="button"
-              onClick={goBack}
-              className="w-full px-4 py-2.5 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+      {/* Sticky bottom action bar */}
+      <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:-mx-8 mt-6 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-slate-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex flex-col-reverse sm:flex-row items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={goBack}
+          className="w-full sm:w-auto px-6 py-2.5 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="create-user-form"
+          disabled={saving}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 shadow-sm shadow-indigo-600/20 transition-colors"
+        >
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          {saving ? 'Creating...' : 'Create User'}
+        </button>
       </div>
     </div>
   );
