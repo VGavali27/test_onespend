@@ -327,8 +327,8 @@ export default function CreateUser() {
           </SectionCard>
       </form>
 
-      {/* Sticky bottom action bar */}
-      <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:-mx-8 mt-6 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-slate-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-4 flex flex-col-reverse sm:flex-row items-center justify-end gap-2">
+      {/* Form actions */}
+      <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 mt-2">
         <button
           type="button"
           onClick={goBack}
