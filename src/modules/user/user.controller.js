@@ -12,6 +12,16 @@ export const getAllUsers = async (req, res, next) => {
   }
 };
 
+// Get the authenticated user's full profile
+export const getMyProfile = async (req, res, next) => {
+  try {
+    const profile = await userService.getProfile(req.user.userUuid);
+    return ApiResponse.success(res, profile, 'Profile fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Fetch a single user by UUID
 export const getUserByUuid = async (req, res, next) => {
   try {

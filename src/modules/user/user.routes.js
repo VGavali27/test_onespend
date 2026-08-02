@@ -8,6 +8,8 @@ const router = Router();
 router.use(authMiddleware);
 // List all users
 router.get('/', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), userController.getAllUsers);
+// Get the authenticated user's profile (must precede /:uuid)
+router.get('/me', userController.getMyProfile);
 // Get a single user by UUID
 router.get('/:uuid', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), userController.getUserByUuid);
 // Create a new user (validate body first)

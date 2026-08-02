@@ -1,6 +1,6 @@
 import { Op } from 'sequelize';
 import db from '../../database/models/index.js';
-const { User } = db;
+const { User, Role, Department, UserEmployment, Company } = db;
 
 const ALLOWED_SORT_FIELDS = ['createdAt', 'first_name', 'last_name', 'email'];
 const DEFAULT_SORT = [['createdAt', 'DESC']];
@@ -38,6 +38,22 @@ export const findAll = async (params = {}) => {
 
 // Find a user by UUID
 export const findByUuid = async (uuid) => User.findOne({ where: { uuid } });
+
+// Find a user's full profile — role, department, and employments (with company)
+export const findProfileByUuid = async (uuid) =>
+  User.findOne({
+    where: { uuid },
+    include: [
+      { model: Role, as: 'role', attributes: ['name', 'code'] },
+      { model: Department, as: 'department', attributes: ['name'] },
+      {
+        model: UserEmployment,
+        as: 'employments',
+        include: [{ model: Company, as: 'company', attributes: ['name', 'code'] }],
+        order: [['createdAt', 'DESC']],
+      },
+    ],
+  });
 
 // Find a user by primary key ID (internal use)
 export const findById = async (id) => User.findByPk(id);

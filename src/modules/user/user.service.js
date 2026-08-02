@@ -13,6 +13,13 @@ export const getByUuid = async (uuid) => {
   return user;
 };
 
+// Fetch a user's full profile (role, department, employments) — throws 404 if missing
+export const getProfile = async (uuid) => {
+  const user = await userRepository.findProfileByUuid(uuid);
+  if (!user) throw ApiError.notFound('User not found');
+  return user;
+};
+
 // Create a new user with optional employments — all in a transaction
 export const create = async (data) => {
   const role = await Role.findOne({ where: { uuid: data.role_uuid } });
