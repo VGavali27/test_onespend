@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, Plus, Trash2, Loader2, Briefcase } from 'lucide-react';
 import { userApi, getCompanyOptions, getDepartmentOptions } from '@/services/masterService';
 import { getRoleOptions } from '@/services/accessService';
+import ImageUpload from '@/components/ui/ImageUpload';
 
 const EMPLOYMENT_TYPES = ['PERMANENT', 'CONTRACT', 'INTERN', 'CONSULTANT'];
 
@@ -38,7 +39,6 @@ export default function CreateUser() {
   const [companies, setCompanies] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [imgError, setImgError] = useState(false);
 
   // Load lightweight dropdown options on mount
   useEffect(() => {
@@ -59,10 +59,7 @@ export default function CreateUser() {
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const setProfileImage = (value) => {
-    setForm((f) => ({ ...f, profile_image: value }));
-    setImgError(false);
-  };
+  const setProfileImage = (value) => setForm((f) => ({ ...f, profile_image: value }));
 
   const updateEmployment = (i, field, value) =>
     setEmployments((list) => list.map((e, idx) => (idx === i ? { ...e, [field]: value } : e)));
@@ -130,7 +127,7 @@ export default function CreateUser() {
       <form
         id="create-user-form"
         onSubmit={handleSubmit}
-        className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden max-w-3xl"
+        className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden"
       >
         <div className="px-4 sm:px-6 py-5 space-y-5">
           {error && (
@@ -140,30 +137,13 @@ export default function CreateUser() {
           )}
 
           {/* Profile image */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="w-16 h-16 rounded-full overflow-hidden bg-slate-100 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0">
-              {form.profile_image && !imgError ? (
-                <img
-                  src={form.profile_image}
-                  alt="Profile preview"
-                  className="w-full h-full object-cover"
-                  onError={() => setImgError(true)}
-                />
-              ) : (
-                <Users className="h-7 w-7 text-slate-400" />
-              )}
-            </div>
-            <div className="flex-1 w-full">
-              <Field label="Profile image URL">
-                <input
-                  className={inputClass}
-                  value={form.profile_image}
-                  onChange={(e) => setProfileImage(e.target.value)}
-                  placeholder="https://example.com/photo.jpg"
-                />
-              </Field>
-              <p className="text-[12px] text-slate-400 mt-1">Paste an image URL to show a profile picture.</p>
-            </div>
+          <div className="max-w-md">
+            <ImageUpload
+              value={form.profile_image}
+              onChange={setProfileImage}
+              onRemove={() => setProfileImage('')}
+              label="Profile image"
+            />
           </div>
 
           {/* Basic info */}
@@ -179,7 +159,7 @@ export default function CreateUser() {
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <Field label="Email address">
               <input type="email" className={inputClass} value={form.email} onChange={set('email')} placeholder="name@company.com" />
             </Field>
@@ -188,11 +168,13 @@ export default function CreateUser() {
             </Field>
           </div>
 
-          <Field label="Password" required>
-            <input type="password" className={inputClass} value={form.password} onChange={set('password')} placeholder="Min. 6 characters" required minLength={6} />
-          </Field>
+          <div className="max-w-md">
+            <Field label="Password" required>
+              <input type="password" className={inputClass} value={form.password} onChange={set('password')} placeholder="Min. 6 characters" required minLength={6} />
+            </Field>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <Field label="Role" required>
               <select className={inputClass} value={form.role_uuid} onChange={set('role_uuid')} required>
                 <option value="">Select role...</option>
@@ -248,7 +230,7 @@ export default function CreateUser() {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                       <Field label="Company" required>
                         <select
                           className={inputClass}
