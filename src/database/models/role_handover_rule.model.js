@@ -7,7 +7,7 @@ export default (sequelize, DataTypes) => {
         primaryKey: true,
         autoIncrement: true,
       },
-      uuid: { type: DataTypes.UUID, allowNull: false, unique: true },
+      uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
       module: { type: DataTypes.STRING(50), allowNull: false },
       from_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       to_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },

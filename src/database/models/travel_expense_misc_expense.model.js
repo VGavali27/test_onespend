@@ -9,7 +9,7 @@ export default (sequelize, DataTypes) => {
         primaryKey: true,
         autoIncrement: true,
       },
-      uuid: { type: DataTypes.UUID, allowNull: false, unique: true },
+      uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
       travel_expense_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       expense_type: { type: DataTypes.STRING(100), allowNull: false },
       expense_date: { type: DataTypes.DATEONLY, allowNull: false },
