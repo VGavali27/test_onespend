@@ -3,8 +3,8 @@ import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 const { Role, Company, Department, sequelize } = db;
 
-// Fetch all users
-export const getAll = async () => userRepository.findAll();
+// Fetch users with pagination/search/filter/sort
+export const getAll = async (params = {}) => userRepository.findAll(params);
 
 // Fetch a single user by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {

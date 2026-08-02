@@ -1,10 +1,12 @@
 import * as userService from './user.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
-// Fetch all users
-export const getAllUsers = async (_req, res, next) => {
+// Fetch all users (paginated) — query params: page, limit, search, status, sortBy, sortOrder
+export const getAllUsers = async (req, res, next) => {
   try {
-    const users = await userService.getAll();
-    return ApiResponse.success(res, users, 'Users fetched successfully');
+    const { rows, total } = await userService.getAll(req.query);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+    return ApiResponse.paginated(res, rows, { page, limit, total });
   } catch (error) {
     next(error);
   }
