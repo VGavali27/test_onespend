@@ -8,6 +8,7 @@ const employmentSchema = Joi.object({
     .messages({ 'string.guid': 'Company UUID must be a valid UUID', 'any.required': 'Company UUID is required' }),
   employee_code: Joi.string().max(50).required().messages({ 'string.empty': 'Employee code is required' }),
   designation: Joi.string().max(150).allow(null, ''),
+  email: Joi.string().email().allow(null, '').messages({ 'string.email': 'Must be a valid email' }),
   employment_type: Joi.string()
     .valid('PERMANENT', 'CONTRACT', 'INTERN', 'CONSULTANT')
     .required()

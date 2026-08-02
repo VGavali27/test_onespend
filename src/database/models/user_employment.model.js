@@ -18,6 +18,7 @@ export default (sequelize, DataTypes) => {
 
       employee_code: DataTypes.STRING(50),
       designation: DataTypes.STRING(150),
+      email: DataTypes.STRING(150),
 
       reporting_manager_employment_id: DataTypes.BIGINT.UNSIGNED,
 
