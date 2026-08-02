@@ -30,7 +30,7 @@ export async function up(queryInterface, Sequelize) {
     onDelete: 'CASCADE',
   });
   await queryInterface.addConstraint('expense_documents', {
-    fields: ['uploaded_by'],
+    fields: ['uploaded_by_employment_id'],
     type: 'foreign key',
     name: 'fk_ed_uploaded_by_emp',
     references: { table: 'user_employments', field: 'id' },

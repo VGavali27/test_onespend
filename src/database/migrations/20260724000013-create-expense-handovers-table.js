@@ -41,7 +41,7 @@ export async function up(queryInterface, Sequelize) {
     onDelete: 'RESTRICT',
   });
   await queryInterface.addConstraint('expense_handovers', {
-    fields: ['action_by'],
+    fields: ['action_by_employment_id'],
     type: 'foreign key',
     name: 'fk_eh_action_by_emp',
     references: { table: 'user_employments', field: 'id' },

@@ -44,7 +44,7 @@ export async function up(queryInterface, Sequelize) {
     onDelete: 'RESTRICT',
   });
   await queryInterface.addConstraint('expenses', {
-    fields: ['requested_by'],
+    fields: ['requested_by_employment_id'],
     type: 'foreign key',
     name: 'fk_exp_requested_by_emp',
     references: { table: 'user_employments', field: 'id' },
