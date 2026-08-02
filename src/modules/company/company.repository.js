@@ -4,6 +4,10 @@ const { Company } = db;
 // Fetch all companies ordered by creation date (newest first)
 export const findAll = async () => Company.findAll({ order: [['createdAt', 'DESC']] });
 
+// Lightweight dropdown options — only uuid + name
+export const findOptions = async () =>
+  Company.findAll({ attributes: ['uuid', 'name'], order: [['name', 'ASC']] });
+
 // Find a company by its UUID
 export const findByUuid = async (uuid) => Company.findOne({ where: { uuid } });
 

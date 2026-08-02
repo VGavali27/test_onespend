@@ -7,6 +7,8 @@ const router = Router();
 router.use(authMiddleware);
 // List all departments
 router.get('/', departmentController.getAllDepartments);
+// Lightweight department options for dropdowns (must precede /:uuid)
+router.get('/options', departmentController.getDepartmentOptions);
 // Get a single department by UUID
 router.get('/:uuid', departmentController.getDepartmentByUuid);
 // Create a new department (validate body first)

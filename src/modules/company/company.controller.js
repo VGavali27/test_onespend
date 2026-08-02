@@ -11,6 +11,16 @@ export const getAllCompanies = async (_req, res, next) => {
   }
 };
 
+// Lightweight company options for dropdowns
+export const getCompanyOptions = async (_req, res, next) => {
+  try {
+    const options = await companyService.getOptions();
+    return ApiResponse.success(res, options, 'Company options fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Fetch a single company by UUID
 export const getCompanyByUuid = async (req, res, next) => {
   try {

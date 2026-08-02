@@ -10,6 +10,16 @@ export const getAllDepartments = async (_req, res, next) => {
   }
 };
 
+// Lightweight department options for dropdowns
+export const getDepartmentOptions = async (_req, res, next) => {
+  try {
+    const options = await departmentService.getOptions();
+    return ApiResponse.success(res, options, 'Department options fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Fetch a single department by UUID
 export const getDepartmentByUuid = async (req, res, next) => {
   try {

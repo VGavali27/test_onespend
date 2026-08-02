@@ -7,6 +7,8 @@ const router = Router();
 router.use(authMiddleware);
 // List all companies
 router.get('/', companyController.getAllCompanies);
+// Lightweight company options for dropdowns (must precede /:uuid)
+router.get('/options', companyController.getCompanyOptions);
 // Get a single company by UUID
 router.get('/:uuid', companyController.getCompanyByUuid);
 // Create a new company (validate body first)

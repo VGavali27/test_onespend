@@ -7,6 +7,9 @@ const { Group } = db;
 // Fetch all companies
 export const getAll = async () => companyRepository.findAll();
 
+// Lightweight company options for dropdowns
+export const getOptions = async () => companyRepository.findOptions();
+
 // Fetch a single company by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {
   const company = await companyRepository.findByUuid(uuid);

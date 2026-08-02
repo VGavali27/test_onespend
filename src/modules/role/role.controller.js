@@ -10,6 +10,16 @@ export const getAllRoles = async (_req, res, next) => {
   }
 };
 
+// Lightweight role options for dropdowns
+export const getRoleOptions = async (_req, res, next) => {
+  try {
+    const options = await roleService.getOptions();
+    return ApiResponse.success(res, options, 'Role options fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Fetch a single role by UUID
 export const getRoleByUuid = async (req, res, next) => {
   try {

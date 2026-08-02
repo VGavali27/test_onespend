@@ -5,6 +5,10 @@ const { Role } = db;
 export const findAll = async () =>
   Role.findAll({ order: [['level', 'ASC'], ['createdAt', 'DESC']] });
 
+// Lightweight dropdown options — only uuid + name
+export const findOptions = async () =>
+  Role.findAll({ attributes: ['uuid', 'name'], order: [['level', 'ASC'], ['name', 'ASC']] });
+
 // Find a role by its UUID
 export const findByUuid = async (uuid) => Role.findOne({ where: { uuid } });
 

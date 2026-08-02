@@ -4,6 +4,9 @@ import ApiError from '../../utils/ApiError.js';
 // Fetch all roles
 export const getAll = async () => roleRepository.findAll();
 
+// Lightweight role options for dropdowns
+export const getOptions = async () => roleRepository.findOptions();
+
 // Fetch a single role by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {
   const role = await roleRepository.findByUuid(uuid);

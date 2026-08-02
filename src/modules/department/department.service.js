@@ -4,6 +4,9 @@ import ApiError from '../../utils/ApiError.js';
 // Fetch all departments
 export const getAll = async () => departmentRepository.findAll();
 
+// Lightweight department options for dropdowns
+export const getOptions = async () => departmentRepository.findOptions();
+
 // Fetch a single department by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {
   const department = await departmentRepository.findByUuid(uuid);

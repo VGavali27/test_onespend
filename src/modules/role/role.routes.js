@@ -8,6 +8,8 @@ router.use(authMiddleware);
 router.use(requireRole('SUPER_ADMIN'));
 // List all roles
 router.get('/', roleController.getAllRoles);
+// Lightweight role options for dropdowns (must precede /:uuid)
+router.get('/options', roleController.getRoleOptions);
 // Get a single role by UUID
 router.get('/:uuid', roleController.getRoleByUuid);
 // Create a new role (validate body first)
