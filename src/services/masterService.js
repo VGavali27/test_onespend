@@ -7,5 +7,9 @@ export const departmentApi = crud('/departments');
 export const userApi = crud('/users');
 export const employmentApi = crud('/user-employments');
 
+// Fetch users with server-side pagination/search/filter/sort.
+// Params: page, limit, search, status, sortBy, sortOrder. `config` can pass axios options (e.g. signal).
+export const getUsers = (params, config) => api.get('/users', { params, ...config });
+
 // ── Employments by user (company switcher) ──
 export const getEmploymentsByUser = (userUuid) => api.get(`/user-employments/by-user/${userUuid}`);
