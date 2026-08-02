@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Users as UsersIcon, Plus, Search, Eye, Pencil, Trash2 } from 'lucide-react';
-import DataTable from '@/components/ui/DataTable';
+import { Users as UsersIcon, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
+import DataTablePage from '@/components/ui/DataTablePage';
 import { getUsers } from '@/services/masterService';
 
 const STATUS_STYLES = {
@@ -59,29 +59,15 @@ const columns = [
 
 export default function Users() {
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [searchInput, setSearchInput] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const hasFilters = statusFilter !== 'ALL';
+  const clearFilters = () => setStatusFilter('ALL');
 
-  // Debounce the search input before hitting the API
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchInput), 300);
-    return () => clearTimeout(t);
-  }, [searchInput]);
-
-  const hasFilters = debouncedSearch.trim() !== '' || statusFilter !== 'ALL';
-
-  const clearFilters = () => {
-    setSearchInput('');
-    setStatusFilter('ALL');
-  };
-
-  // fetchFn receives page params from DataTable and returns the page's rows + total
-  const fetchUsers = async ({ page, limit, sortBy, sortOrder }, { signal }) => {
+  const fetchUsers = async ({ page, limit, sortBy, sortOrder, search }, { signal }) => {
     const { data } = await getUsers(
       {
         page,
         limit,
-        search: debouncedSearch,
+        search,
         status: statusFilter === 'ALL' ? '' : statusFilter,
         sortBy: SORT_FIELD_MAP[sortBy] ?? sortBy,
         sortOrder,
@@ -92,29 +78,20 @@ export default function Users() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Page header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-            <UsersIcon className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">Users</h1>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">Manage users and their access</p>
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search by name, email or mobile..."
-              className="w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-colors"
-            />
-          </div>
+    <DataTablePage
+      title="Users"
+      subtitle="Manage users and their access"
+      icon={UsersIcon}
+      columns={columns}
+      fetchFn={fetchUsers}
+      filterDeps={[statusFilter]}
+      countLabel="user"
+      emptyMessage="No users yet"
+      searchPlaceholder="Search by name, email or mobile..."
+      hasFilters={hasFilters}
+      onClearFilters={clearFilters}
+      actions={
+        <>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -130,31 +107,9 @@ export default function Users() {
             <Plus className="h-4 w-4" />
             Add User
           </button>
-        </div>
-      </div>
-
-      {/* Table — self-managed: DataTable owns pagination/sorting/loading/fetching */}
-      <DataTable
-        columns={columns}
-        fetchFn={fetchUsers}
-        filterDeps={[debouncedSearch, statusFilter]}
-        initialSorting={[{ id: 'created_at', desc: true }]}
-        getRowId={(row) => row.uuid}
-        countLabel="user"
-        emptyMessage={hasFilters ? 'No users match your filters' : 'No users yet'}
-        emptyAction={
-          hasFilters ? (
-            <button
-              onClick={clearFilters}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
-            >
-              <Search className="h-4 w-4" />
-              Clear filters
-            </button>
-          ) : null
-        }
-      />
-    </div>
+        </>
+      }
+    />
   );
 }
 

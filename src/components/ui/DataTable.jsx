@@ -213,7 +213,7 @@ export default function DataTable({
                     {headerGroup.headers.map((header) => (
                       <th
                         key={header.id}
-                        className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400"
+                        className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
                       >
                         {header.isPlaceholder ? null : (
                           <div
@@ -238,7 +238,7 @@ export default function DataTable({
                   <tr
                     key={row.id}
                     onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                    className={`group hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors ${
+                    className={`group border-l-2 border-l-transparent hover:border-l-indigo-500 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors ${
                       onRowClick ? 'cursor-pointer' : ''
                     }`}
                   >
