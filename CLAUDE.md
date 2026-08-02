@@ -54,7 +54,11 @@ src/
 │   ├── seed.js                   # Run: node src/database/seed.js
 │   └── rollback.js               # Run: node src/database/rollback.js
 ├── modules/
-│   └── user/                     # Only active API module (CRUD complete)
+│   ├── auth/                     # Login (JWT), authMiddleware, requireRole, optionalAuth
+│   ├── upload/                   # Image upload (multer) → serves /uploads
+│   ├── user/                     # CRUD + paginated list + GET /users/me
+│   └── company, department, role, permission, user_employment,
+│       role_permission, expense_category, expense, travel_*  # CRUD modules
 └── routes/
     └── index.js                  # Central route aggregator
 ```
@@ -127,11 +131,12 @@ npm run seed              # run seeders
 
 ## What's Built / What's Pending
 
-### API Modules (8 complete)
-- [x] User API — CRUD by UUID, create with nested employments
-- [x] Company API — CRUD by UUID
-- [x] Department API — CRUD by UUID
-- [x] Role API — CRUD by UUID
+### API Modules
+- [x] Authentication / Authorization — JWT login, authMiddleware, requireRole
+- [x] User API — CRUD by UUID, **paginated list** (page/limit/search/status/sort), create/update with employments, **GET /users/me** (full profile), GET /users/:uuid returns profile
+- [x] Company API — CRUD by UUID + **GET /companies/options**
+- [x] Department API — CRUD by UUID + **GET /departments/options**
+- [x] Role API — CRUD by UUID + **GET /roles/options**
 - [x] Permission API — CRUD by UUID
 - [x] UserEmployment API — CRUD by UUID
 - [x] Expense API — CRUD by UUID, combined create with travel support
@@ -143,9 +148,9 @@ npm run seed              # run seeders
 - [x] TravelForex API — CRUD by UUID
 - [x] TravelMiscExpense API — CRUD by UUID
 - [x] RolePermission API — sync permissions for a role
+- [x] Upload API — POST /uploads (multer image upload, 2MB limit), served statically at /uploads
 - [ ] ExpenseDocument API
 - [ ] ExpenseHandover API
-- [ ] Authentication / Authorization
 
 ### Seeders (10 files)
 - [x] Groups — Kings Group Ventures (KGV)
@@ -171,3 +176,7 @@ npm run seed              # run seeders
 - **Encrypted amounts** — all `*_amount` and `exchange_rate` fields auto-encrypted via Sequelize hooks
 - **Combined endpoints** — `POST /api/expenses` creates expense + travel + child items in one transaction
 - **Approval chain** — `expense_categories` define first/final approver roles, `role_handover_rules` define handover paths
+- **Password hashing** — passwords bcrypt-hashed on create and update (fixed plaintext bug)
+- **UUID auto-generation** — every model's `uuid` has `defaultValue: UUIDV4` (fixed "uuid cannot be null" on create)
+- **Per-employment email** — `user_employments.email` column (a user can have a different email per company)
+- **Lightweight options** — `/roles|companies|departments/options` return only `[{ uuid, name }]` for dropdowns
