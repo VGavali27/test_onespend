@@ -25,6 +25,7 @@ const emptyForm = {
 const emptyEmployment = {
   company_uuid: '',
   employee_code: '',
+  email: '',
   designation: '',
   employment_type: 'PERMANENT',
   joining_date: '',
@@ -85,6 +86,7 @@ export default function CreateUser() {
           ? employments.map((emp) => ({
               company_uuid: emp.company_uuid,
               employee_code: emp.employee_code,
+              email: emp.email || null,
               designation: emp.designation || null,
               employment_type: emp.employment_type,
               joining_date: emp.joining_date || null,
@@ -251,6 +253,15 @@ export default function CreateUser() {
                           onChange={(e) => updateEmployment(i, 'employee_code', e.target.value)}
                           placeholder="e.g. EMP-001"
                           required
+                        />
+                      </Field>
+                      <Field label="Employment email">
+                        <input
+                          type="email"
+                          className={inputClass}
+                          value={emp.email}
+                          onChange={(e) => updateEmployment(i, 'email', e.target.value)}
+                          placeholder="name@company.com"
                         />
                       </Field>
                       <Field label="Employment type" required>
