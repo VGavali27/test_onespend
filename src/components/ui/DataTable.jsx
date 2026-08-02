@@ -73,6 +73,7 @@ export default function DataTable({
   getRowId,
   countLabel,
   toolbar,
+  reloadKey = 0,
   emptyMessage = 'No data found',
   emptyAction,
   emptyIcon: EmptyIcon = Inbox,
@@ -88,7 +89,7 @@ export default function DataTable({
   const [internalError, setInternalError] = useState(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [sorting, setSorting] = useState(initialSorting);
-  const [reloadKey, setReloadKey] = useState(0);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Keep the latest fetchFn in a ref so the fetch effect doesn't re-run every render
   const fetchFnRef = useRef(fetchFn);
@@ -131,7 +132,7 @@ export default function DataTable({
     };
     run();
     return () => controller.abort();
-  }, [pagination, sorting, reloadKey, ...filterDeps]);
+  }, [pagination, sorting, reloadKey, retryKey, ...filterDeps]);
 
   // Resolve effective props (self-managed vs controlled)
   const effective = isSelfManaged
@@ -140,7 +141,7 @@ export default function DataTable({
         rowCount: internalRowCount,
         loading: internalLoading,
         error: internalError,
-        onRetry: () => setReloadKey((k) => k + 1),
+        onRetry: () => setRetryKey((k) => k + 1),
         pagination,
         setPagination,
         sorting,

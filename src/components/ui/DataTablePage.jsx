@@ -31,6 +31,7 @@ export default function DataTablePage({
   getRowId = (row) => row.uuid ?? row.id,
   initialSorting = [],
   countLabel = 'record',
+  reloadKey = 0,
   emptyMessage = 'No data found',
   hasFilters = false,
   onClearFilters,
@@ -92,6 +93,7 @@ export default function DataTablePage({
         initialSorting={initialSorting}
         getRowId={getRowId}
         countLabel={countLabel}
+        reloadKey={reloadKey}
         emptyMessage={anyFilters ? `No ${countLabel}s match your filters` : emptyMessage}
         emptyAction={
           anyFilters ? (
