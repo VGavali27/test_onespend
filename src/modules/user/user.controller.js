@@ -22,10 +22,10 @@ export const getMyProfile = async (req, res, next) => {
   }
 };
 
-// Fetch a single user by UUID
+// Fetch a single user by UUID (full profile: role, department, employments)
 export const getUserByUuid = async (req, res, next) => {
   try {
-    const user = await userService.getByUuid(req.params.uuid);
+    const user = await userService.getProfile(req.params.uuid);
     return ApiResponse.success(res, user, 'User fetched successfully');
   } catch (error) {
     next(error);

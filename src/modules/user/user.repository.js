@@ -44,8 +44,8 @@ export const findProfileByUuid = async (uuid) =>
   User.findOne({
     where: { uuid },
     include: [
-      { model: Role, as: 'role', attributes: ['name', 'code'] },
-      { model: Department, as: 'department', attributes: ['name'] },
+      { model: Role, as: 'role', attributes: ['uuid', 'name', 'code'] },
+      { model: Department, as: 'department', attributes: ['uuid', 'name'] },
       {
         model: UserEmployment,
         as: 'employments',

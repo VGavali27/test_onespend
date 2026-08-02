@@ -55,6 +55,7 @@ export const updateUserSchema = Joi.object({
   mobile: Joi.string().max(20).allow(null, ''),
   password: Joi.string().min(6).max(128),
   profile_image: Joi.string().allow(null, ''),
+  employments: Joi.array().items(employmentSchema).allow(null),
 })
   .min(1)
   .messages({ 'object.min': 'At least one field is required' });
