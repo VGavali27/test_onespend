@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login as apiLogin } from '@/services/api';
+import { login } from '@/services/authService';
 
 const AuthContext = createContext(null);
 
@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password) => {
-    const { data } = await apiLogin(email, password);
+    const { data } = await login(email, password);
     const { token, user: userData } = data.data;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
