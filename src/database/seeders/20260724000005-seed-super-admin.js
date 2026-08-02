@@ -34,6 +34,7 @@ export async function up({ context }) {
       company_id: companyId,
       employee_code: `KGV-EMP-${seq}`,
       designation: 'Super Administrator',
+      email: `superadmin+${companyId}@kingsgroup.com`,
       employment_type: 'PERMANENT',
       status: 'ACTIVE',
       created_at: new Date(),

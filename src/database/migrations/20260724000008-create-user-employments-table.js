@@ -12,6 +12,7 @@ export async function up(queryInterface, Sequelize) {
     department_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     employee_code: { type: Sequelize.STRING(50), allowNull: true },
     designation: { type: Sequelize.STRING(150), allowNull: true },
+    email: { type: Sequelize.STRING(150), allowNull: true },
     reporting_manager_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     employment_type: { type: Sequelize.ENUM('PERMANENT', 'CONTRACT', 'INTERN', 'CONSULTANT'), allowNull: true },
     joining_date: { type: Sequelize.DATEONLY, allowNull: true },
@@ -37,6 +38,7 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.addIndex('user_employments', ['company_id'], { name: 'idx_ue_company_id' });
   await queryInterface.addIndex('user_employments', ['department_id'], { name: 'idx_ue_department_id' });
   await queryInterface.addIndex('user_employments', ['employee_code'], { name: 'idx_ue_employee_code' });
+  await queryInterface.addIndex('user_employments', ['email'], { name: 'idx_ue_email' });
   await queryInterface.addConstraint('user_employments', {
     fields: ['user_id'],
     type: 'foreign key',
