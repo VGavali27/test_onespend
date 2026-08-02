@@ -176,9 +176,9 @@ export default function Users() {
         getRowId={(row) => row.uuid}
         toolbar={
           <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-gray-700">
-            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
               {total} user{total === 1 ? '' : 's'}
-            </p>
+            </span>
           </div>
         }
         emptyMessage={hasFilters ? 'No users match your filters' : 'No users yet'}
@@ -200,10 +200,27 @@ export default function Users() {
 
 // ── Page-specific presentational helpers ──
 
+const AVATAR_COLORS = [
+  'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400',
+  'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400',
+  'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400',
+  'bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400',
+  'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400',
+  'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400',
+];
+
+// Deterministic color per user so avatars aren't all the same shade
+const avatarColorFor = (name) => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+};
+
 function UserCell({ user }) {
+  const name = getFullName(user);
   return (
     <div className="flex items-center gap-3">
-      <div className="w-9 h-9 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
+      <div className={`w-9 h-9 rounded-full ${avatarColorFor(name)} flex items-center justify-center text-xs font-bold flex-shrink-0`}>
         {getInitials(user)}
       </div>
       <div className="min-w-0">

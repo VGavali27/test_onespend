@@ -95,7 +95,7 @@ export default function DataTable({
   const initialLoading = loading && data.length === 0;
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
       {toolbar}
 
       {initialLoading ? (
@@ -208,10 +208,10 @@ export default function DataTable({
                   <button
                     key={p}
                     onClick={() => table.setPageIndex(p - 1)}
-                    className={`min-w-8 h-8 px-2 rounded-md text-[12px] font-semibold transition-colors ${
+                    className={`min-w-8 h-8 px-2 rounded-md text-[12px] font-semibold border transition-colors ${
                       p === pageIndex + 1
-                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-gray-800'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/20'
+                        : 'bg-white dark:bg-gray-900 border-slate-200 dark:border-gray-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-gray-800'
                     }`}
                   >
                     {p}
@@ -253,7 +253,7 @@ function PageButton({ onClick, disabled, title, icon: Icon }) {
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="w-8 h-8 inline-flex items-center justify-center rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+      className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
     >
       <Icon className="h-4 w-4" />
     </button>
@@ -265,13 +265,13 @@ function SkeletonRows() {
     <div className="divide-y divide-slate-100 dark:divide-gray-800">
       {[0, 1, 2, 3, 4].map((i) => (
         <div key={i} className="flex items-center gap-4 px-5 py-4">
-          <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-gray-800 animate-pulse flex-shrink-0" />
+          <div className="skeleton w-9 h-9 rounded-full flex-shrink-0" />
           <div className="flex-1 space-y-2">
-            <div className="h-3.5 w-40 bg-slate-100 dark:bg-gray-800 rounded animate-pulse" />
-            <div className="h-3 w-56 bg-slate-100 dark:bg-gray-800 rounded animate-pulse" />
+            <div className="skeleton h-3.5 w-40" />
+            <div className="skeleton h-3 w-56" />
           </div>
-          <div className="h-3.5 w-24 bg-slate-100 dark:bg-gray-800 rounded animate-pulse" />
-          <div className="h-5 w-16 bg-slate-100 dark:bg-gray-800 rounded-full animate-pulse" />
+          <div className="skeleton h-3.5 w-24" />
+          <div className="skeleton h-5 w-16 rounded-full" />
         </div>
       ))}
     </div>
