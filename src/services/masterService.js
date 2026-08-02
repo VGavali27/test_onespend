@@ -14,6 +14,9 @@ export const getUsers = (params, config) => api.get('/users', { params, ...confi
 // ── Employments by user (company switcher) ──
 export const getEmploymentsByUser = (userUuid) => api.get(`/user-employments/by-user/${userUuid}`);
 
+// ── Current user's full profile (role, department, employments) ──
+export const getMyProfile = () => api.get('/users/me');
+
 // ── Dropdown options (lightweight: uuid + name) ──
 export const getCompanyOptions = () => api.get('/companies/options');
 export const getDepartmentOptions = () => api.get('/departments/options');

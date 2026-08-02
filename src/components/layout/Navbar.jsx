@@ -1,9 +1,11 @@
 import { Moon, Sun, Bell, Search, ChevronDown, User, LogOut, Settings, HelpCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useState, useRef, useEffect } from 'react';
 
 export default function Navbar({ title }) {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -28,8 +30,8 @@ export default function Navbar({ title }) {
   ];
 
   const profileItems = [
-    { id: 'profile', label: 'My Profile', icon: User, action: () => {} },
-    { id: 'settings', label: 'Account Settings', icon: Settings, action: () => {} },
+    { id: 'profile', label: 'My Profile', icon: User, action: () => navigate('/profile') },
+    { id: 'settings', label: 'Account Settings', icon: Settings, action: () => navigate('/settings') },
     { id: 'help', label: 'Help & Support', icon: HelpCircle, action: () => {} },
     { id: 'logout', label: 'Logout', icon: LogOut, danger: true, action: logout },
   ];

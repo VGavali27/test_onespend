@@ -8,6 +8,7 @@ const pageTitles = {
   '/reports': 'Reports',
   '/companies': 'Companies',
   '/users': 'Users',
+  '/profile': 'My Profile',
   '/settings': 'Settings',
   '/help': 'Help',
 };
