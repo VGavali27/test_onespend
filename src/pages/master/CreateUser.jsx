@@ -15,7 +15,6 @@ import {
 import { userApi, getCompanyOptions, getDepartmentOptions } from '@/services/masterService';
 import { getRoleOptions } from '@/services/accessService';
 import ImageUpload from '@/components/ui/ImageUpload';
-import { resolveAssetUrl } from '@/utils/assets';
 
 const EMPLOYMENT_TYPES = ['PERMANENT', 'CONTRACT', 'INTERN', 'CONSULTANT'];
 
@@ -114,13 +113,6 @@ export default function CreateUser() {
       setSaving(false);
     }
   };
-
-  // Live preview values
-  const previewName = [form.first_name, form.middle_name, form.last_name].filter(Boolean).join(' ').trim() || 'New user';
-  const previewInitials = ((form.first_name?.[0] ?? '') + (form.last_name?.[0] ?? '')).toUpperCase() || '?';
-  const previewPhoto = form.profile_image ? resolveAssetUrl(form.profile_image) : null;
-  const previewRole = roles.find((r) => r.uuid === form.role_uuid);
-  const previewDept = departments.find((d) => d.uuid === form.department_uuid);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -339,29 +331,6 @@ export default function CreateUser() {
 
         {/* ── Sticky side panel: live preview + actions ── */}
         <div className="space-y-6 lg:sticky lg:top-6">
-          {/* Live preview */}
-          <div className="hidden lg:block bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-4">User preview</p>
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full overflow-hidden bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-sm font-bold flex-shrink-0">
-                {previewPhoto ? (
-                  <img src={previewPhoto} alt="Preview" className="w-full h-full object-cover" />
-                ) : (
-                  previewInitials
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{previewName}</p>
-                <p className="text-[12px] text-slate-400 truncate">{form.email || 'No email yet'}</p>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-gray-800 space-y-2">
-              <PreviewRow label="Role" value={previewRole?.name || '—'} />
-              <PreviewRow label="Department" value={previewDept?.name || '—'} />
-              <PreviewRow label="Employments" value={employments.length ? `${employments.length} company(ies)` : '—'} />
-            </div>
-          </div>
-
           {/* Actions */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-5 space-y-2.5">
             <button
@@ -418,11 +387,3 @@ function Field({ label, required, children }) {
   );
 }
 
-function PreviewRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-[12px] text-slate-400">{label}</span>
-      <span className="text-[12px] font-medium text-slate-700 dark:text-slate-300 text-right">{value}</span>
-    </div>
-  );
-}
