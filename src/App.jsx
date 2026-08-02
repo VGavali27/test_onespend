@@ -8,6 +8,7 @@ import Dashboard from '@/pages/dashboard/Dashboard';
 import Settings from '@/pages/settings/Settings';
 import Users from '@/pages/master/Users';
 import CreateUser from '@/pages/master/CreateUser';
+import EditUser from '@/pages/master/EditUser';
 import Profile from '@/pages/profile/Profile';
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
               <Route path="master/departments" element={<Dashboard />} />
               <Route path="master/users" element={<Users />} />
               <Route path="master/users/new" element={<CreateUser />} />
+              <Route path="master/users/:uuid/edit" element={<EditUser />} />
               <Route path="master/employments" element={<Dashboard />} />
               <Route path="profile" element={<Profile />} />
               <Route path="settings" element={<Settings />} />

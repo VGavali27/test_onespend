@@ -48,10 +48,16 @@ const columns = [
   columnHelper.display({
     id: 'actions',
     header: () => <span className="block text-right">Actions</span>,
-    cell: () => (
+    cell: ({ row }) => (
       <div className="flex items-center justify-end gap-1">
         <IconButton title="View user" icon={Eye} />
-        <IconButton title="Edit user" icon={Pencil} />
+        <Link
+          to={`/master/users/${row.original.uuid}/edit`}
+          title="Edit user"
+          className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+        >
+          <Pencil className="h-4 w-4" />
+        </Link>
         <IconButton title="Delete user" icon={Trash2} danger />
       </div>
     ),
