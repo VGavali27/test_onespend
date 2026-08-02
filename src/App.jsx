@@ -7,6 +7,7 @@ import Login from '@/pages/auth/Login';
 import Dashboard from '@/pages/dashboard/Dashboard';
 import Settings from '@/pages/settings/Settings';
 import Users from '@/pages/master/Users';
+import CreateUser from '@/pages/master/CreateUser';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
               <Route path="master/companies" element={<Dashboard />} />
               <Route path="master/departments" element={<Dashboard />} />
               <Route path="master/users" element={<Users />} />
+              <Route path="master/users/new" element={<CreateUser />} />
               <Route path="master/employments" element={<Dashboard />} />
               <Route path="settings" element={<Settings />} />
             </Route>

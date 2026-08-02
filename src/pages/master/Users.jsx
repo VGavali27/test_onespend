@@ -1,8 +1,8 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Users as UsersIcon, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import DataTablePage from '@/components/ui/DataTablePage';
-import AddUserModal from '@/pages/master/AddUserModal';
 import { getUsers } from '@/services/masterService';
 
 const STATUS_STYLES = {
@@ -60,8 +60,6 @@ const columns = [
 
 export default function Users() {
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [addOpen, setAddOpen] = useState(false);
-  const [tableReloadKey, setTableReloadKey] = useState(0);
   const hasFilters = statusFilter !== 'ALL';
   const clearFilters = () => setStatusFilter('ALL');
 
@@ -81,16 +79,14 @@ export default function Users() {
   };
 
   return (
-    <>
-      <DataTablePage
-        title="Users"
+    <DataTablePage
+      title="Users"
       subtitle="Manage users and their access"
       icon={UsersIcon}
       columns={columns}
       fetchFn={fetchUsers}
       filterDeps={[statusFilter]}
       countLabel="user"
-      reloadKey={tableReloadKey}
       emptyMessage="No users yet"
       searchPlaceholder="Search by name, email or mobile..."
       hasFilters={hasFilters}
@@ -108,23 +104,16 @@ export default function Users() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
+          <Link
+            to="/master/users/new"
             className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Add User
-          </button>
+          </Link>
         </>
       }
     />
-      <AddUserModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onCreated={() => setTableReloadKey((k) => k + 1)}
-      />
-    </>
   );
 }
 
