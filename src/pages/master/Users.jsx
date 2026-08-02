@@ -58,16 +58,9 @@ const columns = [
 ];
 
 export default function Users() {
-  const [users, setUsers] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [reloadKey, setReloadKey] = useState(0);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sorting, setSorting] = useState([{ id: 'created_at', desc: true }]);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
   // Debounce the search input before hitting the API
   useEffect(() => {
@@ -75,48 +68,27 @@ export default function Users() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Reset to first page whenever a filter or sort changes
-  useEffect(() => {
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
-  }, [debouncedSearch, statusFilter, sorting]);
-
-  // Fetch the current page from the server
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchPage = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data } = await getUsers(
-          {
-            page: pagination.pageIndex + 1,
-            limit: pagination.pageSize,
-            search: debouncedSearch,
-            status: statusFilter === 'ALL' ? '' : statusFilter,
-            sortBy: SORT_FIELD_MAP[sorting[0]?.id] ?? sorting[0]?.id,
-            sortOrder: sorting[0]?.desc ? 'desc' : 'asc',
-          },
-          { signal: controller.signal }
-        );
-        setUsers(data?.data ?? []);
-        setTotal(data?.meta?.total ?? 0);
-      } catch (err) {
-        if (err?.code !== 'ERR_CANCELED') {
-          setError(err?.response?.data?.message || 'Failed to load users. Please try again.');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPage();
-    return () => controller.abort();
-  }, [pagination, debouncedSearch, statusFilter, sorting, reloadKey]);
-
   const hasFilters = debouncedSearch.trim() !== '' || statusFilter !== 'ALL';
 
   const clearFilters = () => {
     setSearchInput('');
     setStatusFilter('ALL');
+  };
+
+  // fetchFn receives page params from DataTable and returns the page's rows + total
+  const fetchUsers = async ({ page, limit, sortBy, sortOrder }, { signal }) => {
+    const { data } = await getUsers(
+      {
+        page,
+        limit,
+        search: debouncedSearch,
+        status: statusFilter === 'ALL' ? '' : statusFilter,
+        sortBy: SORT_FIELD_MAP[sortBy] ?? sortBy,
+        sortOrder,
+      },
+      { signal }
+    );
+    return { data: data?.data ?? [], total: data?.meta?.total ?? 0 };
   };
 
   return (
@@ -161,26 +133,14 @@ export default function Users() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table — self-managed: DataTable owns pagination/sorting/loading/fetching */}
       <DataTable
         columns={columns}
-        data={users}
-        rowCount={total}
-        loading={loading}
-        error={error}
-        onRetry={() => setReloadKey((k) => k + 1)}
-        pagination={pagination}
-        onPaginationChange={setPagination}
-        sorting={sorting}
-        onSortingChange={setSorting}
+        fetchFn={fetchUsers}
+        filterDeps={[debouncedSearch, statusFilter]}
+        initialSorting={[{ id: 'created_at', desc: true }]}
         getRowId={(row) => row.uuid}
-        toolbar={
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-gray-700">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
-              {total} user{total === 1 ? '' : 's'}
-            </span>
-          </div>
-        }
+        countLabel="user"
         emptyMessage={hasFilters ? 'No users match your filters' : 'No users yet'}
         emptyAction={
           hasFilters ? (
@@ -224,7 +184,7 @@ function UserCell({ user }) {
         {getInitials(user)}
       </div>
       <div className="min-w-0">
-        <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 truncate">{getFullName(user)}</p>
+        <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 truncate">{name}</p>
         <p className="text-[12px] text-slate-400 truncate">{user.email || '—'}</p>
       </div>
     </div>

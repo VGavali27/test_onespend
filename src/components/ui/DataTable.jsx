@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -38,75 +38,171 @@ function getPageList(current, total) {
 /**
  * Reusable data table built on TanStack Table.
  *
- * Server-side usage (parent owns state + fetches):
- *   pass `pagination` + `onPaginationChange` and/or `sorting` + `onSortingChange`.
+ * SIMPLE (recommended) — self-managed fetching:
+ *   <DataTable
+ *     columns={columns}
+ *     fetchFn={({ page, limit, sortBy, sortOrder }, { signal }) => ({ data, total })}
+ *     filterDeps={[search, status]}   // refetch + jump to page 1 when these change
+ *     initialSorting={[{ id: 'created_at', desc: true }]}
+ *     getRowId={(row) => row.uuid}
+ *     countLabel="user"               // renders "{total} users" pill
+ *   />
+ *   The component owns pagination, sorting, loading, error, and the fetch.
  *
- * Client-side usage (state managed internally):
- *   omit those props and just pass `data` (rowCount defaults to data.length).
- *
- * Handles loading / error / empty states and the pagination footer for you.
+ * ADVANCED (controlled) — you own the state:
+ *   pass data, rowCount, loading, error, pagination/onPaginationChange,
+ *   sorting/onSortingChange. Omit fetchFn.
  */
 export default function DataTable({
   columns,
-  data = [],
-  rowCount,
-  loading = false,
-  error = null,
-  onRetry,
+  // ── Self-managed mode (recommended) ──
+  fetchFn,
+  filterDeps = [],
+  initialSorting = [],
+  // ── Controlled mode (advanced) — omit fetchFn ──
+  data: controlledData,
+  rowCount: controlledRowCount,
+  loading: controlledLoading,
+  error: controlledError,
+  onRetry: controlledOnRetry,
+  pagination: controlledPagination,
+  onPaginationChange,
+  sorting: controlledSorting,
+  onSortingChange,
+  // ── Common ──
+  getRowId,
+  countLabel,
   toolbar,
   emptyMessage = 'No data found',
   emptyAction,
   emptyIcon: EmptyIcon = Inbox,
-  pagination: externalPagination,
-  onPaginationChange,
-  sorting: externalSorting,
-  onSortingChange,
-  getRowId,
   onRowClick,
   pageSizeOptions = DEFAULT_PAGE_SIZES,
 }) {
-  const [internalPagination, setInternalPagination] = useState({ pageIndex: 0, pageSize: 10 });
-  const [internalSorting, setInternalSorting] = useState([]);
+  const isSelfManaged = Boolean(fetchFn);
 
-  const pagination = externalPagination ?? internalPagination;
-  const setPagination = onPaginationChange ?? setInternalPagination;
-  const sorting = externalSorting ?? internalSorting;
-  const setSorting = onSortingChange ?? setInternalSorting;
+  // Internal state (self-managed mode)
+  const [internalData, setInternalData] = useState([]);
+  const [internalRowCount, setInternalRowCount] = useState(0);
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalError, setInternalError] = useState(null);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [sorting, setSorting] = useState(initialSorting);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Keep the latest fetchFn in a ref so the fetch effect doesn't re-run every render
+  const fetchFnRef = useRef(fetchFn);
+  useEffect(() => {
+    fetchFnRef.current = fetchFn;
+  });
+
+  // Jump back to the first page when a filter changes (self-managed mode)
+  useEffect(() => {
+    if (!isSelfManaged) return;
+    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
+  }, filterDeps);
+
+  // Fetch the current page (self-managed mode)
+  useEffect(() => {
+    if (!isSelfManaged) return;
+    const controller = new AbortController();
+    const run = async () => {
+      setInternalLoading(true);
+      setInternalError(null);
+      try {
+        const result = await fetchFnRef.current(
+          {
+            page: pagination.pageIndex + 1,
+            limit: pagination.pageSize,
+            sortBy: sorting[0]?.id,
+            sortOrder: sorting[0]?.desc ? 'desc' : 'asc',
+          },
+          { signal: controller.signal }
+        );
+        setInternalData(result?.data ?? []);
+        setInternalRowCount(result?.total ?? 0);
+      } catch (err) {
+        if (err?.code !== 'ERR_CANCELED') {
+          setInternalError(err?.response?.data?.message || 'Failed to load data. Please try again.');
+        }
+      } finally {
+        setInternalLoading(false);
+      }
+    };
+    run();
+    return () => controller.abort();
+  }, [pagination, sorting, reloadKey, ...filterDeps]);
+
+  // Resolve effective props (self-managed vs controlled)
+  const effective = isSelfManaged
+    ? {
+        data: internalData,
+        rowCount: internalRowCount,
+        loading: internalLoading,
+        error: internalError,
+        onRetry: () => setReloadKey((k) => k + 1),
+        pagination,
+        setPagination,
+        sorting,
+        setSorting,
+      }
+    : {
+        data: controlledData ?? [],
+        rowCount: controlledRowCount ?? 0,
+        loading: controlledLoading ?? false,
+        error: controlledError ?? null,
+        onRetry: controlledOnRetry,
+        pagination: controlledPagination ?? { pageIndex: 0, pageSize: 10 },
+        setPagination: onPaginationChange ?? setPagination,
+        sorting: controlledSorting ?? [],
+        setSorting: onSortingChange ?? setSorting,
+      };
 
   const table = useReactTable({
-    data,
+    data: effective.data,
     columns,
-    state: { sorting, pagination },
-    onSortingChange: setSorting,
-    onPaginationChange: setPagination,
+    state: { sorting: effective.sorting, pagination: effective.pagination },
+    onSortingChange: effective.setSorting,
+    onPaginationChange: effective.setPagination,
     manualPagination: true,
     manualSorting: true,
-    rowCount: rowCount ?? data.length,
+    rowCount: effective.rowCount,
     getCoreRowModel: getCoreRowModel(),
     ...(getRowId ? { getRowId } : {}),
   });
 
-  const { pageIndex, pageSize } = pagination;
-  const total = rowCount ?? data.length;
+  const { pageIndex, pageSize } = effective.pagination;
+  const total = effective.rowCount;
   const pageCount = table.getPageCount();
   const pageList = getPageList(pageIndex + 1, pageCount);
   const from = total === 0 ? 0 : pageIndex * pageSize + 1;
   const to = Math.min((pageIndex + 1) * pageSize, total);
-  const initialLoading = loading && data.length === 0;
+  const initialLoading = effective.loading && effective.data.length === 0;
+
+  const renderedToolbar =
+    toolbar ??
+    (countLabel ? (
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-gray-700">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
+          {total} {countLabel}
+          {total === 1 ? '' : 's'}
+        </span>
+      </div>
+    ) : null);
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      {toolbar}
+      {renderedToolbar}
 
       {initialLoading ? (
         <SkeletonRows />
-      ) : error ? (
-        <ErrorState message={error} onRetry={onRetry} />
-      ) : data.length === 0 ? (
+      ) : effective.error ? (
+        <ErrorState message={effective.error} onRetry={effective.onRetry} />
+      ) : effective.data.length === 0 ? (
         <EmptyState message={emptyMessage} action={emptyAction} Icon={EmptyIcon} />
       ) : (
         <>
-          <div className={`overflow-x-auto transition-opacity ${loading ? 'opacity-60' : ''}`}>
+          <div className={`overflow-x-auto transition-opacity ${effective.loading ? 'opacity-60' : ''}`}>
             <table className="w-full text-left">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
@@ -165,7 +261,7 @@ export default function DataTable({
                 <span className="font-medium text-slate-700 dark:text-slate-200">{to}</span>
                 {' of '}
                 <span className="font-medium text-slate-700 dark:text-slate-200">{total}</span>
-                {loading && (
+                {effective.loading && (
                   <span className="inline-flex items-center gap-1.5 ml-3 text-slate-400">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Updating...
@@ -177,7 +273,7 @@ export default function DataTable({
                 <select
                   value={pageSize}
                   onChange={(e) =>
-                    setPagination((p) => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))
+                    effective.setPagination((p) => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))
                   }
                   className="px-2 py-1 rounded-md text-[12px] font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none cursor-pointer"
                 >
