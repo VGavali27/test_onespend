@@ -15,6 +15,7 @@ import travelLocalTransportRoutes from '../modules/travel_local_transport/travel
 import travelForexRoutes from '../modules/travel_forex/travel_forex.routes.js';
 import travelMiscExpenseRoutes from '../modules/travel_misc_expense/travel_misc_expense.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
+import uploadRoutes from '../modules/upload/upload.routes.js';
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use('/travel-accommodations', travelAccommodationRoutes);
 router.use('/travel-local-transports', travelLocalTransportRoutes);
 router.use('/travel-forex', travelForexRoutes);
 router.use('/travel-misc-expenses', travelMiscExpenseRoutes);
+router.use('/uploads', uploadRoutes);
 
 export default router;
