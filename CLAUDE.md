@@ -25,7 +25,7 @@ src/
 ├── components/
 │   ├── layout/
 │   │   ├── AppLayout.jsx          # Layout wrapper (sidebar + navbar + outlet)
-│   │   ├── Sidebar.jsx            # Collapsible role-based navigation
+│   │   ├── Sidebar.jsx            # Collapsible role-based nav (accordion + preview-open, submenu icons, guide line)
 │   │   └── Navbar.jsx             # Top bar — search, theme, notifications, profile menu
 │   ├── ui/                        # Reusable UI components
 │   │   ├── DataTable.jsx          # Generic TanStack table (self-managed fetchFn mode)
@@ -42,7 +42,7 @@ src/
 │   ├── AuthContext.jsx            # Auth state, login/logout, JWT management
 │   └── ThemeContext.jsx           # Dark/light theme + font family/size preferences
 ├── data/
-│   └── menuConfig.js              # Role-based menu/submenu configuration
+│   └── menuConfig.js              # Role-based menu config; submenu items carry their own icon
 ├── pages/
 │   ├── auth/
 │   │   └── Login.jsx              # Split-panel login (real API)
@@ -145,7 +145,7 @@ VITE_APP_ENV=development
 - [x] Enterprise design system (Indigo/Slate theme, dark/light mode)
 - [x] **Real login API** — `POST /auth/login` via `authService`, JWT stored, AuthContext wiring (fixed a recursion bug)
 - [x] Dashboard (stats cards, spending charts, activity feed)
-- [x] Collapsible role-based sidebar with submenus
+- [x] Collapsible role-based sidebar with submenus — active section stays open, other sections collapse once you navigate to a page; submenu items have their own icons + a guide line
 - [x] Navbar with search, notifications, profile dropdown
 - [x] Settings page (font family, font size, theme)
 - [x] Protected routes + auth guard
