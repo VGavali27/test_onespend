@@ -58,12 +58,14 @@ src/
 │   ├── access/                    # Access Control
 │   │   ├── roles/                 # Roles: list / add / edit / view
 │   │   ├── permissions/           # Permissions: list / add / edit / view
-│   │   └── rolePermissions/       # RolePermissions: assign permissions to a role
+│   │   ├── rolePermissions/       # RolePermissions: assign permissions to a role
+│   │   └── roleHandoverRules/     # RoleHandoverRules: list + Role-Permissions-style editor (add/remove via sync)
 │   ├── profile/
 │   │   └── Profile.jsx            # My Profile page (navbar menu → GET /users/me)
 │   ├── expenses/                  # (future) MyExpenses, CreateExpense...
 │   ├── travel/                    # (future) TravelRequests...
-│   ├── finance/                   # (future) Categories, Payments, Reports...
+│   ├── finance/
+│   │   └── categories/            # Expense Categories: list / add / edit / view (routed + menu under Master Data → /master/categories)
 │   └── settings/
 │       └── Settings.jsx           # Appearance, font family, font size
 ├── services/                      # ALL API calls live here — one file per domain
@@ -72,14 +74,15 @@ src/
 │   ├── expenseService.js          # /expenses
 │   ├── travelService.js           # /travel-* (segments, forex, misc...)
 │   ├── masterService.js           # /companies, /departments, /users, /user-employments, /users/me
-│   ├── accessService.js           # /roles, /permissions, /role-permissions, /roles/options
+│   ├── accessService.js           # /roles, /permissions, /role-permissions, /role-handover-rules (+sync), /roles/options
 │   ├── financeService.js          # /expense-categories
 │   └── uploadService.js           # POST /uploads (image upload)
 ├── validations/                   # Shared Zod schemas — one file per form/domain
 │   ├── userFormSchema.js          # User create/edit form schema + EMPLOYMENT_TYPES
 │   ├── authSchema.js              # Login form schema
 │   ├── companySchema.js           # Company create/edit form schema (full detail)
-│   └── departmentSchema.js        # Department create/edit form schema
+│   ├── departmentSchema.js        # Department create/edit form schema
+│   └── expenseCategorySchema.js   # Expense category create/edit form schema
 └── utils/
     ├── assets.js                  # resolveAssetUrl(path) — backend asset path → absolute URL
     ├── format.js                  # formatDate, nullIfEmpty, formatType
@@ -118,9 +121,12 @@ All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazi
 /master/companies         → Companies list / new / :uuid (view) / :uuid/edit
 /master/departments       → Departments list / new / :uuid (view) / :uuid/edit
 /master/users             → Users list / new / :uuid (view) / :uuid/edit
+/master/categories        → Expense Categories list / new / :uuid (view) / :uuid/edit
 /access/roles             → Roles list / new / :uuid (view) / :uuid/edit
 /access/permissions       → Permissions list / new / :uuid (view) / :uuid/edit
 /access/role-permissions  → Role Permissions (assignment)
+/access/role-handover-rules          → Role Handover Rules list
+/access/role-handover-rules/edit     → Configure a from role's handover rules
 /profile                  → My Profile
 /settings                 → Settings
 /expenses, /travel, ...   → Mapped to pages (to be built)
@@ -157,10 +163,13 @@ VITE_APP_ENV=development
   - [x] View User — read-only detail (personal / role-dept / employments) with Edit button
 - [x] **Companies module** (`src/pages/master/companies/`) — list (client-side paginated `DataTable`, logo thumbnail), full-detail add/edit form (identity/contact/address/tax + status + **logo upload**), group dropdown via `/groups/options`, delete confirm, **View Company** with Edit button
 - [x] **Departments module** (`src/pages/master/departments/`) — list, add/edit form (name/code/status/description), delete confirm, **View Department** with Edit button
+- [x] **Expense Categories module** (`src/pages/finance/categories/`) — list/add/edit/view; first-receiver & final-approver role dropdowns; delete confirm (routed + menu under **Master Data** → `/master/categories`)
 - [x] **Access Control** (`src/pages/access/`) — Roles + Permissions list/add/edit/view, and **Role Permissions** page (role selector → grouped permission checklist → `sync` API); status field on both forms
+- [x] **Role Handover Rules** (`src/pages/access/roleHandoverRules/`) — list shows all roles with rule status (or blank) + a Role-Permissions-style **editor** (module + from-role selector → To-role checklist → `sync` API that activates/deactivates rules)
 - [x] **React Hook Form + Zod** — `Login`, UserForm, CompanyForm, DepartmentForm; schemas in `src/validations/`
 - [x] **My Profile page** (navbar) — avatar, personal info, role/department, all employments
 - [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `StatusBadge`, `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
+- [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
 
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
