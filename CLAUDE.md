@@ -59,7 +59,7 @@ src/
 │   ├── group/                    # Read-only groups (GET /groups, /groups/options) — for company group dropdown
 │   ├── user/                     # CRUD + paginated list + GET /users/me
 │   └── company, department, role, permission, user_employment,
-│       role_permission, expense_category, expense, travel_*  # CRUD modules
+│       role_permission, role_handover_rule, expense_category, expense, travel_*  # CRUD modules
 └── routes/
     └── index.js                  # Central route aggregator
 ```
@@ -149,6 +149,7 @@ npm run seed              # run seeders
 - [x] TravelForex API — CRUD by UUID
 - [x] TravelMiscExpense API — CRUD by UUID
 - [x] RolePermission API — sync permissions for a role
+- [x] RoleHandoverRule API — CRUD by UUID + **PUT /sync** (activate/deactivate a role's to-role set; never deletes, just flips status ACTIVE/INACTIVE)
 - [x] Upload API — POST /uploads (multer image upload, 2MB limit), served statically at /uploads
 - [ ] ExpenseDocument API
 - [ ] ExpenseHandover API
