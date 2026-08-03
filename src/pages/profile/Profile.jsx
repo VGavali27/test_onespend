@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { formatDate, formatType } from '@/utils/format';
+import { getFullName, getInitials } from '@/utils/user';
 import {
   UserRound,
   Briefcase,
@@ -10,12 +12,8 @@ import {
 } from 'lucide-react';
 import { getMyProfile } from '@/services/masterService';
 import { resolveAssetUrl } from '@/utils/assets';
-
-const STATUS_STYLES = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
-  INACTIVE: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
-  BLOCKED: 'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-400/20',
-};
+import StatusBadge from '@/components/ui/StatusBadge';
+import { InfoCard, InfoRow, Detail } from '@/components/ui/detail';
 
 const EMPLOYMENT_STATUS_STYLES = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
@@ -23,16 +21,6 @@ const EMPLOYMENT_STATUS_STYLES = {
   RESIGNED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
   TERMINATED: 'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-400/20',
 };
-
-const getFullName = (u) => [u.first_name, u.middle_name, u.last_name].filter(Boolean).join(' ') || '—';
-
-const getInitials = (u) =>
-  ((u.first_name?.[0] ?? '') + (u.last_name?.[0] ?? '')).toUpperCase() || '?';
-
-const formatDate = (iso) =>
-  iso
-    ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—';
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
@@ -94,7 +82,7 @@ export default function Profile() {
             <div className="text-center sm:text-left flex-1 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white truncate">{getFullName(profile)}</h2>
-                <StatusBadge status={profile.status} styles={STATUS_STYLES} />
+                <StatusBadge status={profile.status} />
               </div>
               <p className="text-sm text-slate-400 mt-0.5 truncate">{profile.email}</p>
               <p className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20">
@@ -119,7 +107,7 @@ export default function Profile() {
             <InfoCard icon={Building2} title="Role & Department">
               <InfoRow label="Role" value={profile.role?.name || '—'} />
               <InfoRow label="Department" value={profile.department?.name || '—'} />
-              <InfoRow label="Status" value={<StatusBadge status={profile.status} styles={STATUS_STYLES} />} />
+              <InfoRow label="Status" value={<StatusBadge status={profile.status} />} />
             </InfoCard>
           </div>
 
@@ -176,53 +164,6 @@ export default function Profile() {
 }
 
 // ── Presentational helpers ──
-
-const formatType = (t) => (t ? t.charAt(0) + t.slice(1).toLowerCase() : '—');
-
-function StatusBadge({ status, styles }) {
-  const base = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ring-inset';
-  const style = (styles ?? STATUS_STYLES)[status] ?? 'bg-slate-50 text-slate-600 ring-slate-600/20 dark:bg-gray-800 dark:text-slate-300 dark:ring-slate-400/20';
-  return (
-    <span className={`${base} ${style}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {(status || '—').charAt(0) + (status || '').slice(1).toLowerCase()}
-    </span>
-  );
-}
-
-function InfoCard({ icon: Icon, title, children }) {
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
-        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-          <Icon className="h-4 w-4" />
-        </div>
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</h3>
-      </div>
-      <div className="px-6 py-4 space-y-3">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-[13px] text-slate-400">{label}</span>
-      <span className="text-[13px] font-medium text-slate-700 dark:text-slate-200 text-right">{value}</span>
-    </div>
-  );
-}
-
-function Detail({ label, value }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="text-[12px] font-medium text-slate-700 dark:text-slate-200 truncate">{value}</p>
-    </div>
-  );
-}
 
 function ErrorState({ message, onRetry }) {
   return (

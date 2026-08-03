@@ -4,11 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/context/AuthContext';
 import { Wallet, Loader2, Eye, EyeOff, Sparkles, Shield } from 'lucide-react';
 import { loginSchema } from '@/validations/authSchema';
-
-const inputClass =
-  'w-full px-3.5 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-all text-sm';
-
-const inputClassFor = (hasError) => `${inputClass} ${hasError ? 'border-red-400 dark:border-red-500 focus:ring-red-500/20 focus:border-red-500' : ''}`;
+import { inputClassFor } from '@/components/ui/form';
 
 export default function Login() {
   const { login } = useAuth();

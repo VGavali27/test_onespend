@@ -1,30 +1,17 @@
 import { useState } from 'react';
+import { formatDate } from '@/utils/format';
+import { getFullName, getInitials } from '@/utils/user';
 import { Link } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Users as UsersIcon, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import DataTablePage from '@/components/ui/DataTablePage';
+import StatusBadge from '@/components/ui/StatusBadge';
 import { getUsers } from '@/services/masterService';
-
-const STATUS_STYLES = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
-  INACTIVE: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
-  BLOCKED: 'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-400/20',
-};
 
 const STATUS_OPTIONS = ['ALL', 'ACTIVE', 'INACTIVE', 'BLOCKED'];
 
 // Frontend accessor id → backend sortable attribute name
 const SORT_FIELD_MAP = { createdAt: 'createdAt', first_name: 'first_name' };
-
-const getFullName = (u) => [u.first_name, u.middle_name, u.last_name].filter(Boolean).join(' ') || '—';
-
-const getInitials = (u) =>
-  ((u.first_name?.[0] ?? '') + (u.last_name?.[0] ?? '')).toUpperCase() || '?';
-
-const formatDate = (iso) =>
-  iso
-    ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—';
 
 const columnHelper = createColumnHelper();
 
@@ -172,17 +159,6 @@ function UserCell({ user }) {
         <p className="text-[12px] text-slate-400 truncate">{user.email || '—'}</p>
       </div>
     </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const base = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ring-inset';
-  const style = STATUS_STYLES[status] ?? 'bg-slate-50 text-slate-600 ring-slate-600/20 dark:bg-gray-800 dark:text-slate-300 dark:ring-slate-400/20';
-  return (
-    <span className={`${base} ${style}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {(status || '—').charAt(0) + (status || '').slice(1).toLowerCase()}
-    </span>
   );
 }
 

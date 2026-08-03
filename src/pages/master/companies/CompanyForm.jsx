@@ -6,6 +6,8 @@ import { getGroupOptions } from '@/services/masterService';
 import { companyFormSchema } from '@/validations/companySchema';
 import { inputClassFor, FormSection, FormField } from '@/components/ui/form';
 import ImageUpload from '@/components/ui/ImageUpload';
+import { nullIfEmpty } from '@/utils/format';
+import { applyServerErrors } from '@/utils/formErrors';
 
 const emptyForm = {
   name: '',
@@ -78,33 +80,24 @@ export default function CompanyForm({
       code: values.code.trim(),
       group_uuid: values.group_uuid,
       status: values.status,
-      logo_img: values.logo_img.trim() || null,
-      email: values.email.trim() || null,
-      phone: values.phone.trim() || null,
-      website: values.website.trim() || null,
-      gst_number: values.gst_number.trim() || null,
-      pan_number: values.pan_number.trim() || null,
-      cin_number: values.cin_number.trim() || null,
-      address_line_1: values.address_line_1.trim() || null,
-      address_line_2: values.address_line_2.trim() || null,
-      city: values.city.trim() || null,
-      state: values.state.trim() || null,
-      country: values.country.trim() || null,
-      pincode: values.pincode.trim() || null,
+      logo_img: nullIfEmpty(values.logo_img),
+      email: nullIfEmpty(values.email),
+      phone: nullIfEmpty(values.phone),
+      website: nullIfEmpty(values.website),
+      gst_number: nullIfEmpty(values.gst_number),
+      pan_number: nullIfEmpty(values.pan_number),
+      cin_number: nullIfEmpty(values.cin_number),
+      address_line_1: nullIfEmpty(values.address_line_1),
+      address_line_2: nullIfEmpty(values.address_line_2),
+      city: nullIfEmpty(values.city),
+      state: nullIfEmpty(values.state),
+      country: nullIfEmpty(values.country),
+      pincode: nullIfEmpty(values.pincode),
     };
     try {
       await onSubmit(payload);
     } catch (err) {
-      const serverErrors = err?.response?.data?.errors;
-      if (Array.isArray(serverErrors) && serverErrors.length > 0) {
-        for (const e of serverErrors) {
-          try {
-            setError(e.field, { type: 'server', message: e.message });
-          } catch {
-            // field not in the form — skip
-          }
-        }
-      } else {
+      if (!applyServerErrors(err, setError)) {
         setSubmitError(err?.response?.data?.message || 'Failed to save company. Please try again.');
       }
     }

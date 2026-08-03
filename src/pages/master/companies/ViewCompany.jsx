@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatDate } from '@/utils/format';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Building2, Mail, MapPin, FileText, Clock } from 'lucide-react';
 import { companyApi } from '@/services/masterService';
@@ -7,8 +8,6 @@ import ErrorState from '@/components/ui/ErrorState';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
 import { resolveAssetUrl } from '@/utils/assets';
 
-const formatDate = (iso) =>
-  iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 export default function ViewCompany() {
   const { uuid } = useParams();

@@ -5,13 +5,10 @@ import { UserRound, KeyRound, Briefcase, Plus, Trash2, Loader2, Eye, EyeOff } fr
 import { getCompanyOptions, getDepartmentOptions } from '@/services/masterService';
 import { getRoleOptions } from '@/services/accessService';
 import ImageUpload from '@/components/ui/ImageUpload';
+import { inputClassFor } from '@/components/ui/form';
+import { nullIfEmpty } from '@/utils/format';
+import { applyServerErrors } from '@/utils/formErrors';
 import { buildUserFormSchema, EMPLOYMENT_TYPES } from '@/validations/userFormSchema';
-
-const inputClass =
-  'w-full px-3.5 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-all text-sm';
-
-// Add a red border on invalid fields (drives off the RHF `errors` state)
-const inputClassFor = (hasError) => `${inputClass} ${hasError ? 'border-red-400 dark:border-red-500 focus:ring-red-500/20 focus:border-red-500' : ''}`;
 
 const emptyForm = {
   first_name: '',
@@ -100,11 +97,11 @@ export default function UserForm({
     setSubmitError(null);
     const payload = {
       first_name: values.first_name.trim(),
-      middle_name: values.middle_name.trim() || null,
-      last_name: values.last_name.trim() || null,
-      email: values.email.trim() || null,
-      mobile: values.mobile.trim() || null,
-      profile_image: values.profile_image.trim() || null,
+      middle_name: nullIfEmpty(values.middle_name),
+      last_name: nullIfEmpty(values.last_name),
+      email: nullIfEmpty(values.email),
+      mobile: nullIfEmpty(values.mobile),
+      profile_image: nullIfEmpty(values.profile_image),
       status: values.status,
       role_uuid: values.role_uuid,
       department_uuid: values.department_uuid || null,
@@ -113,27 +110,17 @@ export default function UserForm({
         ? values.employments.map((emp) => ({
             company_uuid: emp.company_uuid,
             employee_code: emp.employee_code,
-            email: emp.email || null,
-            designation: emp.designation || null,
+            email: nullIfEmpty(emp.email),
+            designation: nullIfEmpty(emp.designation),
             employment_type: emp.employment_type,
-            joining_date: emp.joining_date || null,
+            joining_date: nullIfEmpty(emp.joining_date),
           }))
         : null,
     };
     try {
       await onSubmit(payload);
     } catch (err) {
-      // Map server-side validation errors (Joi 422) back onto fields
-      const serverErrors = err?.response?.data?.errors;
-      if (Array.isArray(serverErrors) && serverErrors.length > 0) {
-        for (const e of serverErrors) {
-          try {
-            setError(e.field, { type: 'server', message: e.message });
-          } catch {
-            // field not present in the form — skip
-          }
-        }
-      } else {
+      if (!applyServerErrors(err, setError)) {
         setSubmitError(err?.response?.data?.message || 'Failed to save user. Please try again.');
       }
     }

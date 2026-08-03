@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Shield, Loader2, Save, KeyRound } from 'lucide-react';
 import { roleApi, permissionApi, getPermissionsByRole, syncRolePermissions } from '@/services/accessService';
-
-const inputClass =
-  'w-full px-3.5 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm';
+import { inputClass } from '@/components/ui/form';
 
 export default function RolePermissions() {
   const [roles, setRoles] = useState([]);

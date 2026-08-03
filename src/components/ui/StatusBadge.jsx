@@ -4,10 +4,11 @@ const STATUS_STYLES = {
   BLOCKED: 'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-400/20',
 };
 
-// Reusable status pill for list/table columns (matches the Users page styling)
-export default function StatusBadge({ status }) {
+// Reusable status pill for list/table columns. Pass `styles` to override the
+// default ACTIVE/INACTIVE/BLOCKED map (e.g. employment statuses).
+export default function StatusBadge({ status, styles }) {
   const base = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1 ring-inset';
-  const style = STATUS_STYLES[status] ?? 'bg-slate-50 text-slate-600 ring-slate-600/20 dark:bg-gray-800 dark:text-slate-300 dark:ring-slate-400/20';
+  const style = (styles ?? STATUS_STYLES)[status] ?? 'bg-slate-50 text-slate-600 ring-slate-600/20 dark:bg-gray-800 dark:text-slate-300 dark:ring-slate-400/20';
   return (
     <span className={`${base} ${style}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />

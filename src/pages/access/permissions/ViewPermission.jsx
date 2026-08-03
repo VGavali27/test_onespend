@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatDate } from '@/utils/format';
 import { useNavigate, useParams } from 'react-router-dom';
 import { KeyRound, Clock } from 'lucide-react';
 import { permissionApi } from '@/services/accessService';
@@ -6,8 +7,6 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import ErrorState from '@/components/ui/ErrorState';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
 
-const formatDate = (iso) =>
-  iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 export default function ViewPermission() {
   const { uuid } = useParams();

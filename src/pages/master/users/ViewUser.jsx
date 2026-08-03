@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { formatDate, formatType } from '@/utils/format';
+import { getFullName, getInitials } from '@/utils/user';
 import { useNavigate, useParams } from 'react-router-dom';
 import { UserRound, Building2, Shield, Briefcase, Inbox } from 'lucide-react';
 import { userApi } from '@/services/masterService';
@@ -7,10 +9,6 @@ import ErrorState from '@/components/ui/ErrorState';
 import { InfoCard, InfoRow, Detail, DetailHeader } from '@/components/ui/detail';
 import { resolveAssetUrl } from '@/utils/assets';
 
-const getFullName = (u) => [u?.first_name, u?.middle_name, u?.last_name].filter(Boolean).join(' ') || '—';
-const getInitials = (u) => ((u?.first_name?.[0] ?? '') + (u?.last_name?.[0] ?? '')).toUpperCase() || '?';
-const formatDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
-const formatType = (t) => (t ? t.charAt(0) + t.slice(1).toLowerCase() : '—');
 
 export default function ViewUser() {
   const { uuid } = useParams();

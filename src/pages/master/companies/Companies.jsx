@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { formatDate } from '@/utils/format';
+import { sortRows } from '@/utils/table';
 import { Link } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Building2, Plus, Pencil, Trash2, Loader2, Eye } from 'lucide-react';
@@ -10,25 +12,8 @@ import { resolveAssetUrl } from '@/utils/assets';
 
 const columnHelper = createColumnHelper();
 
-const formatDate = (iso) =>
-  iso
-    ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—';
 
 // Client-side sort (the backend list returns all rows unsorted)
-const sortRows = (rows, sortBy, sortOrder) => {
-  if (!sortBy) return rows;
-  const dir = sortOrder === 'desc' ? -1 : 1;
-  return [...rows].sort((a, b) => {
-    const av = a[sortBy];
-    const bv = b[sortBy];
-    if (av == null && bv == null) return 0;
-    if (av == null) return 1 * dir;
-    if (bv == null) return -1 * dir;
-    if (typeof av === 'string') return av.localeCompare(String(bv)) * dir;
-    return (av < bv ? -1 : av > bv ? 1 : 0) * dir;
-  });
-};
 
 export default function Companies() {
   const [deleteTarget, setDeleteTarget] = useState(null);

@@ -81,7 +81,11 @@ src/
 │   ├── companySchema.js           # Company create/edit form schema (full detail)
 │   └── departmentSchema.js        # Department create/edit form schema
 └── utils/
-    └── assets.js                  # resolveAssetUrl(path) — backend asset path → absolute URL
+    ├── assets.js                  # resolveAssetUrl(path) — backend asset path → absolute URL
+    ├── format.js                  # formatDate, nullIfEmpty, formatType
+    ├── user.js                    # getFullName, getInitials
+    ├── table.js                   # sortRows (client-side sort for DataTable)
+    └── formErrors.js              # applyServerErrors — map 422 errors onto RHF fields
 ```
 
 ## Key Conventions

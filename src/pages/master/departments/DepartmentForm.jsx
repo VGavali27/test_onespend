@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Tags, Loader2 } from 'lucide-react';
 import { departmentFormSchema } from '@/validations/departmentSchema';
 import { inputClassFor, FormSection, FormField } from '@/components/ui/form';
+import { nullIfEmpty } from '@/utils/format';
+import { applyServerErrors } from '@/utils/formErrors';
 
 const emptyForm = { name: '', code: '', status: 'ACTIVE', description: '' };
 
@@ -39,21 +41,12 @@ export default function DepartmentForm({
       name: values.name.trim(),
       code: values.code.trim(),
       status: values.status,
-      description: values.description.trim() || null,
+      description: nullIfEmpty(values.description),
     };
     try {
       await onSubmit(payload);
     } catch (err) {
-      const serverErrors = err?.response?.data?.errors;
-      if (Array.isArray(serverErrors) && serverErrors.length > 0) {
-        for (const e of serverErrors) {
-          try {
-            setError(e.field, { type: 'server', message: e.message });
-          } catch {
-            // field not in the form — skip
-          }
-        }
-      } else {
+      if (!applyServerErrors(err, setError)) {
         setSubmitError(err?.response?.data?.message || 'Failed to save department. Please try again.');
       }
     }
