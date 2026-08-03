@@ -1,7 +1,7 @@
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Wallet, LogOut, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Wallet, LogOut, Menu, X, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useState } from 'react';
 import { menuConfig } from '@/data/menuConfig';
 
 const hasAccess = (roles, userRole) => {
@@ -10,20 +10,28 @@ const hasAccess = (roles, userRole) => {
   return false;
 };
 
-// Single leaf nav link
-function LeafItem({ item, onNavigate }) {
+// The parent whose children contain the current path (used to open it on load)
+const activeParentId = (menus, pathname) =>
+  menus.find((m) => m.children?.some((c) => pathname.startsWith(c.to)))?.id ?? null;
+
+// Single leaf nav link. `nested` = rendered inside a submenu → tighter padding + smaller icon.
+function LeafItem({ item, onNavigate, nested = false }) {
   const Icon = item.icon;
   return (
     <NavLink to={item.to} onClick={onNavigate} className="block">
       {({ isActive }) => (
         <span
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+          className={`flex items-center gap-2.5 ${nested ? 'px-2.5 py-1.5' : 'px-3 py-2'} rounded-lg text-[13px] font-medium transition-colors ${
             isActive
               ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800'
           }`}
         >
-          <Icon className="h-4.5 w-4.5 flex-shrink-0" />
+          <Icon
+            className={`${nested ? 'h-3.5 w-3.5' : 'h-4.5 w-4.5'} flex-shrink-0 ${
+              nested ? 'text-slate-400 dark:text-slate-500' : ''
+            }`}
+          />
           <span className="truncate">{item.label}</span>
           {isActive && <span className="ml-auto w-1 h-4 bg-indigo-500 rounded-full" />}
         </span>
@@ -32,34 +40,28 @@ function LeafItem({ item, onNavigate }) {
   );
 }
 
-// Parent item with collapsible children
-function ParentItem({ item, onNavigate, openMenus, toggleMenu }) {
+// Parent item with collapsible submenu. Accordion: only one submenu is open at a time.
+function ParentItem({ item, onNavigate, open, toggleMenu }) {
   const Icon = item.icon;
-  const isOpen = openMenus.includes(item.id);
-  const location = useLocation();
-  const hasActiveChild = item.children?.some((c) => location.pathname.startsWith(c.to));
-
   return (
     <div>
       <button
         onClick={() => toggleMenu(item.id)}
         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
-          hasActiveChild
+          open
             ? 'text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800'
         }`}
       >
         <Icon className="h-4.5 w-4.5 flex-shrink-0" />
         <span className="flex-1 text-left truncate">{item.label}</span>
-        <ChevronDown
-          className={`h-4 w-4 transition-transform duration-200 ${isOpen || hasActiveChild ? 'rotate-180' : ''}`}
-        />
+        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {(isOpen || hasActiveChild) && (
-        <div className="mt-1 ml-4 pl-3 border-l border-slate-200 dark:border-gray-700 space-y-0.5 animate-slide-in">
+      {open && (
+        <div className="mt-1 ml-2 pl-3 border-l border-slate-200 dark:border-gray-700 space-y-0.5 animate-slide-in">
           {item.children.map((child) => (
-            <LeafItem key={child.id} item={{ ...child, icon: ChevronRight }} onNavigate={onNavigate} />
+            <LeafItem key={child.id} item={child} nested onNavigate={onNavigate} />
           ))}
         </div>
       )}
@@ -69,11 +71,23 @@ function ParentItem({ item, onNavigate, openMenus, toggleMenu }) {
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openMenus, setOpenMenus] = useState([]);
+  // The section containing the current page is always open; `preview` lets you
+  // peek at another section without closing it. Navigating to a page commits
+  // to that section and collapses the rest.
+  const [preview, setPreview] = useState(null);
+
+  const activeId = useMemo(() => activeParentId(menuConfig, location.pathname), [location.pathname]);
+
+  useEffect(() => {
+    setPreview(null);
+  }, [location.pathname]);
 
   const toggleMenu = (id) => {
-    setOpenMenus((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
+    // Clicking the active section (or the currently previewed one) clears previews;
+    // clicking any other section previews it while keeping the active one open.
+    setPreview((prev) => (prev === id || id === activeId ? null : id));
   };
 
   const visibleMenus = menuConfig.filter((item) => hasAccess(item.roles, user?.role));
@@ -123,7 +137,7 @@ export default function Sidebar() {
                 key={item.id}
                 item={item}
                 onNavigate={() => setMobileOpen(false)}
-                openMenus={openMenus}
+                open={activeId === item.id || preview === item.id}
                 toggleMenu={toggleMenu}
               />
             ) : (
