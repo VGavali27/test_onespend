@@ -43,7 +43,7 @@ export const updateCategory = async (req, res, next) => {
 // Soft delete a category by UUID
 export const deleteCategory = async (req, res, next) => {
   try {
-    const result = await expenseCategoryService.delete(req.params.uuid);
+    const result = await expenseCategoryService.deleteRecord(req.params.uuid);
     return ApiResponse.success(res, null, result.message);
   } catch (error) {
     next(error);

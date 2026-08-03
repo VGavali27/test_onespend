@@ -1,11 +1,19 @@
 import db from '../../database/models/index.js';
-const { ExpenseCategory } = db;
+
+const { Role, ExpenseCategory } = db;
+
+// Include the receiver/approver role names on every read
+const roleIncludes = [
+  { model: Role, as: 'firstReceiverRole' },
+  { model: Role, as: 'finalApproverRole' },
+];
 
 // Fetch all categories ordered by name
-export const findAll = async () => ExpenseCategory.findAll({ order: [['name', 'ASC']] });
+export const findAll = async () => ExpenseCategory.findAll({ include: roleIncludes, order: [['name', 'ASC']] });
 
 // Find a category by its UUID
-export const findByUuid = async (uuid) => ExpenseCategory.findOne({ where: { uuid } });
+export const findByUuid = async (uuid) =>
+  ExpenseCategory.findOne({ where: { uuid }, include: roleIncludes });
 
 // Find a category by its code
 export const findByCode = async (code) => ExpenseCategory.findOne({ where: { code } });
