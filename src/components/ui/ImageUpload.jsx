@@ -4,13 +4,22 @@ import { uploadImage } from '@/services/uploadService';
 import { resolveAssetUrl } from '@/utils/assets';
 
 /**
- * Headshot-style profile image picker.
- * Circular preview with a camera overlay on hover, click or drag & drop to
- * upload, and a remove button once an image is set.
+ * Image picker with upload + preview + remove.
+ * Defaults to a circular (headshot) style; pass `shape="square"` for a
+ * company logo / thumbnail and an `icon` fallback (e.g. Building2).
  *
  *   <ImageUpload value={profileImage} onChange={setUrl} onRemove={clear} label="Profile image" />
+ *   <ImageUpload shape="square" icon={Building2} value={logoImg} onChange={setLogo} onRemove={clear} label="Logo" />
  */
-export default function ImageUpload({ value, onChange, onRemove, label, hint = 'PNG, JPG or WEBP up to 2MB' }) {
+export default function ImageUpload({
+  value,
+  onChange,
+  onRemove,
+  label,
+  hint = 'PNG, JPG or WEBP up to 2MB',
+  shape = 'circle',
+  icon: Icon = UserRound,
+}) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,6 +48,7 @@ export default function ImageUpload({ value, onChange, onRemove, label, hint = '
   };
 
   const src = value ? resolveAssetUrl(value) : null;
+  const containerShape = shape === 'square' ? 'rounded-xl' : 'rounded-full';
 
   return (
     <div className="flex flex-col items-center">
@@ -61,7 +71,7 @@ export default function ImageUpload({ value, onChange, onRemove, label, hint = '
           setDragging(false);
           handleFile(e.dataTransfer.files?.[0]);
         }}
-        className={`group relative w-28 h-28 rounded-full overflow-hidden border-2 border-dashed bg-slate-50 dark:bg-gray-800 flex items-center justify-center cursor-pointer transition-colors ${
+        className={`group relative w-28 h-28 ${containerShape} overflow-hidden border-2 border-dashed bg-slate-50 dark:bg-gray-800 flex items-center justify-center cursor-pointer transition-colors ${
           dragging
             ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
             : src
@@ -72,9 +82,9 @@ export default function ImageUpload({ value, onChange, onRemove, label, hint = '
         {uploading ? (
           <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
         ) : src ? (
-          <img src={src} alt="Profile preview" className="w-full h-full object-cover" />
+          <img src={src} alt="Preview" className="w-full h-full object-cover" />
         ) : (
-          <UserRound className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+          <Icon className="h-10 w-10 text-slate-300 dark:text-slate-600" />
         )}
 
         {/* Hover overlay — change photo */}

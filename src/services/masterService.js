@@ -20,3 +20,4 @@ export const getMyProfile = () => api.get('/users/me');
 // ── Dropdown options (lightweight: uuid + name) ──
 export const getCompanyOptions = () => api.get('/companies/options');
 export const getDepartmentOptions = () => api.get('/departments/options');
+export const getGroupOptions = () => api.get('/groups/options');

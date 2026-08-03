@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Users, RotateCw, UserX } from 'lucide-react';
 import { userApi } from '@/services/masterService';
-import UserForm from '@/pages/master/UserForm';
+import UserForm from '@/pages/master/users/UserForm';
 
 const toFormValues = (user) => ({
   first_name: user.first_name || '',
@@ -12,6 +12,7 @@ const toFormValues = (user) => ({
   mobile: user.mobile || '',
   password: '',
   profile_image: user.profile_image || '',
+  status: user.status || 'ACTIVE',
   role_uuid: user.role?.uuid || '',
   department_uuid: user.department?.uuid || '',
 });

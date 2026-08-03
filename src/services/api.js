@@ -57,7 +57,7 @@ api.interceptors.response.use(
  *   const one = await companyApi.get(uuid);
  */
 export const crud = (base) => ({
-  list: (params) => api.get(base, { params }),
+  list: (params, config) => api.get(base, { params, ...config }),
   get: (uuid) => api.get(`${base}/${uuid}`),
   create: (payload) => api.post(base, payload),
   update: (uuid, payload) => api.put(`${base}/${uuid}`, payload),

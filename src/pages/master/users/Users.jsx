@@ -14,7 +14,7 @@ const STATUS_STYLES = {
 const STATUS_OPTIONS = ['ALL', 'ACTIVE', 'INACTIVE', 'BLOCKED'];
 
 // Frontend accessor id → backend sortable attribute name
-const SORT_FIELD_MAP = { created_at: 'createdAt', first_name: 'first_name' };
+const SORT_FIELD_MAP = { createdAt: 'createdAt', first_name: 'first_name' };
 
 const getFullName = (u) => [u.first_name, u.middle_name, u.last_name].filter(Boolean).join(' ') || '—';
 
@@ -37,11 +37,24 @@ const columns = [
     header: 'Mobile',
     cell: (info) => info.getValue() || '—',
   }),
+  columnHelper.accessor('role', {
+    header: 'Role',
+    enableSorting: false,
+    cell: (info) => {
+      const role = info.getValue();
+      return role?.name ? <RoleBadge role={role} /> : '—';
+    },
+  }),
+  columnHelper.accessor('department', {
+    header: 'Department',
+    enableSorting: false,
+    cell: (info) => info.getValue()?.name || '—',
+  }),
   columnHelper.accessor('status', {
     header: 'Status',
     cell: (info) => <StatusBadge status={info.getValue()} />,
   }),
-  columnHelper.accessor('created_at', {
+  columnHelper.accessor('createdAt', {
     header: 'Created',
     cell: (info) => formatDate(info.getValue()),
   }),
@@ -49,8 +62,14 @@ const columns = [
     id: 'actions',
     header: () => <span className="block text-right">Actions</span>,
     cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        <IconButton title="View user" icon={Eye} />
+      <div className="flex items-center justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+        <Link
+          to={`/master/users/${row.original.uuid}`}
+          title="View user"
+          className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+        >
+          <Eye className="h-4 w-4" />
+        </Link>
         <Link
           to={`/master/users/${row.original.uuid}/edit`}
           title="Edit user"
@@ -145,7 +164,7 @@ function UserCell({ user }) {
   const name = getFullName(user);
   return (
     <div className="flex items-center gap-3">
-      <div className={`w-9 h-9 rounded-full ${avatarColorFor(name)} flex items-center justify-center text-xs font-bold flex-shrink-0`}>
+      <div className={`w-9 h-9 rounded-full ${avatarColorFor(name)} ring-1 ring-black/5 dark:ring-white/10 shadow-sm flex items-center justify-center text-xs font-bold flex-shrink-0`}>
         {getInitials(user)}
       </div>
       <div className="min-w-0">
@@ -163,6 +182,17 @@ function StatusBadge({ status }) {
     <span className={`${base} ${style}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
       {(status || '—').charAt(0) + (status || '').slice(1).toLowerCase()}
+    </span>
+  );
+}
+
+function RoleBadge({ role }) {
+  return (
+    <span
+      title={role.code}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold text-indigo-700 bg-indigo-50 ring-1 ring-inset ring-indigo-600/20 dark:text-indigo-300 dark:bg-indigo-900/20 dark:ring-indigo-400/20"
+    >
+      {role.name}
     </span>
   );
 }

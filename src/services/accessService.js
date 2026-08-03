@@ -10,5 +10,6 @@ export const getRoleOptions = () => api.get('/roles/options');
 
 // ── Role permissions (custom endpoints) ──
 export const getPermissionsByRole = (roleUuid) => api.get(`/role-permissions/by-role/${roleUuid}`);
+// The backend sync endpoint expects the permission UUIDs as the raw body (an array).
 export const syncRolePermissions = (roleUuid, permissionUuids) =>
-  api.put(`/role-permissions/${roleUuid}/sync`, { permissionUuids });
+  api.put(`/role-permissions/${roleUuid}/sync`, permissionUuids);

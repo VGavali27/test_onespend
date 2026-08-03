@@ -192,7 +192,7 @@ export default function DataTable({
     ) : null);
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
+    <div className="bg-surface rounded-lg border border-border shadow-card overflow-hidden">
       {renderedToolbar}
 
       {initialLoading ? (
@@ -204,23 +204,22 @@ export default function DataTable({
       ) : (
         <>
           <div className={`overflow-x-auto transition-opacity ${effective.loading ? 'opacity-60' : ''}`}>
-            <table className="w-full text-left">
+            <table className="w-full text-left border-separate border-spacing-0">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <tr
-                    key={headerGroup.id}
-                    className="border-b border-slate-200 dark:border-gray-700 bg-slate-50/80 dark:bg-gray-800/50"
-                  >
+                  <tr key={headerGroup.id}>
                     {headerGroup.headers.map((header) => (
                       <th
                         key={header.id}
-                        className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                        className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-secondary bg-surface-alt border-b border-border"
                       >
                         {header.isPlaceholder ? null : (
                           <div
                             className={
                               header.column.getCanSort()
-                                ? 'inline-flex items-center gap-1 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-200 transition-colors'
+                                ? `inline-flex items-center gap-1 cursor-pointer select-none transition-colors hover:text-text-primary ${
+                                    header.column.getIsSorted() ? 'text-brand-600' : ''
+                                  }`
                                 : ''
                             }
                             onClick={header.column.getToggleSortingHandler()}
@@ -239,12 +238,13 @@ export default function DataTable({
                   <tr
                     key={row.id}
                     onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                    className={`group border-l-2 border-l-transparent hover:border-l-indigo-500 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition-colors ${
-                      onRowClick ? 'cursor-pointer' : ''
-                    }`}
+                    className={`group transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-5 py-3.5">
+                      <td
+                        key={cell.id}
+                        className="px-5 py-3.5 border-b border-border-light group-hover:bg-surface-hover first:rounded-l-lg last:rounded-r-lg transition-colors last:border-b-0"
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -255,7 +255,7 @@ export default function DataTable({
           </div>
 
           {/* Pagination footer */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-slate-200 dark:border-gray-700 bg-slate-50/80 dark:bg-gray-800/50">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-border bg-surface-alt/60">
             <div className="flex items-center gap-4">
               <p className="text-[12px] text-slate-500 dark:text-slate-400">
                 Showing <span className="font-medium text-slate-700 dark:text-slate-200">{from}</span>–
@@ -276,7 +276,7 @@ export default function DataTable({
                   onChange={(e) =>
                     effective.setPagination((p) => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))
                   }
-                  className="px-2 py-1 rounded-md text-[12px] font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none cursor-pointer"
+                  className="px-2 py-1 rounded-lg text-[12px] font-medium text-text-secondary bg-surface border border-border focus:outline-none cursor-pointer"
                 >
                   {pageSizeOptions.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -305,10 +305,10 @@ export default function DataTable({
                   <button
                     key={p}
                     onClick={() => table.setPageIndex(p - 1)}
-                    className={`min-w-8 h-8 px-2 rounded-md text-[12px] font-semibold border transition-colors ${
+                    className={`min-w-8 h-8 px-2 rounded-lg text-[12px] font-semibold border transition-colors ${
                       p === pageIndex + 1
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/20'
-                        : 'bg-white dark:bg-gray-900 border-slate-200 dark:border-gray-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-gray-800'
+                        ? 'bg-brand-600 text-white border-brand-600 shadow-sm shadow-brand-600/20'
+                        : 'bg-surface border-border text-text-secondary hover:bg-surface-hover'
                     }`}
                   >
                     {p}
@@ -350,7 +350,7 @@ function PageButton({ onClick, disabled, title, icon: Icon }) {
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+      className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-border bg-surface text-text-tertiary hover:bg-surface-hover hover:text-text-primary disabled:opacity-40 disabled:pointer-events-none transition-colors"
     >
       <Icon className="h-4 w-4" />
     </button>
@@ -364,10 +364,10 @@ function SkeletonRows() {
         <div key={i} className="flex items-center gap-4 px-5 py-4">
           <div className="skeleton w-9 h-9 rounded-full flex-shrink-0" />
           <div className="flex-1 space-y-2">
-            <div className="skeleton h-3.5 w-40" />
-            <div className="skeleton h-3 w-56" />
+            <div className="skeleton h-3.5 w-40 rounded-lg" />
+            <div className="skeleton h-3 w-56 rounded-lg" />
           </div>
-          <div className="skeleton h-3.5 w-24" />
+          <div className="skeleton h-3.5 w-24 rounded-lg" />
           <div className="skeleton h-5 w-16 rounded-full" />
         </div>
       ))}

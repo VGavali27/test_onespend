@@ -1,27 +1,38 @@
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/context/AuthContext';
 import { Wallet, Loader2, Eye, EyeOff, Sparkles, Shield } from 'lucide-react';
+import { loginSchema } from '@/validations/authSchema';
+
+const inputClass =
+  'w-full px-3.5 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-all text-sm';
+
+const inputClassFor = (hasError) => `${inputClass} ${hasError ? 'border-red-400 dark:border-red-500 focus:ring-red-500/20 focus:border-red-500' : ''}`;
 
 export default function Login() {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(loginSchema),
+    mode: 'onBlur',
+  });
+
+  const handleFormSubmit = handleSubmit(async (values) => {
     setError('');
-    setLoading(true);
     try {
-      await login(email, password);
+      await login(values.email, values.password);
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials');
-    } finally {
-      setLoading(false);
+      setError(err?.response?.data?.message || 'Invalid credentials');
     }
-  };
+  });
 
   return (
     <div className="min-h-screen flex bg-gray-50 dark:bg-gray-950">
@@ -69,7 +80,7 @@ export default function Login() {
             <p className="text-sm text-gray-400 mt-1">Sign in to your account</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form noValidate onSubmit={handleFormSubmit} className="space-y-5">
             <div className="text-center lg:text-left">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Welcome back</h2>
               <p className="text-sm text-gray-400 mt-1">Enter your credentials to continue</p>
@@ -88,12 +99,11 @@ export default function Login() {
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email address</label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...register('email')}
                 placeholder="name@company.com"
-                required
-                className="w-full px-3.5 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-all text-sm"
+                className={inputClassFor(!!errors.email)}
               />
+              {errors.email && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.email.message}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -106,25 +116,24 @@ export default function Login() {
               <div className="relative">
                 <input
                   type={showPw ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  {...register('password')}
                   placeholder="Enter your password"
-                  required
-                  className="w-full px-3.5 py-3 pr-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 dark:focus:border-indigo-400 outline-none transition-all text-sm"
+                  className={`${inputClassFor(!!errors.password)} pr-11`}
                 />
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {errors.password && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{errors.password.message}</p>}
             </div>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="w-full py-3 px-4 gradient-brand hover:opacity-90 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2.5"
             >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? 'Signing in...' : 'Sign in'}
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSubmitting ? 'Signing in...' : 'Sign in'}
             </button>
 
             <div className="relative py-2">
@@ -140,7 +149,7 @@ export default function Login() {
                 <button
                   key={role}
                   type="button"
-                  onClick={() => { setEmail(e); setPassword('Admin@123'); }}
+                  onClick={() => { setValue('email', e); setValue('password', 'Admin@123'); }}
                   className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left group"
                 >
                   <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-105 transition-transform">

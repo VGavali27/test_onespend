@@ -12,13 +12,16 @@ React frontend for the enterprise expense management platform. Provides role-bas
 - **HTTP:** Axios (for API calls)
 - **Tables:** TanStack Table v8 (wrapped in reusable `DataTable`)
 - **State:** React Context (Auth, Theme)
+- **Forms/Validation:** React Hook Form + Zod (via `zodResolver`)
 
 ## Folder Structure
 ```
 src/
-├── App.jsx                        # Root — routing + providers
+├── App.jsx                        # Root — providers + <AppRoutes/>
 ├── main.jsx                       # Entry point
 ├── index.css                      # Design system + Tailwind theme
+├── routes/
+│   └── index.jsx                  # Route tree (pages lazily code-split via React.lazy)
 ├── components/
 │   ├── layout/
 │   │   ├── AppLayout.jsx          # Layout wrapper (sidebar + navbar + outlet)
@@ -28,7 +31,12 @@ src/
 │   │   ├── DataTable.jsx          # Generic TanStack table (self-managed fetchFn mode)
 │   │   ├── DataTablePage.jsx      # Listing page shell (header + search + DataTable)
 │   │   ├── Modal.jsx              # Reusable modal dialog
-│   │   └── ImageUpload.jsx        # Headshot uploader (drag-drop + preview)
+│   │   ├── ImageUpload.jsx        # Drag-&-drop image picker (shape="circle"|"square", icon override) → POST /uploads
+│   │   ├── StatusBadge.jsx        # ACTIVE/INACTIVE/BLOCKED status pill
+│   │   ├── PageHeader.jsx         # Standard page header (title/subtitle/icon + back)
+│   │   ├── ErrorState.jsx         # Full-card load-error state with retry
+│   │   ├── detail.jsx             # Read-only view primitives: InfoCard, InfoRow, Detail, DetailHeader (back + edit)
+│   │   └── form.jsx               # Form primitives: inputClass/For, FormSection, FormField
 │   └── ProtectedRoute.jsx         # Auth guard — redirects to /login if unauthenticated
 ├── context/
 │   ├── AuthContext.jsx            # Auth state, login/logout, JWT management
@@ -41,10 +49,16 @@ src/
 │   ├── dashboard/
 │   │   └── Dashboard.jsx          # Stats cards, charts, activity feed
 │   ├── master/
-│   │   ├── Users.jsx              # User list (server-side table + filters)
-│   │   ├── CreateUser.jsx         # Add User page
-│   │   ├── EditUser.jsx           # Edit User page (prefills via shared form)
-│   │   └── UserForm.jsx           # Shared user form (create + edit sections)
+│   │   ├── users/                 # Users: list / add / edit / view
+│   │   │   └── Users.jsx, CreateUser.jsx, EditUser.jsx, UserForm.jsx, ViewUser.jsx
+│   │   ├── companies/             # Companies: list / add / edit / view
+│   │   │   └── Companies.jsx, CreateCompany.jsx, EditCompany.jsx, CompanyForm.jsx, ViewCompany.jsx
+│   │   └── departments/           # Departments: list / add / edit / view
+│   │       └── Departments.jsx, CreateDepartment.jsx, EditDepartment.jsx, DepartmentForm.jsx, ViewDepartment.jsx
+│   ├── access/                    # Access Control
+│   │   ├── roles/                 # Roles: list / add / edit / view
+│   │   ├── permissions/           # Permissions: list / add / edit / view
+│   │   └── rolePermissions/       # RolePermissions: assign permissions to a role
 │   ├── profile/
 │   │   └── Profile.jsx            # My Profile page (navbar menu → GET /users/me)
 │   ├── expenses/                  # (future) MyExpenses, CreateExpense...
@@ -61,6 +75,11 @@ src/
 │   ├── accessService.js           # /roles, /permissions, /role-permissions, /roles/options
 │   ├── financeService.js          # /expense-categories
 │   └── uploadService.js           # POST /uploads (image upload)
+├── validations/                   # Shared Zod schemas — one file per form/domain
+│   ├── userFormSchema.js          # User create/edit form schema + EMPLOYMENT_TYPES
+│   ├── authSchema.js              # Login form schema
+│   ├── companySchema.js           # Company create/edit form schema (full detail)
+│   └── departmentSchema.js        # Department create/edit form schema
 └── utils/
     └── assets.js                  # resolveAssetUrl(path) — backend asset path → absolute URL
 ```
@@ -74,6 +93,7 @@ src/
 - **All API calls go through `src/services/`** — one file per domain; components never call axios directly
 - **Reusable listings:** use `DataTable` (self-managed `fetchFn` mode) or `DataTablePage` for any listing page
 - **Dropdown option fetches** use the lightweight `/options` endpoints (`getRoleOptions`, `getCompanyOptions`, `getDepartmentOptions`), not the full list APIs
+- **Forms:** all forms use React Hook Form + Zod — schemas live in `src/validations/`, components use `useForm` + `zodResolver`, dynamic rows use `useFieldArray`, and server-side 422 errors are mapped back onto fields via `setError`. Don't hand-roll form state or validation.
 
 ## Design System (Indigo/Slate)
 - **Primary:** `#6366f1` (indigo-500)
@@ -86,13 +106,17 @@ src/
 - **Dark mode:** toggle via Navbar or Settings, persists in localStorage
 
 ## Routing
+All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazily code-split** via `React.lazy`; the route tree is wrapped in one `Suspense` with a spinner fallback.
 ```
 /login                    → Public
 /                         → Protected (redirects to /login if unauthenticated)
 /dashboard                → Dashboard
-/master/users             → Users list (server-side table)
-/master/users/new         → Create User
-/master/users/:uuid/edit  → Edit User
+/master/companies         → Companies list / new / :uuid (view) / :uuid/edit
+/master/departments       → Departments list / new / :uuid (view) / :uuid/edit
+/master/users             → Users list / new / :uuid (view) / :uuid/edit
+/access/roles             → Roles list / new / :uuid (view) / :uuid/edit
+/access/permissions       → Permissions list / new / :uuid (view) / :uuid/edit
+/access/role-permissions  → Role Permissions (assignment)
 /profile                  → My Profile
 /settings                 → Settings
 /expenses, /travel, ...   → Mapped to pages (to be built)
@@ -123,18 +147,20 @@ VITE_APP_ENV=development
 - [x] Protected routes + auth guard
 - [x] Feature-based page structure + `@/` alias
 - [x] **Services layer** — shared axios client (JWT + 401 redirect) + per-module service files + `crud()` helper
-- [x] **Users module**
+- [x] **Users module** (`src/pages/master/users/`)
   - [x] List page — TanStack `DataTable`, server-side pagination / search / status filter / sorting
-  - [x] Add User page — full-width form, headshot image upload, optional employments (per-company email)
-  - [x] Edit User page — pre-filled shared `UserForm`, optional password change, editable employments
-- [x] **My Profile page** (navbar menu) — avatar, personal info, role/department, all employments
-- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload`
+  - [x] Add/Edit User — shared `UserForm` (RHF+Zod), headshot upload, **status field**, optional employments
+  - [x] View User — read-only detail (personal / role-dept / employments) with Edit button
+- [x] **Companies module** (`src/pages/master/companies/`) — list (client-side paginated `DataTable`, logo thumbnail), full-detail add/edit form (identity/contact/address/tax + status + **logo upload**), group dropdown via `/groups/options`, delete confirm, **View Company** with Edit button
+- [x] **Departments module** (`src/pages/master/departments/`) — list, add/edit form (name/code/status/description), delete confirm, **View Department** with Edit button
+- [x] **Access Control** (`src/pages/access/`) — Roles + Permissions list/add/edit/view, and **Role Permissions** page (role selector → grouped permission checklist → `sync` API); status field on both forms
+- [x] **React Hook Form + Zod** — `Login`, UserForm, CompanyForm, DepartmentForm; schemas in `src/validations/`
+- [x] **My Profile page** (navbar) — avatar, personal info, role/department, all employments
+- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `StatusBadge`, `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
 
 ### Pending
-- [ ] Delete User (confirm dialog) — table delete icon is a placeholder
-- [ ] View User detail (table eye icon is a placeholder)
-- [ ] Master pages for Companies, Departments, Employments
-- [ ] Access Control pages (Roles, Permissions, Role Permissions)
+- [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
+- [ ] Employments list/create pages (`/master/employments`)
 - [ ] Expenses pages (list, create, detail)
 - [ ] Travel pages
 - [ ] Finance pages (Categories, Payments, Reports)

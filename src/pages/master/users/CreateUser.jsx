@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users } from 'lucide-react';
 import { userApi } from '@/services/masterService';
-import UserForm from '@/pages/master/UserForm';
+import UserForm from '@/pages/master/users/UserForm';
 
 export default function CreateUser() {
   const navigate = useNavigate();
