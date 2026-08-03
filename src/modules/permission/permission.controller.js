@@ -43,7 +43,7 @@ export const updatePermission = async (req, res, next) => {
 // Soft delete a permission by UUID
 export const deletePermission = async (req, res, next) => {
   try {
-    const result = await permissionService.delete(req.params.uuid);
+    const result = await permissionService.deleteRecord(req.params.uuid);
     return ApiResponse.success(res, null, result.message);
   } catch (error) {
     next(error);

@@ -1,15 +1,17 @@
 import db from '../../database/models/index.js';
-const { Company } = db;
+const { Company, Group } = db;
 
 // Fetch all companies ordered by creation date (newest first)
-export const findAll = async () => Company.findAll({ order: [['createdAt', 'DESC']] });
+export const findAll = async () =>
+  Company.findAll({ order: [['createdAt', 'DESC']], include: [{ model: Group, as: 'group', attributes: ['name'] }] });
 
 // Lightweight dropdown options — only uuid + name
 export const findOptions = async () =>
   Company.findAll({ attributes: ['uuid', 'name'], order: [['name', 'ASC']] });
 
-// Find a company by its UUID
-export const findByUuid = async (uuid) => Company.findOne({ where: { uuid } });
+// Find a company by its UUID — includes group so the edit form can prefill group_uuid
+export const findByUuid = async (uuid) =>
+  Company.findOne({ where: { uuid }, include: [{ model: Group, as: 'group', attributes: ['uuid', 'name'] }] });
 
 // Find a company by its primary key ID
 export const findById = async (id) => Company.findByPk(id);

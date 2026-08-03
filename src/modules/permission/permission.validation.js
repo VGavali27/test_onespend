@@ -4,12 +4,14 @@ export const createPermissionSchema = Joi.object({
   action: Joi.string().required().messages({ 'string.empty': 'Action is required' }),
   permission_key: Joi.string().required().messages({ 'string.empty': 'Permission key is required' }),
   description: Joi.string().allow(null, ''),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE'),
 }); // Schema for updating a permission — all fields optional, at least one required
 export const updatePermissionSchema = Joi.object({
   resource: Joi.string(),
   action: Joi.string(),
   permission_key: Joi.string(),
   description: Joi.string().allow(null, ''),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE'),
 })
   .min(1)
   .messages({ 'object.min': 'At least one field is required' });

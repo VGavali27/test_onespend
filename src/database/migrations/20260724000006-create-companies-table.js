@@ -10,6 +10,7 @@ export async function up(queryInterface, Sequelize) {
     group_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     name: { type: Sequelize.STRING(150), allowNull: true },
     code: { type: Sequelize.STRING(30), allowNull: true },
+    logo_img: { type: Sequelize.STRING, allowNull: true },
     email: { type: Sequelize.STRING, allowNull: true },
     phone: { type: Sequelize.STRING, allowNull: true },
     website: { type: Sequelize.STRING, allowNull: true },

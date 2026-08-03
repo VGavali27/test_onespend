@@ -53,7 +53,7 @@ export const updateRole = async (req, res, next) => {
 // Soft delete a role by UUID
 export const deleteRole = async (req, res, next) => {
   try {
-    const result = await roleService.delete(req.params.uuid);
+    const result = await roleService.deleteRecord(req.params.uuid);
     return ApiResponse.success(res, null, result.message);
   } catch (error) {
     next(error);

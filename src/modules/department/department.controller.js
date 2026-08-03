@@ -53,7 +53,7 @@ export const updateDepartment = async (req, res, next) => {
 // Soft delete a department by UUID
 export const deleteDepartment = async (req, res, next) => {
   try {
-    const result = await departmentService.delete(req.params.uuid);
+    const result = await departmentService.deleteRecord(req.params.uuid);
     return ApiResponse.success(res, null, result.message);
   } catch (error) {
     next(error);

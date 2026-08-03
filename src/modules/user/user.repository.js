@@ -31,6 +31,12 @@ export const findAll = async (params = {}) => {
     limit,
     offset: (page - 1) * limit,
     distinct: true,
+    // Only the fields the users table renders (name/email, mobile, status, created date, uuid)
+    attributes: ['uuid', 'first_name', 'middle_name', 'last_name', 'email', 'mobile', 'status', 'createdAt'],
+    include: [
+      { model: Role, as: 'role', attributes: ['name', 'code'] },
+      { model: Department, as: 'department', attributes: ['name'] },
+    ],
   });
 
   return { rows, total: count };
@@ -49,7 +55,7 @@ export const findProfileByUuid = async (uuid, transaction) =>
       {
         model: UserEmployment,
         as: 'employments',
-        include: [{ model: Company, as: 'company', attributes: ['name', 'code'] }],
+        include: [{ model: Company, as: 'company', attributes: ['uuid', 'name', 'code'] }],
         order: [['createdAt', 'DESC']],
       },
     ],

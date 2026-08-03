@@ -5,7 +5,7 @@ export async function up({ context }) {
   return context.bulkInsert('departments', [
     {
       id: 100,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567801',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678001',
       name: 'Finance',
       code: 'FIN',
       description: 'Finance Department',
@@ -15,7 +15,7 @@ export async function up({ context }) {
     },
     {
       id: 101,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567802',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678002',
       name: 'Admin',
       code: 'ADM',
       description: 'Administration Department',
@@ -25,7 +25,7 @@ export async function up({ context }) {
     },
     {
       id: 102,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567803',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678003',
       name: 'IT',
       code: 'IT',
       description: 'Information Technology Department',
@@ -35,7 +35,7 @@ export async function up({ context }) {
     },
     {
       id: 103,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567804',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678004',
       name: 'HR',
       code: 'HR',
       description: 'Human Resources Department',
@@ -45,7 +45,7 @@ export async function up({ context }) {
     },
     {
       id: 104,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567805',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678005',
       name: 'Travel Desk',
       code: 'TRV',
       description: 'Travel Desk Department',
@@ -55,7 +55,7 @@ export async function up({ context }) {
     },
     {
       id: 105,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567806',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678006',
       name: 'Purchase',
       code: 'PUR',
       description: 'Purchase Department',
@@ -65,7 +65,7 @@ export async function up({ context }) {
     },
     {
       id: 106,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567807',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678007',
       name: 'Ration',
       code: 'RAT',
       description: 'Ration Department',
@@ -75,7 +75,7 @@ export async function up({ context }) {
     },
     {
       id: 107,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567808',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678008',
       name: 'Marketing',
       code: 'MKT',
       description: 'Marketing Department',
@@ -85,7 +85,7 @@ export async function up({ context }) {
     },
     {
       id: 108,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567809',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678009',
       name: 'BU - HR',
       code: 'BUHR',
       description: 'Business Unit - HR Department',
@@ -95,7 +95,7 @@ export async function up({ context }) {
     },
     {
       id: 109,
-      uuid: 'b1c2d3e4-f5a6-7890-bcde-f1234567810',
+      uuid: 'b1c2d3e4-f5a6-7890-bcde-f12345678010',
       name: 'Legal',
       code: 'LGL',
       description: 'Legal Department',

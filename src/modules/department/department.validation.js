@@ -9,11 +9,14 @@ export const createDepartmentSchema = Joi.object({
     'string.max': 'Department code must be at most 30 characters',
   }),
   description: Joi.string().allow(null, ''),
-}); // Schema for updating a department — all fields optional, at least one required
+  status: Joi.string().valid('ACTIVE', 'INACTIVE'),
+});
+// Schema for updating a department — all fields optional, at least one required
 export const updateDepartmentSchema = Joi.object({
   name: Joi.string().max(150).messages({ 'string.max': 'Department name must be at most 150 characters' }),
   code: Joi.string().max(30),
   description: Joi.string().allow(null, ''),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE'),
 })
   .min(1)
   .messages({ 'object.min': 'At least one field is required' });

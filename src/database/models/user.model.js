@@ -37,7 +37,10 @@ export default (sequelize, DataTypes) => {
       email_verified_at: DataTypes.DATE,
       mobile_verified_at: DataTypes.DATE,
 
-      status: DataTypes.ENUM('ACTIVE', 'INACTIVE', 'BLOCKED'),
+      status: {
+        type: DataTypes.ENUM('ACTIVE', 'INACTIVE', 'BLOCKED'),
+        defaultValue: 'ACTIVE',
+      },
 
       created_by: DataTypes.BIGINT.UNSIGNED,
       updated_by: DataTypes.BIGINT.UNSIGNED,

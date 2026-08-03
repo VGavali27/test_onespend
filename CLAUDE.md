@@ -56,6 +56,7 @@ src/
 ├── modules/
 │   ├── auth/                     # Login (JWT), authMiddleware, requireRole, optionalAuth
 │   ├── upload/                   # Image upload (multer) → serves /uploads
+│   ├── group/                    # Read-only groups (GET /groups, /groups/options) — for company group dropdown
 │   ├── user/                     # CRUD + paginated list + GET /users/me
 │   └── company, department, role, permission, user_employment,
 │       role_permission, expense_category, expense, travel_*  # CRUD modules

@@ -12,6 +12,7 @@ export const createCompanySchema = Joi.object({
     'string.empty': 'Company code is required',
     'string.max': 'Company code must be at most 30 characters',
   }),
+  logo_img: Joi.string().allow(null, ''),
   email: Joi.string().email().allow(null, '').messages({ 'string.email': 'Must be a valid email' }),
   phone: Joi.string().allow(null, ''),
   website: Joi.string().uri().allow(null, '').messages({ 'string.uri': 'Website must be a valid URL' }),
@@ -24,11 +25,15 @@ export const createCompanySchema = Joi.object({
   state: Joi.string().allow(null, ''),
   country: Joi.string().allow(null, ''),
   pincode: Joi.string().allow(null, ''),
-}); // Schema for updating a company — all fields optional, at least one required
+  status: Joi.string().valid('ACTIVE', 'INACTIVE'),
+});
+
+// Schema for updating a company — all fields optional, at least one required
 export const updateCompanySchema = Joi.object({
   group_uuid: Joi.string().uuid().messages({ 'string.guid': 'Group UUID must be a valid UUID' }),
   name: Joi.string().max(150).messages({ 'string.max': 'Company name must be at most 150 characters' }),
   code: Joi.string().max(30),
+  logo_img: Joi.string().allow(null, ''),
   email: Joi.string().email().allow(null, '').messages({ 'string.email': 'Must be a valid email' }),
   phone: Joi.string().allow(null, ''),
   website: Joi.string().uri().allow(null, ''),
@@ -41,6 +46,7 @@ export const updateCompanySchema = Joi.object({
   state: Joi.string().allow(null, ''),
   country: Joi.string().allow(null, ''),
   pincode: Joi.string().allow(null, ''),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE'),
 })
   .min(1)
   .messages({ 'object.min': 'At least one field is required' });

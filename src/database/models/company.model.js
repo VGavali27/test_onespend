@@ -19,6 +19,8 @@ export default (sequelize, DataTypes) => {
       name: DataTypes.STRING(150),
       code: DataTypes.STRING(30),
 
+      logo_img: DataTypes.STRING,
+
       email: DataTypes.STRING,
       phone: DataTypes.STRING,
 

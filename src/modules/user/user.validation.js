@@ -37,6 +37,7 @@ export const createUserSchema = Joi.object({
     .required()
     .messages({ 'string.min': 'Password must be at least 6 characters', 'string.empty': 'Password is required' }),
   profile_image: Joi.string().allow(null, ''),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE', 'BLOCKED'),
   employments: Joi.array()
     .items(employmentSchema)
     .min(1)
@@ -55,6 +56,7 @@ export const updateUserSchema = Joi.object({
   mobile: Joi.string().max(20).allow(null, ''),
   password: Joi.string().min(6).max(128),
   profile_image: Joi.string().allow(null, ''),
+  status: Joi.string().valid('ACTIVE', 'INACTIVE', 'BLOCKED'),
   employments: Joi.array().items(employmentSchema).allow(null),
 })
   .min(1)
