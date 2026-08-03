@@ -35,8 +35,16 @@ const ViewPermission = lazy(() => import('@/pages/access/permissions/ViewPermiss
 
 const RolePermissions = lazy(() => import('@/pages/access/rolePermissions/RolePermissions'));
 
+const RoleHandoverRules = lazy(() => import('@/pages/access/roleHandoverRules/RoleHandoverRules'));
+const RoleHandoverRuleEdit = lazy(() => import('@/pages/access/roleHandoverRules/RoleHandoverRuleEdit'));
+
 const Profile = lazy(() => import('@/pages/profile/Profile'));
 const Settings = lazy(() => import('@/pages/settings/Settings'));
+
+const Categories = lazy(() => import('@/pages/finance/categories/Categories'));
+const CreateCategory = lazy(() => import('@/pages/finance/categories/CreateCategory'));
+const EditCategory = lazy(() => import('@/pages/finance/categories/EditCategory'));
+const ViewCategory = lazy(() => import('@/pages/finance/categories/ViewCategory'));
 
 // Shown briefly while a lazily-loaded page chunk downloads
 function PageLoader() {
@@ -92,8 +100,16 @@ export default function AppRoutes() {
 
           <Route path="access/role-permissions" element={<RolePermissions />} />
 
+          <Route path="access/role-handover-rules" element={<RoleHandoverRules />} />
+          <Route path="access/role-handover-rules/edit" element={<RoleHandoverRuleEdit />} />
+
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
+
+          <Route path="master/categories" element={<Categories />} />
+          <Route path="master/categories/new" element={<CreateCategory />} />
+          <Route path="master/categories/:uuid/edit" element={<EditCategory />} />
+          <Route path="master/categories/:uuid" element={<ViewCategory />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

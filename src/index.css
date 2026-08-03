@@ -133,11 +133,31 @@ input[type="text"], input[type="email"], input[type="password"], input[type="sea
 /* ── Animations ── */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-12px); } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 .animate-fade-in { animation: fadeIn 0.5s ease-out; }
 .animate-slide-in { animation: slideIn 0.4s ease-out; }
+.animate-slide-out { animation: slideOut 0.25s ease-in forwards; }
+
+/* ── Sidebar submenu: CSS height collapse (no JS timers) ── */
+.submenu {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+}
+.submenu.closed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden; /* hide links (and un-focusable) only after collapse is done */
+  transition: grid-template-rows 0.25s ease, opacity 0.2s ease, visibility 0s 0.25s;
+}
+.submenu-inner {
+  overflow: hidden;
+  min-height: 0;
+}
 .animate-scale-in { animation: scaleIn 0.3s ease-out; }
 
 /* ── Card Hover ── */

@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Wallet, Plane, Building2, Users, UserCog,
   Shield, Settings, BarChart3, CreditCard, ReceiptText,
   Briefcase, Landmark, Plus, CheckCircle2, BadgeCheck, Tags,
-  LayoutGrid, ShieldCheck, KeyRound, KeySquare,
+  LayoutGrid, ShieldCheck, KeyRound, KeySquare, ArrowRightLeft,
 } from 'lucide-react';
 
 /**
@@ -45,7 +45,6 @@ export const menuConfig = [
     icon: Landmark,
     roles: ['SUPER_ADMIN', 'CFO', 'FINANCE_MGR', 'FINANCE_JR', 'PAYMENT_MGR', 'PAYMENT_JR'],
     children: [
-      { id: 'categories', label: 'Expense Categories', icon: Tags, to: '/finance/categories', roles: ['SUPER_ADMIN', 'CFO', 'FINANCE_MGR'] },
       { id: 'payments', label: 'Payments', icon: CreditCard, to: '/finance/payments', roles: ['SUPER_ADMIN', 'CFO', 'PAYMENT_MGR', 'PAYMENT_JR'] },
       { id: 'reports', label: 'Reports', icon: BarChart3, to: '/finance/reports', roles: ['SUPER_ADMIN', 'CFO', 'FINANCE_MGR'] },
     ],
@@ -60,6 +59,7 @@ export const menuConfig = [
       { id: 'departments', label: 'Departments', icon: LayoutGrid, to: '/master/departments', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },
       { id: 'users', label: 'Users', icon: Users, to: '/master/users', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },
       { id: 'user-employments', label: 'Employments', icon: UserCog, to: '/master/employments', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },
+      { id: 'categories', label: 'Expense Categories', icon: Tags, to: '/master/categories', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },
     ],
   },
   {
@@ -71,6 +71,7 @@ export const menuConfig = [
       { id: 'roles', label: 'Roles', icon: ShieldCheck, to: '/access/roles', roles: ['SUPER_ADMIN'] },
       { id: 'permissions', label: 'Permissions', icon: KeyRound, to: '/access/permissions', roles: ['SUPER_ADMIN'] },
       { id: 'role-permissions', label: 'Role Permissions', icon: KeySquare, to: '/access/role-permissions', roles: ['SUPER_ADMIN'] },
+      { id: 'role-handover-rules', label: 'Role Handover Rules', icon: ArrowRightLeft, to: '/access/role-handover-rules', roles: ['SUPER_ADMIN'] },
     ],
   },
   {

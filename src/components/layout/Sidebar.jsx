@@ -40,6 +40,20 @@ function LeafItem({ item, onNavigate, nested = false }) {
   );
 }
 
+// Accordion submenu rendered with a CSS height transition (see .submenu in index.css).
+// Stays in the DOM and toggles a class, so open/close animates smoothly with no timers.
+function Submenu({ open, children }) {
+  return (
+    <div className={`submenu ${open ? '' : 'closed'}`} aria-hidden={!open}>
+      <div className="submenu-inner">
+        <div className="mt-1 ml-2 pl-3 border-l border-slate-200 dark:border-gray-700 space-y-0.5">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Parent item with collapsible submenu. Accordion: only one submenu is open at a time.
 function ParentItem({ item, onNavigate, open, toggleMenu }) {
   const Icon = item.icon;
@@ -58,13 +72,11 @@ function ParentItem({ item, onNavigate, open, toggleMenu }) {
         <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {open && (
-        <div className="mt-1 ml-2 pl-3 border-l border-slate-200 dark:border-gray-700 space-y-0.5 animate-slide-in">
-          {item.children.map((child) => (
-            <LeafItem key={child.id} item={child} nested onNavigate={onNavigate} />
-          ))}
-        </div>
-      )}
+      <Submenu open={open}>
+        {item.children.map((child) => (
+          <LeafItem key={child.id} item={child} nested onNavigate={onNavigate} />
+        ))}
+      </Submenu>
     </div>
   );
 }
@@ -73,21 +85,20 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  // The section containing the current page is always open; `preview` lets you
-  // peek at another section without closing it. Navigating to a page commits
-  // to that section and collapses the rest.
-  const [preview, setPreview] = useState(null);
+  // The currently expanded section — only one submenu open at a time.
+  // Clicking a parent toggles it, so even the active section can be closed.
+  const [openSection, setOpenSection] = useState(null);
 
   const activeId = useMemo(() => activeParentId(menuConfig, location.pathname), [location.pathname]);
 
+  // Open the section of the current page when it changes. A manual close is kept
+  // until the user navigates to a different section.
   useEffect(() => {
-    setPreview(null);
-  }, [location.pathname]);
+    setOpenSection((prev) => (activeId && prev !== activeId ? activeId : prev));
+  }, [activeId]);
 
   const toggleMenu = (id) => {
-    // Clicking the active section (or the currently previewed one) clears previews;
-    // clicking any other section previews it while keeping the active one open.
-    setPreview((prev) => (prev === id || id === activeId ? null : id));
+    setOpenSection((prev) => (prev === id ? null : id));
   };
 
   const visibleMenus = menuConfig.filter((item) => hasAccess(item.roles, user?.role));
@@ -137,7 +148,7 @@ export default function Sidebar() {
                 key={item.id}
                 item={item}
                 onNavigate={() => setMobileOpen(false)}
-                open={activeId === item.id || preview === item.id}
+                open={openSection === item.id}
                 toggleMenu={toggleMenu}
               />
             ) : (
