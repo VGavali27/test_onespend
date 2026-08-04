@@ -32,6 +32,7 @@ src/
 │   │   ├── DataTablePage.jsx      # Listing page shell (header + search + DataTable)
 │   │   ├── Modal.jsx              # Reusable modal dialog
 │   │   ├── ImageUpload.jsx        # Drag-&-drop image picker (shape="circle"|"square", icon override) → POST /uploads
+│   │   ├── DatePicker.jsx         # Themed date/date-time picker (react-datepicker) + DateField RHF helper
 │   │   ├── StatusBadge.jsx        # ACTIVE/INACTIVE/BLOCKED status pill
 │   │   ├── PageHeader.jsx         # Standard page header (title/subtitle/icon + back)
 │   │   ├── ErrorState.jsx         # Full-card load-error state with retry
@@ -62,7 +63,7 @@ src/
 │   │   └── roleHandoverRules/     # RoleHandoverRules: list + Role-Permissions-style editor (add/remove via sync)
 │   ├── profile/
 │   │   └── Profile.jsx            # My Profile page (navbar menu → GET /users/me)
-│   ├── expenses/                  # (future) MyExpenses, CreateExpense...
+│   ├── expenses/                  # MyExpenses (mock list), CreateExpense (real API create), ExpenseDetail (mock view)
 │   ├── travel/                    # (future) TravelRequests...
 │   ├── finance/
 │   │   └── categories/            # Expense Categories: list / add / edit / view (routed + menu under Master Data → /master/categories)

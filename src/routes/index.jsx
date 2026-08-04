@@ -8,6 +8,10 @@ import AppLayout from '@/components/layout/AppLayout';
 const Login = lazy(() => import('@/pages/auth/Login'));
 const Dashboard = lazy(() => import('@/pages/dashboard/Dashboard'));
 
+const MyExpenses = lazy(() => import('@/pages/expenses/MyExpenses'));
+const CreateExpense = lazy(() => import('@/pages/expenses/CreateExpense'));
+const ExpenseDetail = lazy(() => import('@/pages/expenses/ExpenseDetail'));
+
 const Users = lazy(() => import('@/pages/master/users/Users'));
 const CreateUser = lazy(() => import('@/pages/master/users/CreateUser'));
 const EditUser = lazy(() => import('@/pages/master/users/EditUser'));
@@ -70,7 +74,9 @@ export default function AppRoutes() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="expenses" element={<Dashboard />} />
+          <Route path="expenses/my" element={<MyExpenses />} />
+          <Route path="expenses/new" element={<CreateExpense />} />
+          <Route path="expenses/:id" element={<ExpenseDetail />} />
 
           <Route path="master/companies" element={<Companies />} />
           <Route path="master/companies/new" element={<CreateCompany />} />

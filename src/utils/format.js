@@ -8,3 +8,7 @@ export const nullIfEmpty = (v) => (typeof v === 'string' && v.trim() !== '' ? v.
 
 // "PERMANENT" -> "Permanent"
 export const formatType = (t) => (t ? t.charAt(0) + t.slice(1).toLowerCase() : '—');
+
+// ₹ amount formatting (Indian locale)
+export const formatCurrency = (amount) =>
+  amount == null ? '—' : `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
