@@ -1,22 +1,28 @@
 /**
- * Seeder: Insert role handover rules for travel module
+ * Seeder: Insert role handover rules for each expense module.
  *
  * Defines which roles can hand over expense approval to which other roles.
+ * Each module gets the same standard manager chain (see buildRules).
  *
  * Role IDs: 100 SUPER_ADMIN, 101 CFO, 102 PAYMENT_MGR, 103 PAYMENT_JR,
  * 104 FINANCE_MGR, 105 FINANCE_JR, 106 ADMIN_MGR, 107 ADMIN_JR,
  * 108 TRAVEL_MGR, 109 TRAVEL_JR, 110 HOD, 111 EMP_MGR, 112 EMPLOYEE
  */
-export async function up({ context }) {
-  const module = 'travel';
-  const rows = [];
 
+// modules + the uuid prefix used for their rules (prefixes are unique across
+// modules so rule UUIDs never collide)
+const MODULES = [
+  { module: 'travel', prefix: 'd2e3f4a5-b6c7-8901-cdef-12345678' },
+  { module: 'reimbursement', prefix: 'd3e4f5a6-b7c8-9012-cdef-12345678' },
+];
+
+function buildRules(module, prefix) {
+  const rows = [];
   let ruleSeq = 0;
   const addRule = (fromRoleId, toRoleId) => {
     ruleSeq += 1;
-    const seq = String(ruleSeq).padStart(3, '0');
     rows.push({
-      uuid: `d2e3f4a5-b6c7-8901-cdef-12345678${seq}`,
+      uuid: `${prefix}${String(ruleSeq).padStart(3, '0')}`,
       module,
       from_role_id: fromRoleId,
       to_role_id: toRoleId,
@@ -26,7 +32,6 @@ export async function up({ context }) {
     });
   };
 
-  // Manager role IDs for "all mgr" references
   const mgrRoles = [102, 104, 106, 108]; // PAYMENT_MGR, FINANCE_MGR, ADMIN_MGR, TRAVEL_MGR
 
   // ── SUPER_ADMIN (100) → all mgr + HOD + CFO ──
@@ -38,45 +43,32 @@ export async function up({ context }) {
   mgrRoles.forEach((r) => addRule(101, r));
   addRule(101, 110); // HOD
 
-  // ── FINANCE_MGR (104) → all other mgr + HOD + CFO ──
-  mgrRoles.filter((r) => r !== 104).forEach((r) => addRule(104, r));
-  addRule(104, 110); // HOD
-  addRule(104, 101); // CFO
-
-  // ── PAYMENT_MGR (102) → all other mgr + HOD + CFO ──
-  mgrRoles.filter((r) => r !== 102).forEach((r) => addRule(102, r));
-  addRule(102, 110); // HOD
-  addRule(102, 101); // CFO
-
-  // ── ADMIN_MGR (106) → all other mgr + HOD + CFO ──
-  mgrRoles.filter((r) => r !== 106).forEach((r) => addRule(106, r));
-  addRule(106, 110); // HOD
-  addRule(106, 101); // CFO
-
-  // ── TRAVEL_MGR (108) → all other mgr + HOD + CFO ──
-  mgrRoles.filter((r) => r !== 108).forEach((r) => addRule(108, r));
-  addRule(108, 110); // HOD
-  addRule(108, 101); // CFO
+  // each manager → all other managers + HOD + CFO
+  for (const mgr of [104, 102, 106, 108]) {
+    mgrRoles.filter((r) => r !== mgr).forEach((r) => addRule(mgr, r));
+    addRule(mgr, 110); // HOD
+    addRule(mgr, 101); // CFO
+  }
 
   // ── HOD (110) → all mgr + CFO ──
   mgrRoles.forEach((r) => addRule(110, r));
   addRule(110, 101); // CFO
 
-  // ── FINANCE_JR (105) → FINANCE_MGR (104) ──
-  addRule(105, 104);
+  // JR → MGR
+  addRule(105, 104); // FINANCE_JR → FINANCE_MGR
+  addRule(103, 102); // PAYMENT_JR → PAYMENT_MGR
+  addRule(107, 106); // ADMIN_JR → ADMIN_MGR
+  addRule(109, 108); // TRAVEL_JR → TRAVEL_MGR
 
-  // ── PAYMENT_JR (103) → PAYMENT_MGR (102) ──
-  addRule(103, 102);
+  return rows;
+}
 
-  // ── ADMIN_JR (107) → ADMIN_MGR (106) ──
-  addRule(107, 106);
-
-  // ── TRAVEL_JR (109) → TRAVEL_MGR (108) ──
-  addRule(109, 108);
-
-  await context.bulkInsert('role_handover_rules', rows);
+export async function up({ context }) {
+  for (const { module, prefix } of MODULES) {
+    await context.bulkInsert('role_handover_rules', buildRules(module, prefix));
+  }
 }
 
 export async function down({ context }) {
-  return context.bulkDelete('role_handover_rules', { module: 'travel' }, {});
+  return context.bulkDelete('role_handover_rules', { module: MODULES.map((m) => m.module) }, {});
 }

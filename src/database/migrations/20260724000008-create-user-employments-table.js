@@ -9,7 +9,6 @@ export async function up(queryInterface, Sequelize) {
     uuid: { type: Sequelize.UUID, allowNull: false },
     user_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     company_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
-    department_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     employee_code: { type: Sequelize.STRING(50), allowNull: true },
     designation: { type: Sequelize.STRING(150), allowNull: true },
     email: { type: Sequelize.STRING(150), allowNull: true },
@@ -36,7 +35,6 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.addIndex('user_employments', ['uuid'], { name: 'idx_ue_uuid' });
   await queryInterface.addIndex('user_employments', ['user_id'], { name: 'idx_ue_user_id' });
   await queryInterface.addIndex('user_employments', ['company_id'], { name: 'idx_ue_company_id' });
-  await queryInterface.addIndex('user_employments', ['department_id'], { name: 'idx_ue_department_id' });
   await queryInterface.addIndex('user_employments', ['employee_code'], { name: 'idx_ue_employee_code' });
   await queryInterface.addIndex('user_employments', ['email'], { name: 'idx_ue_email' });
   await queryInterface.addConstraint('user_employments', {
@@ -52,14 +50,6 @@ export async function up(queryInterface, Sequelize) {
     type: 'foreign key',
     name: 'fk_ue_company_id',
     references: { table: 'companies', field: 'id' },
-    onUpdate: 'CASCADE',
-    onDelete: 'SET NULL',
-  });
-  await queryInterface.addConstraint('user_employments', {
-    fields: ['department_id'],
-    type: 'foreign key',
-    name: 'fk_ue_department_id',
-    references: { table: 'departments', field: 'id' },
     onUpdate: 'CASCADE',
     onDelete: 'SET NULL',
   });

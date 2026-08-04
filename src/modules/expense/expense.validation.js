@@ -57,6 +57,18 @@ const miscExpenseSchema = Joi.object({
   remarks: Joi.string().allow(null, ''),
 });
 
+// One reimbursement line item (Date / Description / Bill No. / Exps. Type / Total)
+const reimbursementItemSchema = Joi.object({
+  expense_date: Joi.date().iso().allow(null, ''),
+  description: Joi.string().max(255).required().messages({
+    'string.empty': 'Description is required',
+    'string.max': 'Description must be at most 255 characters',
+  }),
+  bill_number: Joi.string().max(100).allow(null, ''),
+  expense_type: Joi.string().max(50).allow(null, ''),
+  total_amount: Joi.string().required().messages({ 'string.empty': 'Amount is required' }),
+});
+
 // Schema for travel expense fields (conditionally required when category is travel)
 const travelFieldsSchema = Joi.object({
   travel_type: Joi.string().max(30),
@@ -91,9 +103,7 @@ export const createExpenseSchema = Joi.object({
     'string.max': 'Title must be at most 255 characters',
   }),
   remarks: Joi.string().allow(null, ''),
-  estimated_amount: Joi.string().required().messages({
-    'string.empty': 'Estimated amount is required',
-  }),
+  estimated_amount: Joi.string().allow(null, ''),
   // Travel fields (optional — only used when category module is 'travel')
   travel_type: Joi.string().max(30),
   purpose: Joi.string(),
@@ -106,6 +116,11 @@ export const createExpenseSchema = Joi.object({
   local_transports: Joi.array().items(localTransportSchema).allow(null),
   forex: Joi.array().items(forexSchema).allow(null),
   misc_expenses: Joi.array().items(miscExpenseSchema).allow(null),
+  // Reimbursement fields (optional — only used when category module is 'reimbursement')
+  advance_amount: Joi.string().allow(null, ''),
+  advance_date: Joi.date().iso().allow(null, ''),
+  payment_method: Joi.string().max(20),
+  items: Joi.array().items(reimbursementItemSchema).allow(null),
 });
 
 // Schema for updating an expense — all fields optional

@@ -108,9 +108,10 @@ All API responses follow this shape via `ApiResponse`:
 | travel_expense_forex | → travel_expenses |
 | travel_expense_local_transports | → travel_expenses |
 | travel_expense_misc_expenses | → travel_expenses |
+| reimbursement_expenses | → expenses (1:1) |
+| reimbursement_expense_items | → reimbursement_expenses |
 
 ### Future models planned
-- Reimbursement
 - Procurement
 - GeneralExpense
 
@@ -140,8 +141,9 @@ npm run seed              # run seeders
 - [x] Role API — CRUD by UUID + **GET /roles/options**
 - [x] Permission API — CRUD by UUID
 - [x] UserEmployment API — CRUD by UUID
-- [x] Expense API — CRUD by UUID, combined create with travel support
+- [x] Expense API — CRUD by UUID. **Combined create supports Travel AND Reimbursement** in one transaction; `estimated_amount` is computed server-side from the line items (not trusted from the client)
 - [x] ExpenseCategory API — CRUD by UUID
+- [x] **Reimbursement API** — header (`reimbursement_expenses`: advance amount/date, payment method, remarks) + line items (`reimbursement_expense_items`: date, description, bill no., exps. type, total). `GET /reimbursements/by-expense/:expenseUuid`, `PUT /reimbursements/:uuid`. Amounts AES-encrypted (created via bulkCreate with `individualHooks`)
 - [x] TravelExpense API — combined create with-travel endpoint
 - [x] TravelSegment API — CRUD by UUID
 - [x] TravelAccommodation API — CRUD by UUID

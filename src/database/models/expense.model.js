@@ -61,6 +61,7 @@ export default (sequelize, DataTypes) => {
     Expense.belongsTo(models.UserEmployment, { foreignKey: 'current_employment_id', as: 'currentEmployment' });
     Expense.belongsTo(models.Role, { foreignKey: 'current_role_id', as: 'currentRole' });
     Expense.hasOne(models.TravelExpense, { foreignKey: 'expense_id', as: 'travelExpense' });
+    Expense.hasOne(models.ReimbursementExpense, { foreignKey: 'expense_id', as: 'reimbursementExpense' });
     Expense.hasMany(models.ExpenseDocument, { foreignKey: 'expense_id', as: 'documents' });
     Expense.hasMany(models.ExpenseHandover, { foreignKey: 'expense_id', as: 'handovers' });
   };

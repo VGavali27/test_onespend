@@ -8,6 +8,7 @@ export async function up(queryInterface, Sequelize) {
     },
     uuid: { type: Sequelize.UUID, allowNull: false },
     role_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
+    department_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     first_name: { type: Sequelize.STRING(100), allowNull: true },
     middle_name: { type: Sequelize.STRING(100), allowNull: true },
     last_name: { type: Sequelize.STRING(100), allowNull: true },
@@ -45,6 +46,15 @@ export async function up(queryInterface, Sequelize) {
     references: { table: 'roles', field: 'id' },
     onUpdate: 'CASCADE',
     onDelete: 'RESTRICT',
+  });
+  await queryInterface.addIndex('users', ['department_id'], { name: 'idx_users_department_id' });
+  await queryInterface.addConstraint('users', {
+    fields: ['department_id'],
+    type: 'foreign key',
+    name: 'fk_users_department_id',
+    references: { table: 'departments', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL',
   });
 }
 export async function down(queryInterface, _Sequelize) {

@@ -13,7 +13,7 @@ const generateExpenseNumber = async () => {
   let seq = 1;
   if (last) {
     const parts = last.expense_number.split('-');
-    seq = parseInt(parts[3], 10) + 1;
+    seq = parseInt(parts[2], 10) + 1; // "EXP-YYYYMMDD-SEQ" → seq is at index 2
   }
   return `EXP-${dateStr}-${String(seq).padStart(4, '0')}`;
 };
@@ -70,6 +70,15 @@ export const create = async (data) => {
     travelChildFields.misc_expenses = data.misc_expenses || [];
   }
 
+  const reimbursementItems = data.items || [];
+  const reimbursementFields = {};
+  if (category.module === 'reimbursement') {
+    reimbursementFields.advance_amount = data.advance_amount || null;
+    reimbursementFields.advance_date = data.advance_date || null;
+    reimbursementFields.payment_method = data.payment_method || 'CASH';
+    reimbursementFields.remarks = data.remarks || null;
+  }
+
   const {
     category_uuid,
     company_uuid,
@@ -85,13 +94,30 @@ export const create = async (data) => {
     local_transports,
     forex,
     misc_expenses,
+    advance_amount,
+    advance_date,
+    payment_method,
+    items,
     ...expenseData
   } = data;
+
+  // Backend-computed estimated amount from the line items (the frontend doesn't send it)
+  const computedEstimated =
+    category.module === 'travel'
+      ? (segments || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0) +
+        (accommodations || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0) +
+        (local_transports || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0) +
+        (forex || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0) +
+        (misc_expenses || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0)
+      : category.module === 'reimbursement'
+        ? (items || []).reduce((s, x) => s + (Number(x.total_amount) || 0), 0)
+        : null;
 
   return sequelize.transaction(async (t) => {
     const expense = await db.Expense.create(
       {
         ...expenseData,
+        estimated_amount: computedEstimated ?? expenseData.estimated_amount ?? null,
         expense_number: expenseNumber,
         category_id: category.id,
         company_id: company.id,
@@ -138,6 +164,19 @@ export const create = async (data) => {
         await db.TravelExpenseMiscExpense.bulkCreate(
           travelChildFields.misc_expenses.map((m) => ({ ...m, travel_expense_id: travelExpense.id })),
           { transaction: t },
+        );
+      }
+    }
+
+    if (category.module === 'reimbursement') {
+      const reimbursement = await db.ReimbursementExpense.create(
+        { expense_id: expense.id, ...reimbursementFields },
+        { transaction: t },
+      );
+      if (reimbursementItems.length > 0) {
+        await db.ReimbursementItem.bulkCreate(
+          reimbursementItems.map((i) => ({ ...i, reimbursement_expense_id: reimbursement.id })),
+          { transaction: t, individualHooks: true },
         );
       }
     }
