@@ -128,9 +128,12 @@ All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazi
 /access/role-permissions  → Role Permissions (assignment)
 /access/role-handover-rules          → Role Handover Rules list
 /access/role-handover-rules/edit     → Configure a from role's handover rules
+/expenses/my              → My Expenses (mock list)
+/expenses/new             → Create Expense (real API)
+/expenses/:id             → Expense Detail (mock view)
 /profile                  → My Profile
 /settings                 → Settings
-/expenses, /travel, ...   → Mapped to pages (to be built)
+/travel, /finance, ...    → Mapped to pages (to be built)
 ```
 
 ## Scripts
@@ -168,14 +171,16 @@ VITE_APP_ENV=development
 - [x] **Access Control** (`src/pages/access/`) — Roles + Permissions list/add/edit/view, and **Role Permissions** page (role selector → grouped permission checklist → `sync` API); status field on both forms
 - [x] **Role Handover Rules** (`src/pages/access/roleHandoverRules/`) — list shows all roles with rule status (or blank) + a Role-Permissions-style **editor** (module + from-role selector → To-role checklist → `sync` API that activates/deactivates rules)
 - [x] **React Hook Form + Zod** — `Login`, UserForm, CompanyForm, DepartmentForm; schemas in `src/validations/`
+- [x] **Expenses UI** (`src/pages/expenses/`) — **Create Expense wired to the real API** (`POST /expenses`; category + company dropdowns — company scoped to the logged-in user's employments via `GET /users/me`); handles Travel + Reimbursement with per-item **attachments** (file inputs, UI-only); amounts not sent (backend computes). My Expenses list + Detail are still **mock**. Themed `DatePicker` (react-datepicker) used for date/datetime fields.
 - [x] **My Profile page** (navbar) — avatar, personal info, role/department, all employments
-- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `StatusBadge`, `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
+- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
 - [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
 
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
 - [ ] Employments list/create pages (`/master/employments`)
-- [ ] Expenses pages (list, create, detail)
+- [ ] Expense **list + detail** wired to the real API (`GET /expenses`) — currently mock (`MyExpenses`, `ExpenseDetail`)
+- [ ] Expense attachments → real upload (`POST /uploads`) + `expense_documents` per line item
 - [ ] Travel pages
 - [ ] Finance pages (Categories, Payments, Reports)
 - [ ] Company switcher (fetch employments on demand)
