@@ -1,7 +1,7 @@
 # test_onespend — Enterprise Expense Management API
 
 ## Overview
-Multi-role expense tracking & approval platform. Users submit expenses (Travel, and future Reimbursement/Procurement/General) that flow through role-based approval chains.
+Multi-role expense tracking & approval platform. Users submit expenses (Travel, Reimbursement — Procurement/General future) that flow through role-based approval chains.
 
 ## Tech Stack
 - **Runtime:** Node.js 22, ES Modules (`"type": "module"`)
@@ -48,8 +48,8 @@ src/
 │   ├── models/                   # All models (auto-loaded by index.js)
 │   │   ├── index.js              # Dynamic loader — reads all *.model.js files
 │   │   ├── user.model.js         # Factory pattern: export default (sequelize, DataTypes) =>
-│   │   └── ...                   # 19 models total
-│   ├── migrations/               # 19 migrations in FK-safe order
+│   │   └── ...                   # 21 models total
+│   ├── migrations/               # 20 migrations in FK-safe order
 │   ├── migrate.js                # Run: node src/database/migrate.js
 │   ├── seed.js                   # Run: node src/database/seed.js
 │   └── rollback.js               # Run: node src/database/rollback.js
@@ -59,7 +59,7 @@ src/
 │   ├── group/                    # Read-only groups (GET /groups, /groups/options) — for company group dropdown
 │   ├── user/                     # CRUD + paginated list + GET /users/me
 │   └── company, department, role, permission, user_employment,
-│       role_permission, role_handover_rule, expense_category, expense, travel_*  # CRUD modules
+│       role_permission, role_handover_rule, expense_category, expense, reimbursement, travel_*  # CRUD modules
 └── routes/
     └── index.js                  # Central route aggregator
 ```
@@ -80,7 +80,7 @@ All API responses follow this shape via `ApiResponse`:
 { "success": false, "message": "...", "errors": [{ "field": "...", "message": "..." }] }
 ```
 
-## Database — 19 Tables
+## Database — 21 Tables
 
 ### Core (8)
 | Table | Key FKs |
@@ -94,7 +94,7 @@ All API responses follow this shape via `ApiResponse`:
 | role_permissions | → roles, permissions |
 | user_employments | → users, companies, departments |
 
-### Expense Module (11)
+### Expense Module (13)
 | Table | Key FKs |
 |---|---|
 | expense_categories | → roles |
@@ -141,7 +141,7 @@ npm run seed              # run seeders
 - [x] Role API — CRUD by UUID + **GET /roles/options**
 - [x] Permission API — CRUD by UUID
 - [x] UserEmployment API — CRUD by UUID
-- [x] Expense API — CRUD by UUID. **Combined create supports Travel AND Reimbursement** in one transaction; `estimated_amount` is computed server-side from the line items (not trusted from the client)
+- [x] Expense API — CRUD by UUID. **Combined create supports Travel AND Reimbursement** in one transaction; `estimated_amount` is computed server-side from the line items (not trusted from the client). **Scoped lists** — `GET /expenses/my` (own expenses), `GET /expenses` (role+company scoped: SUPER_ADMIN/CFO see all, other expense-manager roles see only companies they're employed in), both server-side paginated (`page/limit/search/status/category/sort`); DRAFT expenses are editable by the creator only
 - [x] ExpenseCategory API — CRUD by UUID
 - [x] **Reimbursement API** — header (`reimbursement_expenses`: advance amount/date, payment method, remarks) + line items (`reimbursement_expense_items`: date, description, bill no., exps. type, total). `GET /reimbursements/by-expense/:expenseUuid`, `PUT /reimbursements/:uuid`. Amounts AES-encrypted (created via bulkCreate with `individualHooks`)
 - [x] TravelExpense API — combined create with-travel endpoint
@@ -152,8 +152,8 @@ npm run seed              # run seeders
 - [x] TravelMiscExpense API — CRUD by UUID
 - [x] RolePermission API — sync permissions for a role
 - [x] RoleHandoverRule API — CRUD by UUID + **PUT /sync** (activate/deactivate a role's to-role set; never deletes, just flips status ACTIVE/INACTIVE)
-- [x] Upload API — POST /uploads (multer image upload, 2MB limit), served statically at /uploads
-- [ ] ExpenseDocument API
+- [x] Upload API — POST /uploads (multer, 2MB limit, **any file type**), served statically at /uploads
+- [x] ExpenseDocument storage — each travel/reimbursement sub-part accepts `attachments`; files are uploaded via `/uploads` and stored as `expense_documents` rows linked to the specific item (`module_name` + `module_record_id`) on create/update (update replaces them)
 - [ ] ExpenseHandover API
 
 ### Seeders (10 files)
@@ -179,6 +179,7 @@ npm run seed              # run seeders
 - **UUID resolution** — API accepts `*_uuid` in body, service resolves to internal ID
 - **Encrypted amounts** — all `*_amount` and `exchange_rate` fields auto-encrypted via Sequelize hooks
 - **Combined endpoints** — `POST /api/expenses` creates expense + travel + child items in one transaction
+- **Per-item attachments** — `expense_documents` link each uploaded file to its own sub-part record (`module_name` = travel_segment / travel_accommodation / travel_forex / travel_local_transport / travel_misc_expense / reimbursement_item)
 - **Approval chain** — `expense_categories` define first/final approver roles, `role_handover_rules` define handover paths
 - **Password hashing** — passwords bcrypt-hashed on create and update (fixed plaintext bug)
 - **UUID auto-generation** — every model's `uuid` has `defaultValue: UUIDV4` (fixed "uuid cannot be null" on create)

@@ -6,7 +6,7 @@ const employmentSchema = Joi.object({
     .uuid()
     .required()
     .messages({ 'string.guid': 'Company UUID must be a valid UUID', 'any.required': 'Company UUID is required' }),
-  employee_code: Joi.string().max(50).required().messages({ 'string.empty': 'Employee code is required' }),
+  employee_code: Joi.string().max(50).allow(null, ''),
   designation: Joi.string().max(150).allow(null, ''),
   email: Joi.string().email().allow(null, '').messages({ 'string.email': 'Must be a valid email' }),
   employment_type: Joi.string()
@@ -22,13 +22,19 @@ export const createUserSchema = Joi.object({
     .uuid()
     .required()
     .messages({ 'string.guid': 'Role UUID must be a valid UUID', 'any.required': 'Role UUID is required' }),
-  department_uuid: Joi.string().uuid().allow(null, '').messages({ 'string.guid': 'Department UUID must be a valid UUID' }),
+  department_uuid: Joi.string()
+    .uuid()
+    .required()
+    .messages({ 'string.guid': 'Department UUID must be a valid UUID', 'any.required': 'Department is required' }),
   first_name: Joi.string()
     .max(100)
     .required()
     .messages({ 'string.empty': 'First name is required', 'string.max': 'First name must be at most 100 characters' }),
   middle_name: Joi.string().max(100).allow(null, ''),
-  last_name: Joi.string().max(100).allow(null, ''),
+  last_name: Joi.string()
+    .max(100)
+    .required()
+    .messages({ 'string.empty': 'Last name is required', 'string.max': 'Last name must be at most 100 characters' }),
   email: Joi.string().email().allow(null, '').messages({ 'string.email': 'Must be a valid email' }),
   mobile: Joi.string().max(20).allow(null, ''),
   password: Joi.string()

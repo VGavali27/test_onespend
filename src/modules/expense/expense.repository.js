@@ -1,11 +1,127 @@
 import db from '../../database/models/index.js';
-const { Expense } = db;
 
-// Fetch all expenses ordered by creation date (newest first)
-export const findAll = async () => Expense.findAll({ order: [['createdAt', 'DESC']] });
+const {
+  Expense,
+  ExpenseCategory,
+  Company,
+  TravelExpense,
+  TravelExpenseSegment,
+  TravelExpenseAccommodation,
+  TravelExpenseForex,
+  TravelExpenseLocalTransport,
+  TravelExpenseMiscExpense,
+  ReimbursementExpense,
+  ReimbursementItem,
+  ExpenseDocument,
+  ExpenseHandover,
+  Role,
+  UserEmployment,
+  User,
+} = db;
 
-// Find an expense by its UUID
-export const findByUuid = async (uuid) => Expense.findOne({ where: { uuid } });
+// Names shown in list views (category/company + who submitted it)
+const listInclude = [
+  { model: ExpenseCategory, as: 'category' },
+  { model: Company, as: 'company' },
+  {
+    model: UserEmployment,
+    as: 'requestedByEmployment',
+    include: [
+      { model: User, as: 'user' },
+      { model: Company, as: 'company' },
+    ],
+  },
+];
+
+// Full nested graph used by the detail endpoint
+const detailInclude = [
+  ...listInclude,
+  {
+    model: TravelExpense,
+    as: 'travelExpense',
+    include: [
+      { model: TravelExpenseSegment, as: 'segments' },
+      { model: TravelExpenseAccommodation, as: 'accommodations' },
+      { model: TravelExpenseForex, as: 'forex' },
+      { model: TravelExpenseLocalTransport, as: 'localTransports' },
+      { model: TravelExpenseMiscExpense, as: 'miscExpenses' },
+    ],
+  },
+  {
+    model: ReimbursementExpense,
+    as: 'reimbursementExpense',
+    include: [{ model: ReimbursementItem, as: 'items' }],
+  },
+  { model: ExpenseDocument, as: 'documents' },
+  {
+    model: ExpenseHandover,
+    as: 'handovers',
+    include: [
+      { model: Role, as: 'fromRole' },
+      { model: Role, as: 'toRole' },
+      { model: UserEmployment, as: 'actionBy', include: [{ model: User, as: 'user' }] },
+    ],
+  },
+];
+
+const { Op } = db.Sequelize;
+
+// Sortable columns. NOTE: estimated_amount is excluded because amounts are stored
+// as AES-encrypted TEXT — the DB can't sort that column numerically.
+const ALLOWED_SORT_FIELDS = ['createdAt', 'title', 'submitted_at'];
+const DEFAULT_SORT = [['createdAt', 'DESC']];
+
+// Merge the scoping `where` with server-side filters (search, status, category)
+const buildWhere = (where, params = {}) => {
+  const w = { ...where };
+  const status = params.status || '';
+  const category = params.category || '';
+  const search = (params.search || '').trim();
+
+  if (status) w.status = status;
+  if (category) w['$category.name$'] = category; // company & category are in listInclude
+  if (search) {
+    w[Op.or] = [
+      { title: { [Op.like]: `%${search}%` } },
+      { expense_number: { [Op.like]: `%${search}%` } },
+      { '$company.name$': { [Op.like]: `%${search}%` } },
+    ];
+  }
+  return w;
+};
+
+// Paginated, filtered, sorted expense list. `where` is the visibility scope
+// (own employments / visible companies); `params` carries page/limit/search/status/category/sortBy/sortOrder.
+export const findAll = async (where = {}, params = {}) => {
+  const page = Math.max(1, Number(params.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(params.limit) || 10));
+  const sortBy = params.sortBy || 'createdAt';
+  const sortOrder = (params.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+  const order = ALLOWED_SORT_FIELDS.includes(sortBy) ? [[sortBy, sortOrder]] : DEFAULT_SORT;
+
+  const { count, rows } = await Expense.findAndCountAll({
+    where: buildWhere(where, params),
+    include: listInclude,
+    order,
+    limit,
+    offset: (page - 1) * limit,
+    distinct: true,
+  });
+
+  return { rows, total: count };
+};
+
+// Expenses belonging to any of the given requester employment ids (used for "my expenses")
+export const findByEmploymentIds = async (employmentIds, params = {}) =>
+  findAll({ requested_by_employment_id: { [Op.in]: employmentIds } }, params);
+
+// Expenses belonging to any of the given companies (used for company-scoped visibility)
+export const findByCompanyIds = async (companyIds, params = {}) =>
+  findAll({ company_id: { [Op.in]: companyIds } }, params);
+
+// Find an expense by its UUID (with the full detail graph)
+export const findByUuid = async (uuid) =>
+  Expense.findOne({ where: { uuid }, include: detailInclude });
 
 // Find the latest expense number for a given prefix/date
 export const findLatestExpenseNumber = async (pattern) => {

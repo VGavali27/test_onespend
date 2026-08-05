@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import * as expenseController from './expense.controller.js';
 import validate from '../../middleware/validate.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authMiddleware, requireRole } from '../../middleware/auth.js';
+import { EXPENSE_MANAGER_ROLES } from './expense.service.js';
 import { createExpenseSchema, updateExpenseSchema } from './expense.validation.js';
 const router = Router();
 router.use(authMiddleware);
-// List all expenses
-router.get('/', expenseController.getAllExpenses);
-// Get a single expense by UUID
+// Scoped "all expenses" list (role + company scoping in the service) — manager roles only
+router.get('/', requireRole(...EXPENSE_MANAGER_ROLES), expenseController.getAllExpenses);
+// Expenses created by the logged-in user — any authenticated user
+router.get('/my', expenseController.getMyExpenses);
+// Get a single expense by UUID (visibility-checked)
 router.get('/:uuid', expenseController.getExpenseByUuid);
 // Create a new expense (validate body first)
 router.post('/', validate(createExpenseSchema), expenseController.createExpense);

@@ -15,7 +15,10 @@ export const createCompanySchema = Joi.object({
   logo_img: Joi.string().allow(null, ''),
   email: Joi.string().email().allow(null, '').messages({ 'string.email': 'Must be a valid email' }),
   phone: Joi.string().allow(null, ''),
-  website: Joi.string().uri().allow(null, '').messages({ 'string.uri': 'Website must be a valid URL' }),
+  website: Joi.string()
+    .uri()
+    .required()
+    .messages({ 'string.empty': 'Website is required', 'string.uri': 'Website must be a valid URL' }),
   gst_number: Joi.string().allow(null, ''),
   pan_number: Joi.string().allow(null, ''),
   cin_number: Joi.string().allow(null, ''),
