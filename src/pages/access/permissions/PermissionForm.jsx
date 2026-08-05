@@ -5,7 +5,8 @@ import { KeyRound, Loader2 } from 'lucide-react';
 import { permissionFormSchema } from '@/validations/permissionSchema';
 import { inputClassFor, FormSection, FormField } from '@/components/ui/form';
 import { nullIfEmpty } from '@/utils/format';
-import { applyServerErrors } from '@/utils/formErrors';
+import { applyServerErrorsDetailed } from '@/utils/formErrors';
+import { useToast } from '@/components/ui/Toast';
 
 const emptyForm = { resource: '', action: '', permission_key: '', description: '', status: 'ACTIVE' };
 
@@ -18,6 +19,7 @@ export default function PermissionForm({
   savingLabel = isEdit ? 'Saving...' : 'Creating...',
 }) {
   const [submitError, setSubmitError] = useState(null);
+  const toast = useToast();
 
   const {
     register,
@@ -43,16 +45,23 @@ export default function PermissionForm({
     try {
       await onSubmit(payload);
     } catch (err) {
-      if (!applyServerErrors(err, setError)) {
-        setSubmitError(err?.response?.data?.message || 'Failed to save permission. Please try again.');
+      const { mapped, summary } = applyServerErrorsDetailed(err, setError);
+      const baseMessage = err?.response?.data?.message || 'Failed to save permission. Please try again.';
+      if (mapped) {
+        setSubmitError('Please fix the highlighted fields and try again.');
+      } else if (summary.length > 0) {
+        setSubmitError(summary.join('\n'));
+      } else {
+        setSubmitError(baseMessage);
       }
+      toast.error(summary[0] || baseMessage);
     }
   });
 
   return (
     <>
       {submitError && (
-        <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 text-[13px] text-red-700 dark:text-red-400">
+        <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 text-[13px] text-red-700 dark:text-red-400 whitespace-pre-line">
           {submitError}
         </div>
       )}

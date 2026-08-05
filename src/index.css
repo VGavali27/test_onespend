@@ -315,3 +315,20 @@ input[type="text"], input[type="email"], input[type="password"], input[type="sea
   color: #fff !important;
   font-weight: 600;
 }
+
+/* Hide number-input spinners — the up/down arrows made it too easy to
+   accidentally change a value by scrolling over the field. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Give the datepicker clear (×) button a little breathing room from the input edge */
+.react-datepicker__close-icon {
+  right: 8px;
+}

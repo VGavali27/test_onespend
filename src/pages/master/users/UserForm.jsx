@@ -7,7 +7,8 @@ import { getRoleOptions } from '@/services/accessService';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { inputClassFor } from '@/components/ui/form';
 import { nullIfEmpty } from '@/utils/format';
-import { applyServerErrors } from '@/utils/formErrors';
+import { applyServerErrorsDetailed } from '@/utils/formErrors';
+import { useToast } from '@/components/ui/Toast';
 import { buildUserFormSchema, EMPLOYMENT_TYPES } from '@/validations/userFormSchema';
 
 const emptyForm = {
@@ -56,6 +57,7 @@ export default function UserForm({
   const [companies, setCompanies] = useState([]);
   const [submitError, setSubmitError] = useState(null);
   const [showPw, setShowPw] = useState(false);
+  const toast = useToast();
 
   const schema = useMemo(() => buildUserFormSchema({ isEdit }), [isEdit]);
 
@@ -120,16 +122,23 @@ export default function UserForm({
     try {
       await onSubmit(payload);
     } catch (err) {
-      if (!applyServerErrors(err, setError)) {
-        setSubmitError(err?.response?.data?.message || 'Failed to save user. Please try again.');
+      const { mapped, summary } = applyServerErrorsDetailed(err, setError);
+      const baseMessage = err?.response?.data?.message || 'Failed to save user. Please try again.';
+      if (mapped) {
+        setSubmitError('Please fix the highlighted fields and try again.');
+      } else if (summary.length > 0) {
+        setSubmitError(summary.join('\n'));
+      } else {
+        setSubmitError(baseMessage);
       }
+      toast.error(summary[0] || baseMessage);
     }
   });
 
   return (
     <>
       {submitError && (
-        <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 text-[13px] text-red-700 dark:text-red-400">
+        <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 text-[13px] text-red-700 dark:text-red-400 whitespace-pre-line">
           {submitError}
         </div>
       )}
@@ -154,7 +163,7 @@ export default function UserForm({
               <Field label="Middle name" error={errors.middle_name?.message}>
                 <input className={inputClassFor(!!errors.middle_name)} {...register('middle_name')} />
               </Field>
-              <Field label="Last name" error={errors.last_name?.message}>
+              <Field label="Last name" required error={errors.last_name?.message}>
                 <input className={inputClassFor(!!errors.last_name)} {...register('last_name')} />
               </Field>
               <Field label="Email address" error={errors.email?.message}>
@@ -220,13 +229,13 @@ export default function UserForm({
                 )}
               />
             </Field>
-            <Field label="Department" error={errors.department_uuid?.message}>
+            <Field label="Department" required error={errors.department_uuid?.message}>
               <Controller
                 control={control}
                 name="department_uuid"
                 render={({ field }) => (
                   <select className={inputClassFor(!!errors.department_uuid)} {...field}>
-                    <option value="">No department</option>
+                    <option value="">Select department...</option>
                     {departments.map((d) => (
                       <option key={d.uuid} value={d.uuid}>{d.name}</option>
                     ))}
@@ -293,7 +302,7 @@ export default function UserForm({
                         )}
                       />
                     </Field>
-                    <Field label="Employee code" required error={errors.employments?.[i]?.employee_code?.message}>
+                    <Field label="Employee code" error={errors.employments?.[i]?.employee_code?.message}>
                       <input
                         className={inputClassFor(!!errors.employments?.[i]?.employee_code)}
                         {...register(`employments.${i}.employee_code`)}

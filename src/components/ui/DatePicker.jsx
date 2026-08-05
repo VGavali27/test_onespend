@@ -9,8 +9,11 @@ const parseDateValue = (v) => {
   if (!v) return null;
   if (v instanceof Date) return v;
   if (typeof v === 'string') {
-    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})(T.*)?$/);
+    if (m) {
+      if (m[4]) return new Date(v); // has a time component → parse the full datetime
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    }
     const d = new Date(v);
     return Number.isNaN(d.getTime()) ? null : d;
   }
@@ -43,7 +46,7 @@ export default function DatePicker({ value, onChange, error, showTimeSelect = fa
         placeholderText={placeholder || (showTimeSelect ? 'Select date & time' : 'Select date')}
         isClearable
         portalId="datepicker-portal"
-        className={`${inputClassFor(!!error)} pl-9`}
+        className={`${inputClassFor(!!error)} pl-4 pr-9`}
         wrapperClassName="w-full"
         {...props}
       />

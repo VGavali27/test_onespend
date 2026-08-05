@@ -19,7 +19,7 @@ export const companyFormSchema = z.object({
 
   email: optionalEmail,
   phone: optionalText(40),
-  website: z.string().trim().url('Must be a valid URL').or(z.literal('')),
+  website: z.string().trim().min(1, 'Website is required').url('Must be a valid URL'),
 
   gst_number: optionalText(50),
   pan_number: optionalText(50),

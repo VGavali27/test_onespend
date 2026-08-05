@@ -7,13 +7,13 @@ import { ArrowLeft, Pencil } from 'lucide-react';
 export function InfoCard({ icon: Icon, title, children }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
         <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
           <Icon className="h-4 w-4" />
         </div>
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</h3>
       </div>
-      <div className="px-6 py-4 space-y-3">{children}</div>
+      <div className="px-4 sm:px-6 py-4 space-y-3">{children}</div>
     </div>
   );
 }

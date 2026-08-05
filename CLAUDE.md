@@ -13,6 +13,7 @@ React frontend for the enterprise expense management platform. Provides role-bas
 - **Tables:** TanStack Table v8 (wrapped in reusable `DataTable`)
 - **State:** React Context (Auth, Theme)
 - **Forms/Validation:** React Hook Form + Zod (via `zodResolver`)
+- **Dates:** react-datepicker (wrapped in themed `DatePicker` + `DateField` RHF helper)
 
 ## Folder Structure
 ```
@@ -36,6 +37,7 @@ src/
 │   │   ├── StatusBadge.jsx        # ACTIVE/INACTIVE/BLOCKED status pill
 │   │   ├── PageHeader.jsx         # Standard page header (title/subtitle/icon + back)
 │   │   ├── ErrorState.jsx         # Full-card load-error state with retry
+│   │   ├── Toast.jsx              # ToastProvider + useToast — success/error toasts (mounted in App.jsx)
 │   │   ├── detail.jsx             # Read-only view primitives: InfoCard, InfoRow, Detail, DetailHeader (back + edit)
 │   │   └── form.jsx               # Form primitives: inputClass/For, FormSection, FormField
 │   └── ProtectedRoute.jsx         # Auth guard — redirects to /login if unauthenticated
@@ -63,7 +65,7 @@ src/
 │   │   └── roleHandoverRules/     # RoleHandoverRules: list + Role-Permissions-style editor (add/remove via sync)
 │   ├── profile/
 │   │   └── Profile.jsx            # My Profile page (navbar menu → GET /users/me)
-│   ├── expenses/                  # MyExpenses (mock list), CreateExpense (real API create), ExpenseDetail (mock view)
+│   ├── expenses/                  # MyExpenses (own), AllExpenses (scoped list), CreateExpense (real API create), ExpenseDetail (real API view)
 │   ├── travel/                    # (future) TravelRequests...
 │   ├── finance/
 │   │   └── categories/            # Expense Categories: list / add / edit / view (routed + menu under Master Data → /master/categories)
@@ -72,7 +74,7 @@ src/
 ├── services/                      # ALL API calls live here — one file per domain
 │   ├── api.js                     # Shared axios client + JWT/401 interceptors + crud() helper
 │   ├── authService.js             # /auth (login)
-│   ├── expenseService.js          # /expenses
+│   ├── expenseService.js          # /expenses (scoped list), /expenses/my (own)
 │   ├── travelService.js           # /travel-* (segments, forex, misc...)
 │   ├── masterService.js           # /companies, /departments, /users, /user-employments, /users/me
 │   ├── accessService.js           # /roles, /permissions, /role-permissions, /role-handover-rules (+sync), /roles/options
@@ -83,7 +85,10 @@ src/
 │   ├── authSchema.js              # Login form schema
 │   ├── companySchema.js           # Company create/edit form schema (full detail)
 │   ├── departmentSchema.js        # Department create/edit form schema
-│   └── expenseCategorySchema.js   # Expense category create/edit form schema
+│   ├── expenseCategorySchema.js   # Expense category create/edit form schema
+│   ├── roleSchema.js              # Role create/edit form schema
+│   ├── permissionSchema.js        # Permission create/edit form schema
+│   └── expenseSchema.js           # Expense create form — category/company + Travel (segments, accommodations, forex, transports, misc) + Reimbursement line items; amounts as strings (backend encrypts)
 └── utils/
     ├── assets.js                  # resolveAssetUrl(path) — backend asset path → absolute URL
     ├── format.js                  # formatDate, nullIfEmpty, formatType
@@ -128,9 +133,11 @@ All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazi
 /access/role-permissions  → Role Permissions (assignment)
 /access/role-handover-rules          → Role Handover Rules list
 /access/role-handover-rules/edit     → Configure a from role's handover rules
-/expenses/my              → My Expenses (mock list)
+/expenses/my              → My Expenses (own — GET /expenses/my)
+/expenses/all             → All Expenses (scoped — GET /expenses; SUPER_ADMIN/CFO see all, other manager roles only their employed companies)
 /expenses/new             → Create Expense (real API)
-/expenses/:id             → Expense Detail (mock view)
+/expenses/:uuid/edit      → Edit a DRAFT expense (creator only; PUT replaces line items)
+/expenses/:id             → Expense Detail (real API view)
 /profile                  → My Profile
 /settings                 → Settings
 /travel, /finance, ...    → Mapped to pages (to be built)
@@ -170,16 +177,15 @@ VITE_APP_ENV=development
 - [x] **Expense Categories module** (`src/pages/finance/categories/`) — list/add/edit/view; first-receiver & final-approver role dropdowns; delete confirm (routed + menu under **Master Data** → `/master/categories`)
 - [x] **Access Control** (`src/pages/access/`) — Roles + Permissions list/add/edit/view, and **Role Permissions** page (role selector → grouped permission checklist → `sync` API); status field on both forms
 - [x] **Role Handover Rules** (`src/pages/access/roleHandoverRules/`) — list shows all roles with rule status (or blank) + a Role-Permissions-style **editor** (module + from-role selector → To-role checklist → `sync` API that activates/deactivates rules)
-- [x] **React Hook Form + Zod** — `Login`, UserForm, CompanyForm, DepartmentForm; schemas in `src/validations/`
-- [x] **Expenses UI** (`src/pages/expenses/`) — **Create Expense wired to the real API** (`POST /expenses`; category + company dropdowns — company scoped to the logged-in user's employments via `GET /users/me`); handles Travel + Reimbursement with per-item **attachments** (file inputs, UI-only); amounts not sent (backend computes). My Expenses list + Detail are still **mock**. Themed `DatePicker` (react-datepicker) used for date/datetime fields.
+- [x] **React Hook Form + Zod** — `Login`, UserForm, CompanyForm, DepartmentForm, RoleForm, PermissionForm, ExpenseForm (Travel + Reimbursement dynamic rows via `useFieldArray`); schemas in `src/validations/`
+- [x] **Expenses UI** (`src/pages/expenses/`) — **Create Expense** wired to the real API (`POST /expenses`; category + company dropdowns — company scoped to the logged-in user's employments via `GET /users/me`); per-item **attachments** (files uploaded via `POST /uploads` on submit, kept per sub-part on edit, shown in the detail view); amounts not sent (backend computes); **validation is module-aware** (Travel XOR Reimbursement required fields, dates required, end ≥ start) and submit shows a **success/error toast** via `useToast()`. **My Expenses** (`GET /expenses/my` — only expenses the user created) and **All Expenses** (`GET /expenses` — role+company scoped: SUPER_ADMIN/CFO see everything, other expense-manager roles see only companies they're actively employed in) are **server-side paginated** via the shared `DataTablePage` (`page/limit/search/status/category/sort` on the backend, `ApiResponse.paginated`); All Expenses shows a clickable **Submitted by** (→ user-details modal) and approver-style actions. **Detail** (`GET /expenses/:uuid`, visibility-checked, payload normalized via `normalizeExpense`) renders all travel sections **tables on desktop / cards on mobile**, each showing its own **attachments**. **DRAFT expenses can be edited** (`/expenses/:uuid/edit` → `EditExpense` reuses `ExpenseForm`; creator-only, `PUT /expenses/:uuid` replaces line items + attachments and recomputes the amount; Edit shown only for the owner's DRAFT). `MyExpenses` is a parameterized list component reused by `AllExpenses`. Themed `DatePicker` (react-datepicker) used for date/datetime fields.
 - [x] **My Profile page** (navbar) — avatar, personal info, role/department, all employments
-- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
+- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
 - [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
 
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
 - [ ] Employments list/create pages (`/master/employments`)
-- [ ] Expense **list + detail** wired to the real API (`GET /expenses`) — currently mock (`MyExpenses`, `ExpenseDetail`)
 - [ ] Expense attachments → real upload (`POST /uploads`) + `expense_documents` per line item
 - [ ] Travel pages
 - [ ] Finance pages (Categories, Payments, Reports)

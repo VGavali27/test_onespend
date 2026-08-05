@@ -25,6 +25,7 @@ export const menuConfig = [
     roles: ['*'],
     children: [
       { id: 'my-expenses', label: 'My Expenses', icon: ReceiptText, to: '/expenses/my', roles: ['*'] },
+      { id: 'all-expenses', label: 'All Expenses', icon: Wallet, to: '/expenses/all', roles: ['SUPER_ADMIN', 'CFO', 'PAYMENT_MGR', 'PAYMENT_JR', 'FINANCE_MGR', 'FINANCE_JR', 'TRAVEL_MGR', 'HOD'] },
       { id: 'create-expense', label: 'Create New', icon: Plus, to: '/expenses/new', roles: ['*'] },
       { id: 'approvals', label: 'Approvals', icon: CheckCircle2, to: '/expenses/approvals', roles: ['HOD', 'FINANCE_MGR', 'CFO', 'PAYMENT_MGR', 'TRAVEL_MGR', 'SUPER_ADMIN'] },
     ],

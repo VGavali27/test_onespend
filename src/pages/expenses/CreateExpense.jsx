@@ -4,14 +4,17 @@ import PageHeader from '@/components/ui/PageHeader';
 import ExpenseForm from '@/pages/expenses/ExpenseForm';
 import { createExpense } from '@/services/expenseService';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 
 export default function CreateExpense() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
   const goBack = () => navigate('/expenses/my');
 
   const handleSubmit = async (payload) => {
     await createExpense(payload);
+    toast.success('Expense submitted successfully');
     navigate('/expenses/my');
   };
 

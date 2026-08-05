@@ -11,7 +11,7 @@ const optionalEmail = z
 // One employment row inside the user form
 const employmentSchema = z.object({
   company_uuid: z.string().min(1, 'Company is required'),
-  employee_code: z.string().trim().min(1, 'Employee code is required').max(50, 'Must be at most 50 characters'),
+  employee_code: z.string().trim().max(50, 'Must be at most 50 characters'),
   email: optionalEmail,
   designation: z.string().trim().max(150, 'Must be at most 150 characters'),
   employment_type: z.enum(['PERMANENT', 'CONTRACT', 'INTERN', 'CONSULTANT']),
@@ -28,7 +28,7 @@ export const buildUserFormSchema = ({ isEdit = false } = {}) =>
   z.object({
     first_name: z.string().trim().min(1, 'First name is required').max(100, 'Must be at most 100 characters'),
     middle_name: z.string().trim().max(100, 'Must be at most 100 characters'),
-    last_name: z.string().trim().max(100, 'Must be at most 100 characters'),
+    last_name: z.string().trim().min(1, 'Last name is required').max(100, 'Must be at most 100 characters'),
     email: optionalEmail,
     mobile: z.string().trim().max(20, 'Must be at most 20 characters'),
     password: isEdit
@@ -37,7 +37,7 @@ export const buildUserFormSchema = ({ isEdit = false } = {}) =>
     profile_image: z.string(),
     status: z.enum(['ACTIVE', 'INACTIVE', 'BLOCKED']),
     role_uuid: z.string().min(1, 'Role is required'),
-    department_uuid: z.string(),
+    department_uuid: z.string().min(1, 'Department is required'),
     employments: z.array(employmentSchema).default([]),
   });
 

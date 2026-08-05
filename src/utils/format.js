@@ -12,3 +12,7 @@ export const formatType = (t) => (t ? t.charAt(0) + t.slice(1).toLowerCase() : '
 // ₹ amount formatting (Indian locale)
 export const formatCurrency = (amount) =>
   amount == null ? '—' : `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+
+// Plain number formatting (no currency symbol — e.g. foreign amounts / exchange rates)
+export const formatNumber = (n) =>
+  n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });

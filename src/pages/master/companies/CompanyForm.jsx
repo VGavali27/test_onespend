@@ -7,7 +7,8 @@ import { companyFormSchema } from '@/validations/companySchema';
 import { inputClassFor, FormSection, FormField } from '@/components/ui/form';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { nullIfEmpty } from '@/utils/format';
-import { applyServerErrors } from '@/utils/formErrors';
+import { applyServerErrorsDetailed } from '@/utils/formErrors';
+import { useToast } from '@/components/ui/Toast';
 
 const emptyForm = {
   name: '',
@@ -43,6 +44,7 @@ export default function CompanyForm({
 }) {
   const [groups, setGroups] = useState([]);
   const [submitError, setSubmitError] = useState(null);
+  const toast = useToast();
 
   const {
     register,
@@ -97,16 +99,23 @@ export default function CompanyForm({
     try {
       await onSubmit(payload);
     } catch (err) {
-      if (!applyServerErrors(err, setError)) {
-        setSubmitError(err?.response?.data?.message || 'Failed to save company. Please try again.');
+      const { mapped, summary } = applyServerErrorsDetailed(err, setError);
+      const baseMessage = err?.response?.data?.message || 'Failed to save company. Please try again.';
+      if (mapped) {
+        setSubmitError('Please fix the highlighted fields and try again.');
+      } else if (summary.length > 0) {
+        setSubmitError(summary.join('\n'));
+      } else {
+        setSubmitError(baseMessage);
       }
+      toast.error(summary[0] || baseMessage);
     }
   });
 
   return (
     <>
       {submitError && (
-        <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 text-[13px] text-red-700 dark:text-red-400">
+        <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 text-[13px] text-red-700 dark:text-red-400 whitespace-pre-line">
           {submitError}
         </div>
       )}
@@ -169,7 +178,7 @@ export default function CompanyForm({
             <FormField label="Phone" error={errors.phone?.message}>
               <input className={inputClassFor(!!errors.phone)} {...register('phone')} placeholder="+91 90000 00000" />
             </FormField>
-            <FormField label="Website" error={errors.website?.message}>
+            <FormField label="Website" required error={errors.website?.message}>
               <input className={inputClassFor(!!errors.website)} {...register('website')} placeholder="https://company.com" />
             </FormField>
           </div>
