@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Truck, Users, MapPin, Landmark, FileText, Plus, Trash2, Loader2, Paperclip } from 'lucide-react';
+import { Truck, Users, MapPin, Landmark, FileText, Plus, Trash2, Loader2, Paperclip, Tag } from 'lucide-react';
 import { vendorApi, vendorDocumentApi } from '@/services/vendorService';
 import { uploadImage } from '@/services/uploadService';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -124,6 +124,23 @@ export default function ViewVendor() {
               <InfoRow label="Type" value={vendor.vendor_type || '—'} />
               <InfoRow label="Status" value={<StatusBadge status={vendor.status} />} />
               <InfoRow label="Rating" value={vendor.rating != null ? vendor.rating : '—'} />
+            </InfoCard>
+
+            <InfoCard icon={Tag} title="Categories">
+              {(vendor.categories || []).length === 0 ? (
+                <p className="text-[13px] text-slate-400">No categories assigned.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {vendor.categories.map((c) => (
+                    <span
+                      key={c.uuid}
+                      className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-[12px] font-medium text-indigo-600 dark:text-indigo-400"
+                    >
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </InfoCard>
 
             <InfoCard icon={FileText} title="Tax & Payment">

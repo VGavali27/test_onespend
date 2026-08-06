@@ -29,6 +29,11 @@ const CreateVendor = lazy(() => import('@/pages/master/vendors/CreateVendor'));
 const EditVendor = lazy(() => import('@/pages/master/vendors/EditVendor'));
 const ViewVendor = lazy(() => import('@/pages/master/vendors/ViewVendor'));
 
+const VendorCategories = lazy(() => import('@/pages/master/vendorCategories/VendorCategories'));
+const CreateVendorCategory = lazy(() => import('@/pages/master/vendorCategories/CreateVendorCategory'));
+const EditVendorCategory = lazy(() => import('@/pages/master/vendorCategories/EditVendorCategory'));
+const ViewVendorCategory = lazy(() => import('@/pages/master/vendorCategories/ViewVendorCategory'));
+
 const Departments = lazy(() => import('@/pages/master/departments/Departments'));
 const CreateDepartment = lazy(() => import('@/pages/master/departments/CreateDepartment'));
 const EditDepartment = lazy(() => import('@/pages/master/departments/EditDepartment'));
@@ -96,6 +101,11 @@ export default function AppRoutes() {
           <Route path="master/vendors/new" element={<CreateVendor />} />
           <Route path="master/vendors/:uuid/edit" element={<EditVendor />} />
           <Route path="master/vendors/:uuid" element={<ViewVendor />} />
+
+          <Route path="master/vendor-categories" element={<VendorCategories />} />
+          <Route path="master/vendor-categories/new" element={<CreateVendorCategory />} />
+          <Route path="master/vendor-categories/:uuid/edit" element={<EditVendorCategory />} />
+          <Route path="master/vendor-categories/:uuid" element={<ViewVendorCategory />} />
 
           <Route path="master/departments" element={<Departments />} />
           <Route path="master/departments/new" element={<CreateDepartment />} />

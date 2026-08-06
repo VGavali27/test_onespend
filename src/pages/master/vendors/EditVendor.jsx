@@ -33,6 +33,7 @@ const toFormValues = (v) => ({
     bank_branch: b.bank_branch || '', account_number: b.account_number || '', ifsc: b.ifsc || '',
     swift_code: b.swift_code || '', currency_code: b.currency_code || 'INR', is_primary: !!b.is_primary,
   })),
+  category_uuids: (v?.categories || []).map((c) => c.uuid),
   documents: (v?.documents || []).map((d) => ({ uuid: d.uuid, name: d.original_file_name, url: d.file_path })),
 });
 

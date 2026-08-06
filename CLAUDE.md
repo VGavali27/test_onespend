@@ -58,8 +58,10 @@ src/
 │   │   │   └── Companies.jsx, CreateCompany.jsx, EditCompany.jsx, CompanyForm.jsx, ViewCompany.jsx
 │   │   ├── departments/           # Departments: list / add / edit / view
 │   │   │   └── Departments.jsx, CreateDepartment.jsx, EditDepartment.jsx, DepartmentForm.jsx, ViewDepartment.jsx
-│   │   └── vendors/               # Vendors: list / add / edit / view (contacts, addresses, bank accounts, documents)
-│   │       └── Vendors.jsx, CreateVendor.jsx, EditVendor.jsx, VendorForm.jsx, ViewVendor.jsx
+│   │   ├── vendors/               # Vendors: list / add / edit / view (contacts, addresses, bank accounts, documents, categories)
+│   │   │   └── Vendors.jsx, CreateVendor.jsx, EditVendor.jsx, VendorForm.jsx, ViewVendor.jsx
+│   │   └── vendorCategories/      # Vendor Categories: list / add / edit / view
+│   │       └── VendorCategories.jsx, CreateVendorCategory.jsx, EditVendorCategory.jsx, VendorCategoryForm.jsx, ViewVendorCategory.jsx
 │   ├── access/                    # Access Control
 │   │   ├── roles/                 # Roles: list / add / edit / view
 │   │   ├── permissions/           # Permissions: list / add / edit / view
@@ -81,6 +83,7 @@ src/
 │   ├── masterService.js           # /companies, /departments, /users, /user-employments, /users/me
 │   ├── accessService.js           # /roles, /permissions, /role-permissions, /role-handover-rules (+sync), /roles/options
 │   ├── financeService.js          # /expense-categories
+│   ├── vendorService.js           # /vendors, /vendors/options, /vendor-documents, /vendor-categories (+/options)
 │   └── uploadService.js           # POST /uploads (image upload)
 ├── validations/                   # Shared Zod schemas — one file per form/domain
 │   ├── userFormSchema.js          # User create/edit form schema + EMPLOYMENT_TYPES
@@ -88,6 +91,7 @@ src/
 │   ├── companySchema.js           # Company create/edit form schema (full detail)
 │   ├── departmentSchema.js        # Department create/edit form schema
 │   ├── expenseCategorySchema.js   # Expense category create/edit form schema
+│   ├── vendorCategorySchema.js    # Vendor category create/edit form schema
 │   ├── roleSchema.js              # Role create/edit form schema
 │   ├── permissionSchema.js        # Permission create/edit form schema
 │   └── expenseSchema.js           # Expense create form — category/company + Travel (segments, accommodations, forex, transports, misc) + Reimbursement line items; amounts as strings (backend encrypts)
@@ -130,6 +134,7 @@ All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazi
 /master/departments       → Departments list / new / :uuid (view) / :uuid/edit
 /master/users             → Users list / new / :uuid (view) / :uuid/edit
 /master/vendors           → Vendors list / new / :uuid (view) / :uuid/edit
+/master/vendor-categories → Vendor Categories list / new / :uuid (view) / :uuid/edit
 /master/categories        → Expense Categories list / new / :uuid (view) / :uuid/edit
 /access/roles             → Roles list / new / :uuid (view) / :uuid/edit
 /access/permissions       → Permissions list / new / :uuid (view) / :uuid/edit
@@ -177,7 +182,8 @@ VITE_APP_ENV=development
   - [x] View User — read-only detail (personal / role-dept / employments) with Edit button
 - [x] **Companies module** (`src/pages/master/companies/`) — list (client-side paginated `DataTable`, logo thumbnail), full-detail add/edit form (identity/contact/address/tax + status + **logo upload**), group dropdown via `/groups/options`, delete confirm, **View Company** with Edit button
 - [x] **Departments module** (`src/pages/master/departments/`) — list, add/edit form (name/code/status/description), delete confirm, **View Department** with Edit button
-- [x] **Vendors module** (`src/pages/master/vendors/`) — list (logo thumbnail), add/edit form with **nested contacts / addresses / bank accounts** (`useFieldArray`), logo upload, **View Vendor** with a **documents** section (upload via `/uploads` + `vendorDocumentApi`, list + delete)
+- [x] **Vendors module** (`src/pages/master/vendors/`) — list (logo thumbnail, **category chips column**), add/edit form with **nested contacts / addresses / bank accounts** (`useFieldArray`) + **vendor category checkbox grid** (sends `vendor_category_uuids`; edit maps existing `categories` back), logo upload, **View Vendor** with a **documents** section (upload via `/uploads` + `vendorDocumentApi`, list + delete) and a **Categories** card
+- [x] **Vendor Categories module** (`src/pages/master/vendorCategories/`) — list/add/edit/view, delete confirm (routed + menu under **Master Data** → `/master/vendor-categories`); category options feed the vendor form's assignment grid
 - [x] **Expense Categories module** (`src/pages/finance/categories/`) — list/add/edit/view; first-receiver & final-approver role dropdowns; delete confirm (routed + menu under **Master Data** → `/master/categories`)
 - [x] **Access Control** (`src/pages/access/`) — Roles + Permissions list/add/edit/view, and **Role Permissions** page (role selector → grouped permission checklist → `sync` API); status field on both forms
 - [x] **Role Handover Rules** (`src/pages/access/roleHandoverRules/`) — list shows all roles with rule status (or blank) + a Role-Permissions-style **editor** (module + from-role selector → To-role checklist → `sync` API that activates/deactivates rules)

@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Truck, Users, MapPin, Landmark, FileText, Paperclip, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Truck, Users, MapPin, Landmark, FileText, Paperclip, Plus, Trash2, Loader2, Tag } from 'lucide-react';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { inputClassFor } from '@/components/ui/form';
 import { applyServerErrorsDetailed } from '@/utils/formErrors';
 import { useToast } from '@/components/ui/Toast';
 import { nullIfEmpty } from '@/utils/format';
 import { vendorFormSchema } from '@/validations/vendorSchema';
+import { getVendorCategoryOptions } from '@/services/vendorService';
 
 const VENDOR_TYPES = ['VENDOR', 'SUPPLIER', 'CONTRACTOR', 'SERVICE_PROVIDER'];
 const CONTACT_TYPES = ['PRIMARY', 'SALES', 'ACCOUNTS', 'OPS'];
@@ -17,7 +18,7 @@ const ACCOUNT_TYPES = ['PRIMARY', 'OPERATING', 'INTERNATIONAL'];
 const emptyForm = {
   name: '', code: '', vendor_type: 'VENDOR', logo_img: '', website: '', gst_number: '',
   pan_number: '', cin_number: '', payment_terms: '', rating: '', status: 'ACTIVE', notes: '',
-  contacts: [], addresses: [], bank_accounts: [], documents: [],
+  contacts: [], addresses: [], bank_accounts: [], category_uuids: [], documents: [],
 };
 const emptyContact = { contact_type: 'PRIMARY', salutation: '', first_name: '', last_name: '', designation: '', email: '', phone: '', mobile: '', is_primary: false };
 const emptyAddress = { address_type: 'REGISTERED', address_line_1: '', address_line_2: '', city: '', state: '', country: '', pincode: '', is_primary: false };
@@ -58,6 +59,30 @@ export default function VendorForm({
   const addresses = useFieldArray({ control, name: 'addresses' });
   const banks = useFieldArray({ control, name: 'bank_accounts' });
 
+  // Vendor categories (optional multi-select of business types this vendor serves)
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [categoryOptionsError, setCategoryOptionsError] = useState(null);
+  const selectedCategories = watch('category_uuids') || [];
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data } = await getVendorCategoryOptions();
+        setCategoryOptions(data?.data ?? []);
+      } catch (e) {
+        setCategoryOptionsError(e?.response?.data?.message || 'Failed to load vendor categories.');
+      }
+    };
+    load();
+  }, []);
+
+  const toggleCategory = (uuid) => {
+    const next = selectedCategories.includes(uuid)
+      ? selectedCategories.filter((u) => u !== uuid)
+      : [...selectedCategories, uuid];
+    setValue('category_uuids', next, { shouldDirty: true });
+  };
+
   const handleFormSubmit = handleSubmit(async (values) => {
     setSubmitError(null);
     const payload = {
@@ -76,6 +101,7 @@ export default function VendorForm({
       contacts: values.contacts,
       addresses: values.addresses,
       bank_accounts: values.bank_accounts,
+      vendor_category_uuids: values.category_uuids,
     };
     try {
       await onSubmit({ payload, documents: values.documents });
@@ -156,6 +182,32 @@ export default function VendorForm({
               </div>
             </div>
           </div>
+        </SectionCard>
+
+        {/* Categories */}
+        <SectionCard icon={Tag} title="Categories" subtitle="Optional — business types this vendor serves">
+          {categoryOptionsError ? (
+            <p className="text-[12px] text-red-600 dark:text-red-400">{categoryOptionsError}</p>
+          ) : categoryOptions.length === 0 ? (
+            <p className="text-[13px] text-slate-400">No vendor categories yet — add them under Master Data → Vendor Categories.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {categoryOptions.map((c) => (
+                <label
+                  key={c.uuid}
+                  className="flex items-center gap-2.5 p-3 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-50/60 dark:bg-gray-800/40 cursor-pointer transition-colors hover:bg-slate-100 dark:hover:bg-gray-800"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(c.uuid)}
+                    onChange={() => toggleCategory(c.uuid)}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-[13px] text-slate-700 dark:text-slate-300">{c.name}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </SectionCard>
 
         {/* Contacts */}

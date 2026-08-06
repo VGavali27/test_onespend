@@ -6,6 +6,10 @@ import { uploadImage } from '@/services/uploadService';
 export const vendorApi = crud('/vendors');
 export const getVendorOptions = () => api.get('/vendors/options');
 
+// ── Vendor categories (Master Data) ──
+export const vendorCategoryApi = crud('/vendor-categories');
+export const getVendorCategoryOptions = () => api.get('/vendor-categories/options');
+
 // ── Vendor documents (uploaded file metadata) ──
 export const vendorDocumentApi = {
   add: (payload) => api.post('/vendor-documents', payload),

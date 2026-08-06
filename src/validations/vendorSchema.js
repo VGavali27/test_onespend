@@ -53,4 +53,6 @@ export const vendorFormSchema = z.object({
   contacts: z.array(contactSchema).default([]),
   addresses: z.array(addressSchema).default([]),
   bank_accounts: z.array(bankAccountSchema).default([]),
+  category_uuids: z.array(z.string()).default([]),
+  documents: z.array(z.any()).default([]), // Files (new) or { uuid, name, url } (existing) — handled on save
 });

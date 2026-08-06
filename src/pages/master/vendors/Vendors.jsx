@@ -47,6 +47,31 @@ export default function Vendors() {
       enableSorting: false,
       cell: (info) => info.getValue() || '—',
     }),
+    columnHelper.display({
+      id: 'categories',
+      header: 'Categories',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const cats = row.original.categories || [];
+        return cats.length === 0 ? (
+          <span className="text-[13px] text-slate-400">—</span>
+        ) : (
+          <div className="flex flex-wrap gap-1 max-w-[220px]">
+            {cats.slice(0, 3).map((c) => (
+              <span
+                key={c.uuid}
+                className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/20 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 truncate"
+              >
+                {c.name}
+              </span>
+            ))}
+            {cats.length > 3 && (
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[11px] text-slate-400">+{cats.length - 3}</span>
+            )}
+          </div>
+        );
+      },
+    }),
     columnHelper.accessor('status', {
       header: 'Status',
       enableSorting: false,
