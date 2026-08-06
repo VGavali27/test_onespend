@@ -8,7 +8,7 @@ import UserDetailsModal from '@/components/ui/UserDetailsModal';
 import { useToast } from '@/components/ui/Toast';
 import { getMyExpenses } from '@/services/expenseService';
 import { categoryApi } from '@/services/financeService';
-import { formatCurrency, formatDateTime } from '@/utils/format';
+import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
 
 const STATUS_OPTIONS = ['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID'];
 const columnHelper = createColumnHelper();
@@ -119,6 +119,15 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     columnHelper.accessor('submitted_at', {
       header: 'Submitted',
       cell: (info) => (info.getValue() ? formatDateTime(info.getValue()) : '-'),
+    }),
+    columnHelper.accessor('createdAt', {
+      header: 'Created',
+      cell: (info) => formatDate(info.getValue()),
+    }),
+    columnHelper.accessor('updatedAt', {
+      header: 'Updated',
+      enableSorting: false,
+      cell: (info) => formatDate(info.getValue()),
     }),
     columnHelper.display({
       id: 'actions',

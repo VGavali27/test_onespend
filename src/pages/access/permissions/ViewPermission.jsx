@@ -54,6 +54,7 @@ export default function ViewPermission() {
           <InfoCard icon={Clock} title="Details">
             <InfoRow label="Description" value={perm.description || '—'} />
             <InfoRow label="Created" value={formatDate(perm.createdAt ?? perm.created_at)} />
+            <InfoRow label="Last updated" value={formatDate(perm.updatedAt ?? perm.updated_at)} />
           </InfoCard>
         </div>
       ) : null}

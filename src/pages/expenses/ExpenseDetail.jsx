@@ -143,6 +143,8 @@ export default function ExpenseDetail() {
           />
           <InfoRow label="Status" value={<StatusBadge status={expense.status} />} />
           <InfoRow label="Submitted" value={expense.submitted_at ? formatDate(expense.submitted_at) : '-'} />
+          <InfoRow label="Created" value={formatDate(expense.createdAt ?? expense.created_at)} />
+          <InfoRow label="Last updated" value={formatDate(expense.updatedAt ?? expense.updated_at)} />
           <InfoRow label="Remarks" value={expense.remarks || '—'} />
         </InfoCard>
 

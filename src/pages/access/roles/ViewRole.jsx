@@ -53,6 +53,7 @@ export default function ViewRole() {
           </InfoCard>
           <InfoCard icon={Clock} title="Meta">
             <InfoRow label="Created" value={formatDate(role.createdAt ?? role.created_at)} />
+            <InfoRow label="Last updated" value={formatDate(role.updatedAt ?? role.updated_at)} />
           </InfoCard>
         </div>
       ) : null}

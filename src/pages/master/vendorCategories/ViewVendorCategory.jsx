@@ -52,6 +52,7 @@ export default function ViewVendorCategory() {
           </InfoCard>
           <InfoCard icon={Clock} title="Meta">
             <InfoRow label="Created" value={formatDate(category.createdAt ?? category.created_at)} />
+            <InfoRow label="Last updated" value={formatDate(category.updatedAt ?? category.updated_at)} />
           </InfoCard>
         </div>
       ) : null}

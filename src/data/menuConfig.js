@@ -3,7 +3,7 @@ import {
   Shield, Settings, BarChart3, CreditCard, ReceiptText,
   Briefcase, Landmark, Plus, CheckCircle2, BadgeCheck, Tags,
   LayoutGrid, ShieldCheck, KeyRound, KeySquare, ArrowRightLeft, Truck,
-  Tag,
+  Tag, ShoppingCart,
 } from 'lucide-react';
 
 /**
@@ -49,6 +49,16 @@ export const menuConfig = [
     children: [
       { id: 'payments', label: 'Payments', icon: CreditCard, to: '/finance/payments', roles: ['SUPER_ADMIN', 'CFO', 'PAYMENT_MGR', 'PAYMENT_JR'] },
       { id: 'reports', label: 'Reports', icon: BarChart3, to: '/finance/reports', roles: ['SUPER_ADMIN', 'CFO', 'FINANCE_MGR'] },
+    ],
+  },
+  {
+    id: 'procurement',
+    label: 'Procurement',
+    icon: ShoppingCart,
+    roles: ['SUPER_ADMIN', 'CFO', 'FINANCE_MGR', 'FINANCE_JR', 'PAYMENT_MGR', 'PAYMENT_JR', 'ADMIN_MGR', 'ADMIN_JR', 'HOD', 'EMP_MGR', 'EMPLOYEE', 'TRAVEL_MGR'],
+    children: [
+      { id: 'all-procurement', label: 'All Requests', icon: ShoppingCart, to: '/procurement', roles: ['*'] },
+      { id: 'new-procurement', label: 'Create New', icon: Plus, to: '/procurement/new', roles: ['*'] },
     ],
   },
   {

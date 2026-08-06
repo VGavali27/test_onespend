@@ -81,6 +81,11 @@ export default function Vendors() {
       header: 'Created',
       cell: (info) => formatDate(info.getValue()),
     }),
+    columnHelper.accessor('updatedAt', {
+      header: 'Updated',
+      enableSorting: false,
+      cell: (info) => formatDate(info.getValue()),
+    }),
     columnHelper.display({
       id: 'actions',
       header: () => <span className="block text-right">Actions</span>,

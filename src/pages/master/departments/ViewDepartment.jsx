@@ -58,6 +58,7 @@ export default function ViewDepartment() {
           </InfoCard>
           <InfoCard icon={Clock} title="Meta">
             <InfoRow label="Created" value={formatDate(dept.createdAt ?? dept.created_at)} />
+            <InfoRow label="Last updated" value={formatDate(dept.updatedAt ?? dept.updated_at)} />
           </InfoCard>
         </div>
       ) : null}

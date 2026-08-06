@@ -76,7 +76,8 @@ export default function ViewUser() {
               <InfoRow label="Last name" value={profile.last_name || '—'} />
               <InfoRow label="Email" value={profile.email || '—'} />
               <InfoRow label="Mobile" value={profile.mobile || '—'} />
-              <InfoRow label="Member since" value={formatDate(profile.created_at)} />
+              <InfoRow label="Member since" value={formatDate(profile.createdAt ?? profile.created_at)} />
+              <InfoRow label="Last updated" value={formatDate(profile.updatedAt ?? profile.updated_at)} />
             </InfoCard>
 
             <InfoCard icon={Building2} title="Role & Department">

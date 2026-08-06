@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Truck, Users, MapPin, Landmark, FileText, Plus, Trash2, Loader2, Paperclip, Tag } from 'lucide-react';
+import { Truck, Users, MapPin, Landmark, FileText, Plus, Trash2, Loader2, Paperclip, Tag, Clock } from 'lucide-react';
 import { vendorApi, vendorDocumentApi } from '@/services/vendorService';
 import { uploadImage } from '@/services/uploadService';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -8,6 +8,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
 import { useToast } from '@/components/ui/Toast';
 import { resolveAssetUrl } from '@/utils/assets';
+import { formatDate } from '@/utils/format';
 
 const DOC_TYPES = ['GST_CERT', 'PAN_CERT', 'AGREEMENT', 'REGISTRATION', 'OTHER'];
 
@@ -198,6 +199,11 @@ export default function ViewVendor() {
                   </div>
                 ))
               )}
+            </InfoCard>
+
+            <InfoCard icon={Clock} title="Meta">
+              <InfoRow label="Created" value={formatDate(vendor.createdAt ?? vendor.created_at)} />
+              <InfoRow label="Last updated" value={formatDate(vendor.updatedAt ?? vendor.updated_at)} />
             </InfoCard>
 
             <InfoCard icon={FileText} title="Documents">
