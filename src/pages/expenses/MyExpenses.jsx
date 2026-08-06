@@ -8,7 +8,7 @@ import UserDetailsModal from '@/components/ui/UserDetailsModal';
 import { useToast } from '@/components/ui/Toast';
 import { getMyExpenses } from '@/services/expenseService';
 import { categoryApi } from '@/services/financeService';
-import { formatDate, formatCurrency } from '@/utils/format';
+import { formatCurrency, formatDateTime } from '@/utils/format';
 
 const STATUS_OPTIONS = ['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID'];
 const columnHelper = createColumnHelper();
@@ -75,36 +75,37 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
         return name ? <CategoryPill name={name} /> : '—';
       },
     }),
+    // All Expenses: one column with the submitter's name (clickable → user modal) on top
+    // and the company below. My Expenses just shows the company.
     columnHelper.accessor('company', {
-      header: 'Company',
+      header: actionMode === 'all' ? 'Submitted by' : 'Company',
       enableSorting: false,
-      cell: (info) => info.getValue()?.name || '—',
+      cell: ({ row }) => {
+        const r = row.original;
+        const companyName = r.company?.name || '—';
+        if (actionMode !== 'all') return companyName;
+        const emp = r.requestedByEmployment;
+        const u = emp?.user;
+        const name = u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : null;
+        return (
+          <div className="min-w-0">
+            {name ? (
+              <button
+                type="button"
+                onClick={() => setViewUser(emp)}
+                className="block max-w-full truncate text-[13px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                title="View user details"
+              >
+                {name}
+              </button>
+            ) : (
+              <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200">—</p>
+            )}
+            <p className="text-[12px] text-slate-400 truncate">{companyName}</p>
+          </div>
+        );
+      },
     }),
-    // "Submitted by" only makes sense when viewing others' expenses (All Expenses)
-    ...(actionMode === 'all'
-      ? [
-          columnHelper.accessor('requestedByEmployment', {
-            header: 'Submitted by',
-            enableSorting: false,
-            cell: ({ row }) => {
-              const emp = row.original.requestedByEmployment;
-              const u = emp?.user;
-              const name = u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : null;
-              if (!name) return '—';
-              return (
-                <button
-                  type="button"
-                  onClick={() => setViewUser(emp)}
-                  className="text-[12px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-                  title="View user details"
-                >
-                  {name}
-                </button>
-              );
-            },
-          }),
-        ]
-      : []),
     columnHelper.accessor('estimated_amount', {
       header: 'Amount',
       enableSorting: false, // stored encrypted in the DB — can't sort numerically server-side
@@ -117,7 +118,7 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     }),
     columnHelper.accessor('submitted_at', {
       header: 'Submitted',
-      cell: (info) => (info.getValue() ? formatDate(info.getValue()) : 'Draft'),
+      cell: (info) => (info.getValue() ? formatDateTime(info.getValue()) : '-'),
     }),
     columnHelper.display({
       id: 'actions',
