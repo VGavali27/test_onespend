@@ -56,8 +56,10 @@ src/
 │   │   │   └── Users.jsx, CreateUser.jsx, EditUser.jsx, UserForm.jsx, ViewUser.jsx
 │   │   ├── companies/             # Companies: list / add / edit / view
 │   │   │   └── Companies.jsx, CreateCompany.jsx, EditCompany.jsx, CompanyForm.jsx, ViewCompany.jsx
-│   │   └── departments/           # Departments: list / add / edit / view
-│   │       └── Departments.jsx, CreateDepartment.jsx, EditDepartment.jsx, DepartmentForm.jsx, ViewDepartment.jsx
+│   │   ├── departments/           # Departments: list / add / edit / view
+│   │   │   └── Departments.jsx, CreateDepartment.jsx, EditDepartment.jsx, DepartmentForm.jsx, ViewDepartment.jsx
+│   │   └── vendors/               # Vendors: list / add / edit / view (contacts, addresses, bank accounts, documents)
+│   │       └── Vendors.jsx, CreateVendor.jsx, EditVendor.jsx, VendorForm.jsx, ViewVendor.jsx
 │   ├── access/                    # Access Control
 │   │   ├── roles/                 # Roles: list / add / edit / view
 │   │   ├── permissions/           # Permissions: list / add / edit / view
@@ -127,6 +129,7 @@ All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazi
 /master/companies         → Companies list / new / :uuid (view) / :uuid/edit
 /master/departments       → Departments list / new / :uuid (view) / :uuid/edit
 /master/users             → Users list / new / :uuid (view) / :uuid/edit
+/master/vendors           → Vendors list / new / :uuid (view) / :uuid/edit
 /master/categories        → Expense Categories list / new / :uuid (view) / :uuid/edit
 /access/roles             → Roles list / new / :uuid (view) / :uuid/edit
 /access/permissions       → Permissions list / new / :uuid (view) / :uuid/edit
@@ -174,6 +177,7 @@ VITE_APP_ENV=development
   - [x] View User — read-only detail (personal / role-dept / employments) with Edit button
 - [x] **Companies module** (`src/pages/master/companies/`) — list (client-side paginated `DataTable`, logo thumbnail), full-detail add/edit form (identity/contact/address/tax + status + **logo upload**), group dropdown via `/groups/options`, delete confirm, **View Company** with Edit button
 - [x] **Departments module** (`src/pages/master/departments/`) — list, add/edit form (name/code/status/description), delete confirm, **View Department** with Edit button
+- [x] **Vendors module** (`src/pages/master/vendors/`) — list (logo thumbnail), add/edit form with **nested contacts / addresses / bank accounts** (`useFieldArray`), logo upload, **View Vendor** with a **documents** section (upload via `/uploads` + `vendorDocumentApi`, list + delete)
 - [x] **Expense Categories module** (`src/pages/finance/categories/`) — list/add/edit/view; first-receiver & final-approver role dropdowns; delete confirm (routed + menu under **Master Data** → `/master/categories`)
 - [x] **Access Control** (`src/pages/access/`) — Roles + Permissions list/add/edit/view, and **Role Permissions** page (role selector → grouped permission checklist → `sync` API); status field on both forms
 - [x] **Role Handover Rules** (`src/pages/access/roleHandoverRules/`) — list shows all roles with rule status (or blank) + a Role-Permissions-style **editor** (module + from-role selector → To-role checklist → `sync` API that activates/deactivates rules)

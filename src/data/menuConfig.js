@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Wallet, Plane, Building2, Users, UserCog,
   Shield, Settings, BarChart3, CreditCard, ReceiptText,
   Briefcase, Landmark, Plus, CheckCircle2, BadgeCheck, Tags,
-  LayoutGrid, ShieldCheck, KeyRound, KeySquare, ArrowRightLeft,
+  LayoutGrid, ShieldCheck, KeyRound, KeySquare, ArrowRightLeft, Truck,
 } from 'lucide-react';
 
 /**
@@ -57,6 +57,7 @@ export const menuConfig = [
     roles: ['SUPER_ADMIN', 'ADMIN_MGR', 'ADMIN_JR'],
     children: [
       { id: 'companies', label: 'Companies', icon: Building2, to: '/master/companies', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },
+      { id: 'vendors', label: 'Vendors', icon: Truck, to: '/master/vendors', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },
       { id: 'departments', label: 'Departments', icon: LayoutGrid, to: '/master/departments', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },
       { id: 'users', label: 'Users', icon: Users, to: '/master/users', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },
       { id: 'user-employments', label: 'Employments', icon: UserCog, to: '/master/employments', roles: ['SUPER_ADMIN', 'ADMIN_MGR'] },

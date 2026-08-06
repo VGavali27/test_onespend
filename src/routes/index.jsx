@@ -24,6 +24,11 @@ const CreateCompany = lazy(() => import('@/pages/master/companies/CreateCompany'
 const EditCompany = lazy(() => import('@/pages/master/companies/EditCompany'));
 const ViewCompany = lazy(() => import('@/pages/master/companies/ViewCompany'));
 
+const Vendors = lazy(() => import('@/pages/master/vendors/Vendors'));
+const CreateVendor = lazy(() => import('@/pages/master/vendors/CreateVendor'));
+const EditVendor = lazy(() => import('@/pages/master/vendors/EditVendor'));
+const ViewVendor = lazy(() => import('@/pages/master/vendors/ViewVendor'));
+
 const Departments = lazy(() => import('@/pages/master/departments/Departments'));
 const CreateDepartment = lazy(() => import('@/pages/master/departments/CreateDepartment'));
 const EditDepartment = lazy(() => import('@/pages/master/departments/EditDepartment'));
@@ -86,6 +91,11 @@ export default function AppRoutes() {
           <Route path="master/companies/new" element={<CreateCompany />} />
           <Route path="master/companies/:uuid/edit" element={<EditCompany />} />
           <Route path="master/companies/:uuid" element={<ViewCompany />} />
+
+          <Route path="master/vendors" element={<Vendors />} />
+          <Route path="master/vendors/new" element={<CreateVendor />} />
+          <Route path="master/vendors/:uuid/edit" element={<EditVendor />} />
+          <Route path="master/vendors/:uuid" element={<ViewVendor />} />
 
           <Route path="master/departments" element={<Departments />} />
           <Route path="master/departments/new" element={<CreateDepartment />} />
