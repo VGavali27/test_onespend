@@ -48,8 +48,8 @@ src/
 │   ├── models/                   # All models (auto-loaded by index.js)
 │   │   ├── index.js              # Dynamic loader — reads all *.model.js files
 │   │   ├── user.model.js         # Factory pattern: export default (sequelize, DataTypes) =>
-│   │   └── ...                   # 21 models total
-│   ├── migrations/               # 20 migrations in FK-safe order
+│   │   └── ...                   # 28 models total
+│   ├── migrations/               # 22 migrations in FK-safe order
 │   ├── migrate.js                # Run: node src/database/migrate.js
 │   ├── seed.js                   # Run: node src/database/seed.js
 │   └── rollback.js               # Run: node src/database/rollback.js
@@ -59,7 +59,8 @@ src/
 │   ├── group/                    # Read-only groups (GET /groups, /groups/options) — for company group dropdown
 │   ├── user/                     # CRUD + paginated list + GET /users/me
 │   └── company, department, role, permission, user_employment,
-│       role_permission, role_handover_rule, expense_category, expense, reimbursement, travel_*  # CRUD modules
+│       role_permission, role_handover_rule, expense_category, expense, reimbursement,
+│       travel_*, vendor, vendor_category  # CRUD modules
 └── routes/
     └── index.js                  # Central route aggregator
 ```
@@ -80,7 +81,7 @@ All API responses follow this shape via `ApiResponse`:
 { "success": false, "message": "...", "errors": [{ "field": "...", "message": "..." }] }
 ```
 
-## Database — 21 Tables
+## Database — 28 Tables
 
 ### Core (8)
 | Table | Key FKs |
@@ -110,6 +111,17 @@ All API responses follow this shape via `ApiResponse`:
 | travel_expense_misc_expenses | → travel_expenses |
 | reimbursement_expenses | → expenses (1:1) |
 | reimbursement_expense_items | → reimbursement_expenses |
+
+### Vendor Module (7)
+| Table | Key FKs |
+|---|---|
+| vendors | — |
+| vendor_contacts | → vendors |
+| vendor_addresses | → vendors |
+| vendor_bank_accounts | → vendors |
+| vendor_documents | → vendors |
+| vendor_categories | — |
+| vendor_category_mappings | → vendors, vendor_categories (junction — business types a vendor serves) |
 
 ### Future models planned
 - Procurement
@@ -154,9 +166,12 @@ npm run seed              # run seeders
 - [x] RoleHandoverRule API — CRUD by UUID + **PUT /sync** (activate/deactivate a role's to-role set; never deletes, just flips status ACTIVE/INACTIVE)
 - [x] Upload API — POST /uploads (multer, 2MB limit, **any file type**), served statically at /uploads
 - [x] ExpenseDocument storage — each travel/reimbursement sub-part accepts `attachments`; files are uploaded via `/uploads` and stored as `expense_documents` rows linked to the specific item (`module_name` + `module_record_id`) on create/update (update replaces them)
+- [x] Vendor API — CRUD by UUID + **GET /vendors/options**; nested contacts / addresses / bank accounts in one create/update transaction; **vendor category assignment** via `vendor_category_uuids` — resolved to category ids and written to the `vendor_category_mappings` junction in the same transaction (errors on an unknown uuid)
+- [x] VendorCategory API — CRUD by UUID + **GET /vendor-categories/options**; classifies vendors by the business types they serve
+- [x] VendorDocument API — add/remove documents on a vendor (uploaded files via `/uploads`)
 - [ ] ExpenseHandover API
 
-### Seeders (10 files)
+### Seeders (11 files)
 - [x] Groups — Kings Group Ventures (KGV)
 - [x] Roles — 13 roles (SUPER_ADMIN → EMPLOYEE)
 - [x] Departments — 10 departments
@@ -166,6 +181,7 @@ npm run seed              # run seeders
 - [x] ExpenseCategories — Travel category
 - [x] Users — one user per role (12 users + SUPER_ADMIN)
 - [x] RoleHandoverRules — travel module approval chain
+- [x] VendorCategories — 5 demo business types (Corporate Travel, IT Services, Consulting, Office Supplies, Logistics)
 - [ ] RoleHandoverRules for other modules
 
 ### Infrastructure

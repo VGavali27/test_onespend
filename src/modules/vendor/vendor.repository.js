@@ -1,7 +1,7 @@
 import db from '../../database/models/index.js';
 import { decrypt } from '../../utils/encryption.js';
 
-const { Vendor, VendorContact, VendorAddress, VendorBankAccount, VendorDocument } = db;
+const { Vendor, VendorContact, VendorAddress, VendorBankAccount, VendorDocument, VendorCategory } = db;
 
 // Children loaded with a single vendor (detail view)
 const childInclude = [
@@ -9,6 +9,7 @@ const childInclude = [
   { model: VendorAddress, as: 'addresses' },
   { model: VendorBankAccount, as: 'bankAccounts' },
   { model: VendorDocument, as: 'documents' },
+  { model: VendorCategory, as: 'categories' },
 ];
 
 // Bank account numbers are encrypted at rest — decrypt them for display
@@ -19,11 +20,12 @@ const decryptBankAccounts = (vendor) => {
   return vendor;
 };
 
-// Lightweight list — only the fields the vendors table renders
+// Lightweight list — only the fields the vendors table renders (+ category chips for filtering)
 export const findAll = async () =>
   Vendor.findAll({
     order: [['createdAt', 'DESC']],
     attributes: ['uuid', 'name', 'code', 'vendor_type', 'logo_img', 'status', 'createdAt'],
+    include: [{ model: VendorCategory, as: 'categories', attributes: ['uuid', 'name'] }],
   });
 
 // Lightweight dropdown options — only uuid + name

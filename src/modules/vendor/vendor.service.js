@@ -2,7 +2,7 @@ import * as vendorRepository from './vendor.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 
-const { Vendor, VendorContact, VendorAddress, VendorBankAccount, VendorDocument, sequelize } = db;
+const { Vendor, VendorContact, VendorAddress, VendorBankAccount, VendorDocument, VendorCategory, VendorCategoryMapping, sequelize } = db;
 
 // List + options
 export const getAll = async () => vendorRepository.findAll();
@@ -25,9 +25,25 @@ const replaceChildren = async (vendorId, contacts = [], addresses = [], bankAcco
   if (bankAccounts.length) await VendorBankAccount.bulkCreate(bankAccounts.map((b) => ({ ...b, vendor_id: vendorId })), { transaction: t });
 };
 
+// Replace a vendor's category mapping (vendor_category_mappings junction) in a transaction.
+// Resolves category UUIDs to ids and errors on any unknown uuid so a typo can't silently drop a category.
+const replaceCategories = async (vendorId, categoryUuids = [], t) => {
+  await VendorCategoryMapping.destroy({ where: { vendor_id: vendorId }, force: true, transaction: t });
+  if (categoryUuids.length) {
+    const categories = await VendorCategory.findAll({ where: { uuid: categoryUuids }, transaction: t });
+    if (categories.length !== categoryUuids.length) {
+      throw ApiError.badRequest('One or more vendor categories are invalid');
+    }
+    await VendorCategoryMapping.bulkCreate(
+      categories.map((c) => ({ vendor_id: vendorId, vendor_category_id: c.id })),
+      { transaction: t }
+    );
+  }
+};
+
 // Create a vendor + its children in one transaction
 export const create = async (data) => {
-  const { contacts = [], addresses = [], bank_accounts = [], ...vendorData } = data;
+  const { contacts = [], addresses = [], bank_accounts = [], vendor_category_uuids = [], ...vendorData } = data;
 
   if (vendorData.code) {
     const existing = await vendorRepository.findByCode(vendorData.code);
@@ -37,6 +53,7 @@ export const create = async (data) => {
   return sequelize.transaction(async (t) => {
     const vendor = await vendorRepository.create(vendorData, t);
     await replaceChildren(vendor.id, contacts, addresses, bank_accounts, t);
+    await replaceCategories(vendor.id, vendor_category_uuids, t);
     return vendorRepository.findByUuid(vendor.uuid, t);
   });
 };
@@ -51,12 +68,15 @@ export const update = async (uuid, data) => {
     if (existing) throw ApiError.conflict('Vendor code already exists');
   }
 
-  const { contacts, addresses, bank_accounts, ...vendorData } = data;
+  const { contacts, addresses, bank_accounts, vendor_category_uuids, ...vendorData } = data;
 
   return sequelize.transaction(async (t) => {
     await vendor.update(vendorData, { transaction: t });
     if (contacts !== undefined || addresses !== undefined || bank_accounts !== undefined) {
       await replaceChildren(vendor.id, contacts ?? [], addresses ?? [], bank_accounts ?? [], t);
+    }
+    if (vendor_category_uuids !== undefined) {
+      await replaceCategories(vendor.id, vendor_category_uuids ?? [], t);
     }
     return vendorRepository.findByUuid(uuid, t);
   });

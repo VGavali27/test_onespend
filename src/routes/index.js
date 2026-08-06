@@ -11,6 +11,7 @@ import expenseCategoryRoutes from '../modules/expense_category/expense_category.
 import expenseRoutes from '../modules/expense/expense.routes.js';
 import vendorRoutes from '../modules/vendor/vendor.routes.js';
 import vendorDocumentRoutes from '../modules/vendor/vendor_document.routes.js';
+import vendorCategoryRoutes from '../modules/vendor_category/vendor_category.routes.js';
 import reimbursementRoutes from '../modules/reimbursement/reimbursement.routes.js';
 import travelExpenseRoutes from '../modules/travel_expense/travel_expense.routes.js';
 import travelSegmentRoutes from '../modules/travel_segment/travel_segment.routes.js';
@@ -37,6 +38,7 @@ router.use('/expense-categories', expenseCategoryRoutes);
 router.use('/expenses', expenseRoutes);
 router.use('/vendors', vendorRoutes);
 router.use('/vendor-documents', vendorDocumentRoutes);
+router.use('/vendor-categories', vendorCategoryRoutes);
 router.use('/reimbursements', reimbursementRoutes);
 router.use('/travel-expenses', travelExpenseRoutes);
 router.use('/travel-segments', travelSegmentRoutes);

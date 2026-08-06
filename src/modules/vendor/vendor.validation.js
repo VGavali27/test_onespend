@@ -55,6 +55,7 @@ export const createVendorSchema = Joi.object({
   contacts: Joi.array().items(contactSchema).allow(null),
   addresses: Joi.array().items(addressSchema).allow(null),
   bank_accounts: Joi.array().items(bankAccountSchema).allow(null),
+  vendor_category_uuids: Joi.array().items(Joi.string().uuid()).allow(null),
 });
 
 // Update a vendor — basic fields + optional child replacement
@@ -74,6 +75,7 @@ export const updateVendorSchema = Joi.object({
   contacts: Joi.array().items(contactSchema).allow(null),
   addresses: Joi.array().items(addressSchema).allow(null),
   bank_accounts: Joi.array().items(bankAccountSchema).allow(null),
+  vendor_category_uuids: Joi.array().items(Joi.string().uuid()).allow(null),
 })
   .min(1)
   .messages({ 'object.min': 'At least one field is required' });

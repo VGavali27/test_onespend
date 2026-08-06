@@ -45,6 +45,12 @@ export default (sequelize, DataTypes) => {
     Vendor.hasMany(models.VendorAddress, { foreignKey: 'vendor_id', as: 'addresses' });
     Vendor.hasMany(models.VendorBankAccount, { foreignKey: 'vendor_id', as: 'bankAccounts' });
     Vendor.hasMany(models.VendorDocument, { foreignKey: 'vendor_id', as: 'documents' });
+    Vendor.belongsToMany(models.VendorCategory, {
+      through: models.VendorCategoryMapping,
+      foreignKey: 'vendor_id',
+      otherKey: 'vendor_category_id',
+      as: 'categories',
+    });
   };
 
   return Vendor;
