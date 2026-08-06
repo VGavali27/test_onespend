@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useRef, useState } from 'react';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Truck, Users, MapPin, Landmark, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Truck, Users, MapPin, Landmark, FileText, Paperclip, Plus, Trash2, Loader2 } from 'lucide-react';
 import ImageUpload from '@/components/ui/ImageUpload';
 import { inputClassFor } from '@/components/ui/form';
 import { applyServerErrorsDetailed } from '@/utils/formErrors';
@@ -17,7 +17,7 @@ const ACCOUNT_TYPES = ['PRIMARY', 'OPERATING', 'INTERNATIONAL'];
 const emptyForm = {
   name: '', code: '', vendor_type: 'VENDOR', logo_img: '', website: '', gst_number: '',
   pan_number: '', cin_number: '', payment_terms: '', rating: '', status: 'ACTIVE', notes: '',
-  contacts: [], addresses: [], bank_accounts: [],
+  contacts: [], addresses: [], bank_accounts: [], documents: [],
 };
 const emptyContact = { contact_type: 'PRIMARY', salutation: '', first_name: '', last_name: '', designation: '', email: '', phone: '', mobile: '', is_primary: false };
 const emptyAddress = { address_type: 'REGISTERED', address_line_1: '', address_line_2: '', city: '', state: '', country: '', pincode: '', is_primary: false };
@@ -35,6 +35,7 @@ export default function VendorForm({
   submitLabel = isEdit ? 'Save Changes' : 'Create Vendor',
   savingLabel = isEdit ? 'Saving...' : 'Creating...',
 }) {
+  // onSubmit receives { payload, documents } — documents are Files (new) or { uuid, name, url } (existing)
   const [submitError, setSubmitError] = useState(null);
   const toast = useToast();
 
@@ -77,7 +78,7 @@ export default function VendorForm({
       bank_accounts: values.bank_accounts,
     };
     try {
-      await onSubmit(payload);
+      await onSubmit({ payload, documents: values.documents });
       toast.success(isEdit ? 'Vendor updated successfully' : 'Vendor created successfully');
     } catch (err) {
       const { mapped, summary } = applyServerErrorsDetailed(err, setError);
@@ -233,6 +234,11 @@ export default function VendorForm({
             ))}
           </ChildRows>
         </SectionCard>
+
+        {/* Documents */}
+        <SectionCard icon={FileText} title="Documents" subtitle="Optional — GST certificates, PAN, agreements, etc.">
+          <DocUpload control={control} setValue={setValue} path="documents" />
+        </SectionCard>
       </form>
 
       {/* Form actions */}
@@ -259,6 +265,51 @@ export default function VendorForm({
 }
 
 // ── Presentational helpers ──
+
+// File picker for vendor documents — stores File objects (new picks) and keeps
+// existing { uuid, name, url } entries (from editing) so uploads/deletes happen on save.
+function DocUpload({ control, setValue, path }) {
+  const docs = useWatch({ control, name: path }) || [];
+  const fileRef = useRef(null);
+
+  const addFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setValue(path, [...docs, ...files], { shouldDirty: true });
+    e.target.value = '';
+  };
+  const remove = (i) => setValue(path, docs.filter((_, idx) => idx !== i), { shouldDirty: true });
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <p className="text-[12px] text-slate-400">{docs.length} file{docs.length === 1 ? '' : 's'} attached</p>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add file
+        </button>
+        <input ref={fileRef} type="file" multiple className="hidden" onChange={addFiles} />
+      </div>
+      {docs.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {docs.map((a, i) => (
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-[11px] text-slate-600 dark:text-slate-300">
+              <Paperclip className="h-3 w-3 text-slate-400" />
+              {a.name || a.url}
+              <button type="button" onClick={() => remove(i)} className="text-slate-400 hover:text-red-500" title="Remove">×</button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[11px] text-slate-400 mt-1">No documents attached</p>
+      )}
+    </div>
+  );
+}
 
 function SectionCard({ icon: Icon, title, subtitle, children }) {
   return (

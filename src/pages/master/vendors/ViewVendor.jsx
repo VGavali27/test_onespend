@@ -48,7 +48,7 @@ export default function ViewVendor() {
     }
     setAddingDoc(true);
     try {
-      const { data } = await uploadImage(docFile);
+      const { data } = await uploadImage(docFile, 'vendor');
       const url = data?.data?.url;
       await vendorDocumentApi.add({
         vendor_uuid: uuid,

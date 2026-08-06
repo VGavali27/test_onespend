@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Truck } from 'lucide-react';
-import { vendorApi } from '@/services/vendorService';
+import { vendorApi, syncVendorDocuments } from '@/services/vendorService';
 import VendorForm from '@/pages/master/vendors/VendorForm';
 import PageHeader from '@/components/ui/PageHeader';
 import ErrorState from '@/components/ui/ErrorState';
@@ -33,7 +33,10 @@ const toFormValues = (v) => ({
     bank_branch: b.bank_branch || '', account_number: b.account_number || '', ifsc: b.ifsc || '',
     swift_code: b.swift_code || '', currency_code: b.currency_code || 'INR', is_primary: !!b.is_primary,
   })),
+  documents: (v?.documents || []).map((d) => ({ uuid: d.uuid, name: d.original_file_name, url: d.file_path })),
 });
+
+const toInitialDocuments = (v) => (v?.documents || []).map((d) => ({ uuid: d.uuid, name: d.original_file_name, url: d.file_path }));
 
 export default function EditVendor() {
   const { uuid } = useParams();
@@ -41,6 +44,7 @@ export default function EditVendor() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [initialValues, setInitialValues] = useState(null);
+  const [initialDocuments, setInitialDocuments] = useState([]);
 
   const goBack = () => navigate('/master/vendors');
 
@@ -50,6 +54,7 @@ export default function EditVendor() {
     try {
       const { data } = await vendorApi.get(uuid);
       setInitialValues(toFormValues(data?.data));
+      setInitialDocuments(toInitialDocuments(data?.data));
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to load vendor.');
     } finally {
@@ -77,8 +82,9 @@ export default function EditVendor() {
         <VendorForm
           initialValues={initialValues}
           isEdit
-          onSubmit={async (payload) => {
+          onSubmit={async ({ payload, documents }) => {
             await vendorApi.update(uuid, payload);
+            await syncVendorDocuments(uuid, documents, initialDocuments);
             navigate(`/master/vendors/${uuid}`);
           }}
           onCancel={goBack}
