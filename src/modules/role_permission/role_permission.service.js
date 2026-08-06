@@ -1,18 +1,19 @@
 import * as rolePermissionRepository from './role_permission.repository.js';
+import * as roleRepository from '../role/role.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
-const { Role, Permission } = db;
+const { Permission } = db;
 
 // Get all permissions assigned to a role (by role UUID)
 export const getPermissionsByRoleUuid = async (roleUuid) => {
-  const role = await Role.findOne({ where: { uuid: roleUuid } });
+  const role = await roleRepository.findByUuid(roleUuid);
   if (!role) throw ApiError.notFound('Role not found');
   return rolePermissionRepository.findPermissionsByRoleId(role.id);
 };
 
 // Sync permissions — replaces all existing with the given set
 export const sync = async (roleUuid, permissionUuids) => {
-  const role = await Role.findOne({ where: { uuid: roleUuid } });
+  const role = await roleRepository.findByUuid(roleUuid);
   if (!role) throw ApiError.notFound('Referenced role not found');
 
   const permissions = permissionUuids.length > 0 ? await Permission.findAll({ where: { uuid: permissionUuids } }) : [];

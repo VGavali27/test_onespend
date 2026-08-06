@@ -1,8 +1,11 @@
 import * as expenseRepository from './expense.repository.js';
+import * as companyRepository from '../company/company.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
-import { decryptAmounts } from '../../utils/encryption.js';
-const { ExpenseCategory, Company, User, UserEmployment, sequelize } = db;
+import { decryptResults } from '../../utils/encryption.js';
+import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser } from '../../modules/user_employment/user_employment.service.js';
+
+const { ExpenseCategory, User, sequelize } = db;
 
 // Roles that see every company's expenses (global visibility)
 const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO'];
@@ -18,18 +21,6 @@ export const EXPENSE_MANAGER_ROLES = [
   'TRAVEL_MGR',
   'HOD',
 ];
-
-// All employment ids for a user (no status filter — historical own-expenses still match)
-const getUserEmploymentIds = async (userId) => {
-  const employments = await UserEmployment.findAll({ where: { user_id: userId } });
-  return employments.map((e) => e.id);
-};
-
-// Company ids of the user's ACTIVE employments (drives company-scoped visibility)
-const getUserCompanyIds = async (userId) => {
-  const employments = await UserEmployment.findAll({ where: { user_id: userId, status: 'ACTIVE' } });
-  return employments.map((e) => e.company_id);
-};
 
 // Persist uploaded attachments as expense_documents, each linked to its own sub-part record
 // (module_name + module_record_id). `sourceItems` are the submitted payload rows (with
@@ -71,17 +62,6 @@ const generateExpenseNumber = async () => {
   return `EXP-${dateStr}-${String(seq).padStart(4, '0')}`;
 };
 
-// Decrypt amount fields in an expense object or array (mutates in place)
-export const decryptResults = (data) => {
-  if (!data) return data;
-  const items = Array.isArray(data) ? data : [data];
-  items.forEach((item) => {
-    if (item?.dataValues) decryptAmounts(item.dataValues);
-    else if (item) decryptAmounts(item);
-  });
-  return data;
-};
-
 // Attach a `canEdit` flag to each row — a user may edit an expense only while it's
 // DRAFT and they are the one who created it (the backend also enforces this on PUT).
 const markCanEdit = (rows, employmentIds) => {
@@ -93,7 +73,7 @@ const markCanEdit = (rows, employmentIds) => {
 
 // Expenses the logged-in user created (under any of their employments) — paginated.
 export const getMyExpenses = async (userId, params = {}) => {
-  const employmentIds = await getUserEmploymentIds(userId);
+  const employmentIds = await getEmploymentIdsByUser(userId);
   if (employmentIds.length === 0) return { rows: [], total: 0 };
   const result = await expenseRepository.findByEmploymentIds(employmentIds, params);
   if (params.decrypt) decryptResults(result.rows);
@@ -108,14 +88,14 @@ export const getVisible = async (user, params = {}) => {
   if (EXPENSE_GLOBAL_ROLES.includes(user.roleCode)) {
     result = await expenseRepository.findAll({}, params);
   } else {
-    const companyIds = await getUserCompanyIds(user.userId);
+    const companyIds = await getActiveCompanyIdsByUser(user.userId);
     result =
       companyIds.length > 0
         ? await expenseRepository.findByCompanyIds(companyIds, params)
         : { rows: [], total: 0 };
   }
   if (params.decrypt) decryptResults(result.rows);
-  const employmentIds = await getUserEmploymentIds(user.userId);
+  const employmentIds = await getEmploymentIdsByUser(user.userId);
   markCanEdit(result.rows, employmentIds);
   return result;
 };
@@ -150,8 +130,8 @@ export const getByUuid = async (uuid, user, decrypt = false) => {
   if (!expense) throw ApiError.notFound('Expense not found');
 
   const [employmentIds, companyIds] = await Promise.all([
-    getUserEmploymentIds(user.userId),
-    getUserCompanyIds(user.userId),
+    getEmploymentIdsByUser(user.userId),
+    getActiveCompanyIdsByUser(user.userId),
   ]);
   const visible =
     EXPENSE_GLOBAL_ROLES.includes(user.roleCode) ||
@@ -169,11 +149,11 @@ export const getByUuid = async (uuid, user, decrypt = false) => {
 export const create = async (data) => {
   const category = await ExpenseCategory.findOne({ where: { uuid: data.category_uuid } });
   if (!category) throw ApiError.notFound('Referenced expense category not found');
-  const company = await Company.findOne({ where: { uuid: data.company_uuid } });
+  const company = await companyRepository.findByUuid(data.company_uuid);
   if (!company) throw ApiError.notFound('Referenced company not found');
   const user = await User.findOne({ where: { uuid: data.requested_by_user_uuid } });
   if (!user) throw ApiError.notFound('Referenced user not found');
-  const employment = await UserEmployment.findOne({ where: { user_id: user.id, status: 'ACTIVE' } });
+  const employment = await getActiveEmploymentByUser(user.id);
   if (!employment) throw ApiError.notFound('No active employment found for the user');
 
   const expenseNumber = await generateExpenseNumber();
@@ -322,7 +302,7 @@ export const update = async (uuid, user, data) => {
   if (expense.status !== 'DRAFT') throw ApiError.badRequest('Cannot update a non-draft expense');
 
   // Only the requesting employee can edit their own draft
-  const employmentIds = await getUserEmploymentIds(user.userId);
+  const employmentIds = await getEmploymentIdsByUser(user.userId);
   if (!employmentIds.includes(expense.requested_by_employment_id)) {
     throw ApiError.forbidden('You can only edit your own draft expenses');
   }
@@ -354,7 +334,7 @@ export const update = async (uuid, user, data) => {
     expenseData.category_id = category.id;
   }
   if (company_uuid) {
-    const company = await Company.findOne({ where: { uuid: company_uuid } });
+    const company = await companyRepository.findByUuid(company_uuid);
     if (!company) throw ApiError.notFound('Referenced company not found');
     expenseData.company_id = company.id;
   }

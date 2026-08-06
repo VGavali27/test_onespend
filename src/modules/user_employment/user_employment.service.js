@@ -1,7 +1,8 @@
 import * as userEmploymentRepository from './user_employment.repository.js';
+import * as companyRepository from '../company/company.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
-const { User, Company, UserEmployment } = db;
+const { User, UserEmployment } = db;
 
 // Fetch all employments
 export const getAll = async () => userEmploymentRepository.findAll();
@@ -24,7 +25,7 @@ export const getByUuid = async (uuid) => {
 export const create = async (data) => {
   const user = await User.findOne({ where: { uuid: data.user_uuid } });
   if (!user) throw ApiError.notFound('Referenced user not found');
-  const company = await Company.findOne({ where: { uuid: data.company_uuid } });
+  const company = await companyRepository.findByUuid(data.company_uuid);
   if (!company) throw ApiError.notFound('Referenced company not found');
 
   let reportingManagerId = null;
@@ -52,7 +53,7 @@ export const update = async (uuid, data) => {
   if (!employment) throw ApiError.notFound('Employment not found');
 
   if (data.company_uuid) {
-    const company = await Company.findOne({ where: { uuid: data.company_uuid } });
+    const company = await companyRepository.findByUuid(data.company_uuid);
     if (!company) throw ApiError.notFound('Referenced company not found');
     data.company_id = company.id;
     delete data.company_uuid;
@@ -82,3 +83,12 @@ export const deleteRecord = async (uuid) => {
   if (!deleted) throw ApiError.notFound('Employment not found');
   return { message: 'Employment deleted successfully' };
 };
+
+// ── Shared helpers for other modules (expense, procurement, travel, ...) ──
+// Employment data-access lives here (the user_employment module owns it); other
+// modules import these instead of re-querying UserEmployment themselves.
+export const getEmploymentIdsByUser = (userId) => userEmploymentRepository.findIdsByUserId(userId);
+export const getActiveCompanyIdsByUser = (userId) => userEmploymentRepository.findActiveCompanyIdsByUserId(userId);
+export const getActiveEmploymentByUser = (userId) => userEmploymentRepository.findActiveByUserId(userId);
+export const getActiveEmploymentByUserAndCompany = (userId, companyId) =>
+  userEmploymentRepository.findActiveByUserAndCompany(userId, companyId);

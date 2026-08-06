@@ -1,7 +1,6 @@
 import * as expenseCategoryRepository from './expense_category.repository.js';
-import db from '../../database/models/index.js';
+import * as roleRepository from '../role/role.repository.js';
 import ApiError from '../../utils/ApiError.js';
-const { Role } = db;
 
 // Fetch all expense categories
 export const getAll = async () => expenseCategoryRepository.findAll();
@@ -15,9 +14,9 @@ export const getByUuid = async (uuid) => {
 
 // Create a new category — resolves role UUIDs, checks code uniqueness
 export const create = async (data) => {
-  const firstReceiver = await Role.findOne({ where: { uuid: data.first_receiver_role_uuid } });
+  const firstReceiver = await roleRepository.findByUuid(data.first_receiver_role_uuid);
   if (!firstReceiver) throw ApiError.notFound('Referenced first receiver role not found');
-  const finalApprover = await Role.findOne({ where: { uuid: data.final_approver_role_uuid } });
+  const finalApprover = await roleRepository.findByUuid(data.final_approver_role_uuid);
   if (!finalApprover) throw ApiError.notFound('Referenced final approver role not found');
   const existing = await expenseCategoryRepository.findByCode(data.code);
   if (existing) throw ApiError.conflict('Category code already exists');
@@ -34,13 +33,13 @@ export const update = async (uuid, data) => {
   const category = await expenseCategoryRepository.findByUuid(uuid);
   if (!category) throw ApiError.notFound('Expense category not found');
   if (data.first_receiver_role_uuid) {
-    const role = await Role.findOne({ where: { uuid: data.first_receiver_role_uuid } });
+    const role = await roleRepository.findByUuid(data.first_receiver_role_uuid);
     if (!role) throw ApiError.notFound('Referenced first receiver role not found');
     data.first_receiver_role_id = role.id;
     delete data.first_receiver_role_uuid;
   }
   if (data.final_approver_role_uuid) {
-    const role = await Role.findOne({ where: { uuid: data.final_approver_role_uuid } });
+    const role = await roleRepository.findByUuid(data.final_approver_role_uuid);
     if (!role) throw ApiError.notFound('Referenced final approver role not found');
     data.final_approver_role_id = role.id;
     delete data.final_approver_role_uuid;

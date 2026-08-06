@@ -77,3 +77,17 @@ export function decryptAmounts(obj) {
   }
   return obj;
 }
+
+/**
+ * Decrypt the amount fields of a record or array of records (mutates in place).
+ * Handles both Sequelize instances (via .dataValues) and plain objects.
+ */
+export function decryptResults(data) {
+  if (!data) return data;
+  const items = Array.isArray(data) ? data : [data];
+  items.forEach((item) => {
+    if (item?.dataValues) decryptAmounts(item.dataValues);
+    else if (item) decryptAmounts(item);
+  });
+  return data;
+}

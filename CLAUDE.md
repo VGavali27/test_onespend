@@ -48,8 +48,8 @@ src/
 │   ├── models/                   # All models (auto-loaded by index.js)
 │   │   ├── index.js              # Dynamic loader — reads all *.model.js files
 │   │   ├── user.model.js         # Factory pattern: export default (sequelize, DataTypes) =>
-│   │   └── ...                   # 28 models total
-│   ├── migrations/               # 22 migrations in FK-safe order
+│   │   └── ...                   # 32 models total
+│   ├── migrations/               # 23 migrations in FK-safe order
 │   ├── migrate.js                # Run: node src/database/migrate.js
 │   ├── seed.js                   # Run: node src/database/seed.js
 │   └── rollback.js               # Run: node src/database/rollback.js
@@ -60,7 +60,7 @@ src/
 │   ├── user/                     # CRUD + paginated list + GET /users/me
 │   └── company, department, role, permission, user_employment,
 │       role_permission, role_handover_rule, expense_category, expense, reimbursement,
-│       travel_*, vendor, vendor_category  # CRUD modules
+│       travel_*, vendor, vendor_category, procurement  # CRUD modules
 └── routes/
     └── index.js                  # Central route aggregator
 ```
@@ -81,7 +81,7 @@ All API responses follow this shape via `ApiResponse`:
 { "success": false, "message": "...", "errors": [{ "field": "...", "message": "..." }] }
 ```
 
-## Database — 28 Tables
+## Database — 32 Tables
 
 ### Core (8)
 | Table | Key FKs |
@@ -123,8 +123,15 @@ All API responses follow this shape via `ApiResponse`:
 | vendor_categories | — |
 | vendor_category_mappings | → vendors, vendor_categories (junction — business types a vendor serves) |
 
+### Procurement Module (4)
+| Table | Key FKs |
+|---|---|
+| procurement_requests | → companies, vendors, user_employments, roles (+ self-FK `parent_id` chains PI → PR → PO) |
+| procurement_items | → procurement_requests |
+| procurement_handovers | → procurement_requests, roles, user_employments |
+| procurement_documents | → procurement_requests (quotation / invoice / delivery files) |
+
 ### Future models planned
-- Procurement
 - GeneralExpense
 
 ## Common Patterns
@@ -169,9 +176,10 @@ npm run seed              # run seeders
 - [x] Vendor API — CRUD by UUID + **GET /vendors/options**; nested contacts / addresses / bank accounts in one create/update transaction; **vendor category assignment** via `vendor_category_uuids` — resolved to category ids and written to the `vendor_category_mappings` junction in the same transaction (errors on an unknown uuid)
 - [x] VendorCategory API — CRUD by UUID + **GET /vendor-categories/options**; classifies vendors by the business types they serve
 - [x] VendorDocument API — add/remove documents on a vendor (uploaded files via `/uploads`)
+- [x] **Procurement API** — `/procurement`. One document row per PI/PR/PO chained via `parent_id`. **Workflow actions**: `submit` / `approve` / `reject` / `create-pr` / `create-po` / `received` / `pay`. Totals computed server-side (qty × price × tax); amounts AES-encrypted. Every role→role hop is **validated against `role_handover_rules` (module='procurement')** — the chain (PI → ADMIN_MGR → PR → HOD → quotation → CFO → PO → Received → FINANCE_MGR → CFO → PAYMENT_MGR) stays configurable. Handovers logged with an encrypted `amount_at_step` snapshot. Documents attached per request (quotation/invoice/delivery). Role-scoped list (SUPER_ADMIN/CFO all, managers company-scoped, requesters own).
 - [ ] ExpenseHandover API
 
-### Seeders (11 files)
+### Seeders (14 files)
 - [x] Groups — Kings Group Ventures (KGV)
 - [x] Roles — 13 roles (SUPER_ADMIN → EMPLOYEE)
 - [x] Departments — 10 departments
@@ -182,7 +190,9 @@ npm run seed              # run seeders
 - [x] Users — one user per role (12 users + SUPER_ADMIN)
 - [x] RoleHandoverRules — travel module approval chain
 - [x] VendorCategories — 5 demo business types (Corporate Travel, IT Services, Consulting, Office Supplies, Logistics)
-- [ ] RoleHandoverRules for other modules
+- [x] ProcurementPermissions — `procurement:create/read/update/approve/po/received/pay` (ids 135–141) + role grants
+- [x] ProcurementHandoverRules — `module='procurement'` role handoff rules for the PI→…→Payment chain
+- [x] ProcurementExpenseCategory — `PROCUREMENT` expense category (first receiver ADMIN_MGR → final approver CFO)
 
 ### Infrastructure
 - [x] Reusable ApiError + ApiResponse + errorHandler
@@ -201,36 +211,19 @@ npm run seed              # run seeders
 - **UUID auto-generation** — every model's `uuid` has `defaultValue: UUIDV4` (fixed "uuid cannot be null" on create)
 - **Per-employment email** — `user_employments.email` column (a user can have a different email per company)
 - **Lightweight options** — `/roles|companies|departments/options` return only `[{ uuid, name }]` for dropdowns
+- **Shared data-access lives in owning modules** — employment helpers (`getEmploymentIdsByUser`, `getActiveCompanyIdsByUser`, `getActiveEmploymentByUser`, `getActiveEmploymentByUserAndCompany`) live in the **`user_employment`** module; company/role uuid resolution goes through the **`company`**/**`role`** repositories; `decryptResults` lives in **`encryption.js`**. Other modules import these instead of re-querying models inline (see `user_employment.service.js`, `company.repository.js`, `role.repository.js`, `utils/encryption.js`).
 
-## Procurement — Planned Module (NOT YET BUILT)
+## Procurement Module — BUILT
 
-Captured design for the future Procurement expense module. Model it on the existing Travel/Reimbursement pattern (generic `expenses` row + module child table + `expense_categories.module`).
+Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Quotation → PO (Purchase Order) → Received → Finance → CFO (re-approval) → Payment`.
 
-### Workflow (role-driven, configurable via `role_handover_rules`)
-`PI (Purchase Intention) → PR (Purchase Request) → Quotation → PO (Purchase Order) → Received → Finance → CFO (re-approval) → Payment`
+- **Schema** (`20260806000003-create-procurement-tables.js`): `procurement_requests` (one row per PI/PR/PO chained via `parent_id`), `procurement_items`, `procurement_handovers`, `procurement_documents`. Encrypted amounts (`total_amount`/`tax_amount`/`grand_total`, item `unit_price`/`total_with_tax`, handover `amount_at_step`) stored as TEXT.
+- **Workflow engine** (`src/modules/procurement/procurement.service.js`): `submit` / `approve` / `reject` / `create-pr` / `create-po` / `received` / `pay`. Each role→role hop is validated against an ACTIVE `role_handover_rules` row with `module='procurement'` (seeded in `20260806000013`). Totals computed server-side from items (qty × price × tax).
+- **Vendor linkage**: `procurement_requests.vendor_id` → `vendors` (link to the Vendors master).
+- **Permissions**: `procurement:*` (ids 135–141) + role grants (seeder `20260806000012`).
+- **Expense category**: `PROCUREMENT` (module='procurement') seeded for future expense conversion.
 
-1. Any requester creates a **PI**; it goes to the **first approver directly** (in our case ADMIN_MGR).
-2. Admin approves the PI and **creates a PR** from it; vendor sends a quotation (offline — no vendor role).
-3. Admin sends the PR + quotation to **HOD** → HOD approves → Admin also approves the quotation → **CFO** approves → back to Admin.
-4. Admin **creates a PO** from the PR. Vendor delivers material + invoice; Admin marks **RECEIVED**.
-5. Admin sends PO + all documents to **Finance** (FINANCE_MGR) → approves → **CFO** approves again.
-6. **Payment team** (PAYMENT_MGR) processes payment; if they can't, they re-confirm with CFO.
-7. Steps/roles are editable through `role_handover_rules` (no code change).
-
-### Proposed tables
-- **`procurement_requests`** — one table for the whole chain: `request_type` (PI|PR|PO), `document_number` (PI-YYYY-XXXX), `parent_id` (self-FK to the doc it was created from), `status`, `company_id`, `requested_by_employment_id`, `current_role_id`, `current_employment_id`, `vendor_name/contact/delivery_address/expected_delivery_date/payment_terms`, `total_amount/tax_amount/grand_total` (encrypted), `received_date`, notes + audit fields.
-  - **Multiple PIs → one PO**: add a junction `procurement_links` (`request_id`, `linked_request_id`) for many-to-many aggregation.
-- **`procurement_items`** — line items per document: `item_name`, `description`, `category`, `quantity`, `unit`, `unit_price`, `total_amount`, `tax_rate`, `tax_amount`, `total_with_tax` (qty × price; amounts encrypted). Items copy from PI→PR→PO but are editable, so each level tracks its own total.
-- **`procurement_handovers`** — approval log per document (modeled on `expense_handovers`): `procurement_request_id`, `action_type` (SUBMIT/APPROVE/REJECT/CREATE_PR/CREATE_PO/RECEIVED/PAY), `from_role_id`, `to_role_id`, `action_by_employment_id`, **`amount_at_step`** (snapshot of the total at each step — satisfies "manage amounts at each level"), remarks, timestamps.
-- **Why NOT reuse `expense_handovers`**: different parent entity (`procurement_request_id` ≠ `expense_id`), different actions/stages (CREATE_PR/PO, RECEIVED, double CFO approval), need `amount_at_step`, and keeping each module's audit trail separate.
-
-### Expense conversion
-- Add **`expenses.procurement_id`** (FK → `procurement_requests.id`).
-- When a **PO is RECEIVED + Finance/CFO approved**, Admin clicks **"Convert to Expense"** → creates an `expenses` row (category `module='procurement'`, `procurement_id` = PO id, amount = PO grand_total, **status = APPROVED** so it goes straight to payment — procurement already did the approvals).
-- One PO → one expense, so multiple PIs never directly create expenses.
-
-### Permissions
-- Add procurement-specific permissions (e.g. `procurement:create/approve/po/received/pay`) rather than overloading `expenses:*`; grant in the seeder to ADMIN_MGR, HOD, CFO, FINANCE_MGR, PAYMENT_MGR.
-
-### Frontend scope (when built)
-- `ExpenseForm` gains a Procurement branch (vendor fields + item rows with qty×price auto-calc), reusing module-aware validation, required markers, error display, attachments, and the list/detail table+card patterns. Likely a separate Procurement section with its own pages (list, create PI, PR/PO creation, approval actions).
+### Deferred (documented follow-ups)
+- **Expense conversion** — `expenses.procurement_id` + "Convert to Expense" action (category `module='procurement'`, status APPROVED).
+- **Multiple PIs → one PO** — add a `procurement_links` junction (`request_id`, `linked_request_id`).
+- Frontend lives in the frontend repo (Procurement section — list, create PI, detail with action bar + handover timeline + documents).

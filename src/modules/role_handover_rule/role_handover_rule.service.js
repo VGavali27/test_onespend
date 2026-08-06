@@ -1,12 +1,10 @@
 import * as roleHandoverRuleRepository from './role_handover_rule.repository.js';
-import db from '../../database/models/index.js';
+import * as roleRepository from '../role/role.repository.js';
 import ApiError from '../../utils/ApiError.js';
-
-const { Role } = db;
 
 // Resolve a role UUID to its internal id — throws 404 if missing
 const resolveRoleId = async (uuid, label) => {
-  const role = await Role.findOne({ where: { uuid } });
+  const role = await roleRepository.findByUuid(uuid);
   if (!role) throw ApiError.notFound(`${label} not found`);
   return role.id;
 };
@@ -77,7 +75,7 @@ export const deleteRecord = async (uuid) => {
 export const sync = async (module, fromRoleUuid, toRoleUuids) => {
   const fromRoleId = await resolveRoleId(fromRoleUuid, 'From role');
 
-  const toRoles = toRoleUuids.length > 0 ? await Role.findAll({ where: { uuid: toRoleUuids } }) : [];
+  const toRoles = toRoleUuids.length > 0 ? await roleRepository.findByUuids(toRoleUuids) : [];
   if (toRoles.length !== toRoleUuids.length) {
     throw ApiError.badRequest('One or more target role UUIDs are invalid');
   }

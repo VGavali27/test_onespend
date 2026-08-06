@@ -1,8 +1,10 @@
 import * as travelExpenseRepository from './travel_expense.repository.js';
 import * as expenseRepository from '../expense/expense.repository.js';
+import * as companyRepository from '../company/company.repository.js';
+import { getActiveEmploymentByUser } from '../../modules/user_employment/user_employment.service.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
-const { ExpenseCategory, Company, User, UserEmployment, sequelize } = db;
+const { ExpenseCategory, User, sequelize } = db;
 
 // Get travel expense by associated expense UUID
 export const getByExpenseUuid = async (expenseUuid) => {
@@ -15,11 +17,11 @@ export const getByExpenseUuid = async (expenseUuid) => {
 export const createWithTravel = async (data) => {
   const category = await ExpenseCategory.findOne({ where: { uuid: data.category_uuid } });
   if (!category) throw ApiError.notFound('Referenced expense category not found');
-  const company = await Company.findOne({ where: { uuid: data.company_uuid } });
+  const company = await companyRepository.findByUuid(data.company_uuid);
   if (!company) throw ApiError.notFound('Referenced company not found');
   const user = await User.findOne({ where: { uuid: data.requested_by_user_uuid } });
   if (!user) throw ApiError.notFound('Referenced user not found');
-  const employment = await UserEmployment.findOne({ where: { user_id: user.id, status: 'ACTIVE' } });
+  const employment = await getActiveEmploymentByUser(user.id);
   if (!employment) throw ApiError.notFound('No active employment found for the user');
 
   const now = new Date();

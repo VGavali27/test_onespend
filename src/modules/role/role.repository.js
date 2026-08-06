@@ -15,6 +15,9 @@ export const findByUuid = async (uuid) => Role.findOne({ where: { uuid } });
 // Find a role by its unique code
 export const findByCode = async (code) => Role.findOne({ where: { code } });
 
+// Find roles by a list of UUIDs (batch lookup)
+export const findByUuids = async (uuids) => Role.findAll({ where: { uuid: uuids } });
+
 // Create a new role record
 export const create = async (data) => Role.create(data);
 

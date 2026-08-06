@@ -1,8 +1,10 @@
 import bcrypt from 'bcryptjs';
 import * as userRepository from './user.repository.js';
+import * as companyRepository from '../company/company.repository.js';
+import * as roleRepository from '../role/role.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
-const { Role, Company, Department, UserEmployment, sequelize } = db;
+const { Department, UserEmployment, sequelize } = db;
 
 // Fetch users with pagination/search/filter/sort
 export const getAll = async (params = {}) => userRepository.findAll(params);
@@ -23,7 +25,7 @@ export const getProfile = async (uuid) => {
 
 // Create a new user with optional employments — all in a transaction
 export const create = async (data) => {
-  const role = await Role.findOne({ where: { uuid: data.role_uuid } });
+  const role = await roleRepository.findByUuid(data.role_uuid);
   if (!role) throw ApiError.notFound('Referenced role not found');
 
   let departmentId = null;
@@ -49,7 +51,7 @@ export const create = async (data) => {
     const createdEmployments = [];
     if (employments?.length > 0) {
       for (const emp of employments) {
-        const company = await Company.findOne({ where: { uuid: emp.company_uuid } });
+        const company = await companyRepository.findByUuid(emp.company_uuid);
         if (!company) throw ApiError.notFound(`Company not found for UUID: ${emp.company_uuid}`);
         const { company_uuid, ...empData } = emp;
         const employment = await user.createEmployment({ ...empData, company_id: company.id }, { transaction: t });
@@ -70,7 +72,7 @@ export const update = async (uuid, data) => {
   if (!user) throw ApiError.notFound('User not found');
 
   if (data.role_uuid) {
-    const role = await Role.findOne({ where: { uuid: data.role_uuid } });
+    const role = await roleRepository.findByUuid(data.role_uuid);
     if (!role) throw ApiError.notFound('Referenced role not found');
     data.role_id = role.id;
     delete data.role_uuid;
@@ -104,7 +106,7 @@ export const update = async (uuid, data) => {
       // Replace the user's employments with the submitted list
       await UserEmployment.destroy({ where: { user_id: user.id }, force: true, transaction: t });
       for (const emp of employments) {
-        const company = await Company.findOne({ where: { uuid: emp.company_uuid } });
+        const company = await companyRepository.findByUuid(emp.company_uuid);
         if (!company) throw ApiError.notFound(`Company not found for UUID: ${emp.company_uuid}`);
         const { company_uuid, ...empData } = emp;
         await user.createEmployment({ ...empData, company_id: company.id }, { transaction: t });
