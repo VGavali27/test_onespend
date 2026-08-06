@@ -185,3 +185,36 @@ npm run seed              # run seeders
 - **UUID auto-generation** — every model's `uuid` has `defaultValue: UUIDV4` (fixed "uuid cannot be null" on create)
 - **Per-employment email** — `user_employments.email` column (a user can have a different email per company)
 - **Lightweight options** — `/roles|companies|departments/options` return only `[{ uuid, name }]` for dropdowns
+
+## Procurement — Planned Module (NOT YET BUILT)
+
+Captured design for the future Procurement expense module. Model it on the existing Travel/Reimbursement pattern (generic `expenses` row + module child table + `expense_categories.module`).
+
+### Workflow (role-driven, configurable via `role_handover_rules`)
+`PI (Purchase Intention) → PR (Purchase Request) → Quotation → PO (Purchase Order) → Received → Finance → CFO (re-approval) → Payment`
+
+1. Any requester creates a **PI**; it goes to the **first approver directly** (in our case ADMIN_MGR).
+2. Admin approves the PI and **creates a PR** from it; vendor sends a quotation (offline — no vendor role).
+3. Admin sends the PR + quotation to **HOD** → HOD approves → Admin also approves the quotation → **CFO** approves → back to Admin.
+4. Admin **creates a PO** from the PR. Vendor delivers material + invoice; Admin marks **RECEIVED**.
+5. Admin sends PO + all documents to **Finance** (FINANCE_MGR) → approves → **CFO** approves again.
+6. **Payment team** (PAYMENT_MGR) processes payment; if they can't, they re-confirm with CFO.
+7. Steps/roles are editable through `role_handover_rules` (no code change).
+
+### Proposed tables
+- **`procurement_requests`** — one table for the whole chain: `request_type` (PI|PR|PO), `document_number` (PI-YYYY-XXXX), `parent_id` (self-FK to the doc it was created from), `status`, `company_id`, `requested_by_employment_id`, `current_role_id`, `current_employment_id`, `vendor_name/contact/delivery_address/expected_delivery_date/payment_terms`, `total_amount/tax_amount/grand_total` (encrypted), `received_date`, notes + audit fields.
+  - **Multiple PIs → one PO**: add a junction `procurement_links` (`request_id`, `linked_request_id`) for many-to-many aggregation.
+- **`procurement_items`** — line items per document: `item_name`, `description`, `category`, `quantity`, `unit`, `unit_price`, `total_amount`, `tax_rate`, `tax_amount`, `total_with_tax` (qty × price; amounts encrypted). Items copy from PI→PR→PO but are editable, so each level tracks its own total.
+- **`procurement_handovers`** — approval log per document (modeled on `expense_handovers`): `procurement_request_id`, `action_type` (SUBMIT/APPROVE/REJECT/CREATE_PR/CREATE_PO/RECEIVED/PAY), `from_role_id`, `to_role_id`, `action_by_employment_id`, **`amount_at_step`** (snapshot of the total at each step — satisfies "manage amounts at each level"), remarks, timestamps.
+- **Why NOT reuse `expense_handovers`**: different parent entity (`procurement_request_id` ≠ `expense_id`), different actions/stages (CREATE_PR/PO, RECEIVED, double CFO approval), need `amount_at_step`, and keeping each module's audit trail separate.
+
+### Expense conversion
+- Add **`expenses.procurement_id`** (FK → `procurement_requests.id`).
+- When a **PO is RECEIVED + Finance/CFO approved**, Admin clicks **"Convert to Expense"** → creates an `expenses` row (category `module='procurement'`, `procurement_id` = PO id, amount = PO grand_total, **status = APPROVED** so it goes straight to payment — procurement already did the approvals).
+- One PO → one expense, so multiple PIs never directly create expenses.
+
+### Permissions
+- Add procurement-specific permissions (e.g. `procurement:create/approve/po/received/pay`) rather than overloading `expenses:*`; grant in the seeder to ADMIN_MGR, HOD, CFO, FINANCE_MGR, PAYMENT_MGR.
+
+### Frontend scope (when built)
+- `ExpenseForm` gains a Procurement branch (vendor fields + item rows with qty×price auto-calc), reusing module-aware validation, required markers, error display, attachments, and the list/detail table+card patterns. Likely a separate Procurement section with its own pages (list, create PI, PR/PO creation, approval actions).
