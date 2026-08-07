@@ -6,7 +6,8 @@ export const expenseCategoryFormSchema = z.object({
   code: z.string().trim().min(1, 'Category code is required').max(50, 'At most 50 characters'),
   name: z.string().trim().min(1, 'Category name is required').max(100, 'At most 100 characters'),
   module: z.string().trim().min(1, 'Module is required').max(50, 'At most 50 characters'),
-  first_receiver_role_uuid: z.string().uuid('First receiver role is required'),
-  final_approver_role_uuid: z.string().uuid('Final approver role is required'),
+  // Non-empty string (not z.uuid) — seeded UUIDs are not RFC-4122 compliant
+  first_receiver_role_uuid: z.string().min(1, 'First receiver role is required'),
+  final_approver_role_uuid: z.string().min(1, 'Final approver role is required'),
   description: z.string().trim().max(500, 'At most 500 characters'),
 });

@@ -10,10 +10,12 @@ const itemSchema = z.object({
 
 // PI create/edit form (amounts sent raw; the backend computes and encrypts totals).
 // NOTE: no vendor — the vendor is only introduced when an admin fills quotations
-// on the PR; the requester must not know the vendor.
+// on the PR; the requester must not know the vendor. company_uuid is validated as
+// a non-empty string (NOT z.string().uuid) because the seeded UUIDs are not
+// RFC-4122 compliant — matches the expense form's company validation.
 export const procurementFormSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(255, 'At most 255 characters'),
-  company_uuid: z.string().uuid('Company is required'),
+  company_uuid: z.string().min(1, 'Company is required'),
   expected_delivery_date: z.string(),
   notes: z.string(),
   items: z.array(itemSchema).default([]),
