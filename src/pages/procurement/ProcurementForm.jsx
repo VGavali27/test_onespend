@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ShoppingCart, Truck, Plus, Trash2, Loader2 } from 'lucide-react';
 import { inputClassFor, FormSection, FormField } from '@/components/ui/form';
-import SearchableSelect from '@/components/ui/SearchableSelect';
+import { DateField } from '@/components/ui/DatePicker';
 import { nullIfEmpty, formatCurrency } from '@/utils/format';
 import { applyServerErrorsDetailed } from '@/utils/formErrors';
 import { useToast } from '@/components/ui/Toast';
@@ -29,7 +29,6 @@ export default function ProcurementForm({
   savingLabel = isEdit ? 'Saving...' : 'Creating...',
 }) {
   const [companies, setCompanies] = useState([]);
-  const [optionsLoading, setOptionsLoading] = useState(true);
   const [optionsError, setOptionsError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
   const toast = useToast();
@@ -77,8 +76,6 @@ export default function ProcurementForm({
         setCompanies(userCompanies);
       } catch (e) {
         setOptionsError(e?.response?.data?.message || 'Failed to load options.');
-      } finally {
-        setOptionsLoading(false);
       }
     };
     load();
@@ -132,24 +129,14 @@ export default function ProcurementForm({
               <input className={inputClassFor(!!errors.title)} {...register('title')} placeholder="e.g. Office laptops for design team" />
             </FormField>
             <FormField label="Company" required error={errors.company_uuid?.message}>
-              <Controller
-                control={control}
-                name="company_uuid"
-                render={({ field }) => (
-                  <SearchableSelect
-                    value={field.value}
-                    onChange={field.onChange}
-                    options={companies.map((c) => ({ value: c.uuid, label: c.name }))}
-                    placeholder="Select company..."
-                    loading={optionsLoading}
-                    error={!!errors.company_uuid}
-                  />
-                )}
-              />
+              <select className={inputClassFor(!!errors.company_uuid)} {...register('company_uuid')} defaultValue="">
+                <option value="">Select company...</option>
+                {companies.map((c) => (
+                  <option key={c.uuid} value={c.uuid}>{c.name}</option>
+                ))}
+              </select>
             </FormField>
-            <FormField label="Expected delivery" error={errors.expected_delivery_date?.message}>
-              <input type="date" className={inputClassFor(!!errors.expected_delivery_date)} {...register('expected_delivery_date')} />
-            </FormField>
+            <DateField control={control} name="expected_delivery_date" label="Expected delivery" error={errors.expected_delivery_date?.message} />
           </div>
         </FormSection>
 
