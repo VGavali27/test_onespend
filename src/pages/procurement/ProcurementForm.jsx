@@ -185,7 +185,7 @@ export default function ProcurementForm({
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
                     <div className="xl:col-span-2">
                       <FormField label="Item name" required error={errors.items?.[i]?.item_name?.message}>
                         <input className={inputClassFor(!!errors.items?.[i]?.item_name)} {...register(`items.${i}.item_name`)} placeholder="Item name" />
@@ -200,7 +200,7 @@ export default function ProcurementForm({
                     <FormField label="Unit price" error={errors.items?.[i]?.unit_price?.message}>
                       <input type="number" min={0} className={inputClassFor(!!errors.items?.[i]?.unit_price)} {...register(`items.${i}.unit_price`)} placeholder="0" />
                     </FormField>
-                    <div className="xl:col-span-6">
+                    <div className="xl:col-span-5">
                       <FormField label="Description" error={errors.items?.[i]?.description?.message}>
                         <input className={inputClassFor(!!errors.items?.[i]?.description)} {...register(`items.${i}.description`)} placeholder="Optional description" />
                       </FormField>
