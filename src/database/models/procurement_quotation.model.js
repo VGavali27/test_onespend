@@ -19,7 +19,7 @@ export default (sequelize, DataTypes) => {
     {
       id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
       uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
-      procurement_request_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
+      pr_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       vendor_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       title: DataTypes.STRING(255),
       total_amount: DataTypes.TEXT,
@@ -44,7 +44,7 @@ export default (sequelize, DataTypes) => {
   );
 
   ProcurementQuotation.associate = (models) => {
-    ProcurementQuotation.belongsTo(models.ProcurementRequest, { foreignKey: 'procurement_request_id', as: 'request' });
+    ProcurementQuotation.belongsTo(models.ProcurementPr, { foreignKey: 'pr_id', as: 'pr' });
     ProcurementQuotation.belongsTo(models.Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
     ProcurementQuotation.hasMany(models.ProcurementDocument, { foreignKey: 'procurement_quotation_id', as: 'documents' });
   };

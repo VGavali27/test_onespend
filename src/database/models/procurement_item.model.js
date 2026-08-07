@@ -20,15 +20,16 @@ export default (sequelize, DataTypes) => {
     {
       id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
       uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
-      procurement_request_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
+      // polymorphic parent — exactly one of pi_id / pr_id / po_id is set
+      pi_id: DataTypes.BIGINT.UNSIGNED,
+      pr_id: DataTypes.BIGINT.UNSIGNED,
+      po_id: DataTypes.BIGINT.UNSIGNED,
       item_name: { type: DataTypes.STRING(255), allowNull: false },
       description: DataTypes.TEXT,
       category: DataTypes.STRING(100),
       quantity: { type: DataTypes.DECIMAL(18, 2), defaultValue: 1 },
-      unit: DataTypes.STRING(20),
       unit_price: DataTypes.TEXT,
       total_amount: DataTypes.TEXT,
-      tax_rate: { type: DataTypes.DECIMAL(6, 2), defaultValue: 0 },
       tax_amount: DataTypes.TEXT,
       total_with_tax: DataTypes.TEXT,
       sort_order: DataTypes.INTEGER,
@@ -45,7 +46,9 @@ export default (sequelize, DataTypes) => {
   );
 
   ProcurementItem.associate = (models) => {
-    ProcurementItem.belongsTo(models.ProcurementRequest, { foreignKey: 'procurement_request_id', as: 'request' });
+    ProcurementItem.belongsTo(models.ProcurementPi, { foreignKey: 'pi_id', as: 'pi' });
+    ProcurementItem.belongsTo(models.ProcurementPr, { foreignKey: 'pr_id', as: 'pr' });
+    ProcurementItem.belongsTo(models.ProcurementPo, { foreignKey: 'po_id', as: 'po' });
   };
 
   return ProcurementItem;

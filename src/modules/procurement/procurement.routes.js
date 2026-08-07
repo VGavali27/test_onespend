@@ -8,6 +8,7 @@ import {
   actionSchema,
   procurementDocumentSchema,
   quotationSchema,
+  updateQuotationSchema,
   selectQuotationSchema,
 } from './procurement.validation.js';
 
@@ -30,7 +31,7 @@ router.delete('/:uuid', procurementController.deleteProcurement);
 // Quotations — admin fills them on a PR; requester picks one blind.
 // (These must precede the generic /:uuid routes above.)
 router.post('/:uuid/quotations', validate(quotationSchema), procurementController.addQuotation);
-router.put('/:uuid/quotations/:quotationUuid', validate(quotationSchema), procurementController.updateQuotation);
+router.put('/:uuid/quotations/:quotationUuid', validate(updateQuotationSchema), procurementController.updateQuotation);
 router.delete('/:uuid/quotations/:quotationUuid', procurementController.deleteQuotation);
 router.post('/:uuid/submit-quotations', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), procurementController.submitQuotations);
 router.post('/:uuid/select-quotation', validate(selectQuotationSchema), procurementController.selectQuotation);

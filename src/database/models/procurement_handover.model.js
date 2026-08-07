@@ -14,7 +14,10 @@ export default (sequelize, DataTypes) => {
     {
       id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
       uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
-      procurement_request_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
+      // polymorphic parent — exactly one of pi_id / pr_id / po_id is set
+      pi_id: DataTypes.BIGINT.UNSIGNED,
+      pr_id: DataTypes.BIGINT.UNSIGNED,
+      po_id: DataTypes.BIGINT.UNSIGNED,
       action_type: { type: DataTypes.STRING(50), allowNull: false },
       from_role_id: DataTypes.BIGINT.UNSIGNED,
       to_role_id: DataTypes.BIGINT.UNSIGNED,
@@ -34,7 +37,9 @@ export default (sequelize, DataTypes) => {
   );
 
   ProcurementHandover.associate = (models) => {
-    ProcurementHandover.belongsTo(models.ProcurementRequest, { foreignKey: 'procurement_request_id', as: 'request' });
+    ProcurementHandover.belongsTo(models.ProcurementPi, { foreignKey: 'pi_id', as: 'pi' });
+    ProcurementHandover.belongsTo(models.ProcurementPr, { foreignKey: 'pr_id', as: 'pr' });
+    ProcurementHandover.belongsTo(models.ProcurementPo, { foreignKey: 'po_id', as: 'po' });
     ProcurementHandover.belongsTo(models.Role, { foreignKey: 'from_role_id', as: 'fromRole' });
     ProcurementHandover.belongsTo(models.Role, { foreignKey: 'to_role_id', as: 'toRole' });
     ProcurementHandover.belongsTo(models.UserEmployment, { foreignKey: 'action_by_employment_id', as: 'actionBy' });

@@ -6,7 +6,7 @@ import ApiError from '../../utils/ApiError.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
 import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser, getActiveEmploymentByUserAndCompany } from '../../modules/user_employment/user_employment.service.js';
 
-const { Vendor, RoleHandoverRule, sequelize } = db;
+const { Vendor, RoleHandoverRule, ProcurementPi, ProcurementPr, ProcurementPo, ProcurementQuotation, sequelize } = db;
 
 // Role ids (see seeders/20260724000002-seed-roles.js)
 const ROLE_IDS = {
@@ -18,7 +18,7 @@ const ROLE_IDS = {
   HOD: 110,
 };
 
-// Who acts next after an APPROVE at the given (request_type, status).
+// Who acts next after an APPROVE at the given (type, status).
 // next_role null = no further approver (chain continues via a document action,
 // e.g. the admin creating the PR/PO).
 const APPROVAL_STEPS = {
@@ -52,6 +52,21 @@ const requireHandoverRule = async (fromRoleId, toRoleId) => {
     where: { module: 'procurement', from_role_id: fromRoleId, to_role_id: toRoleId, status: 'ACTIVE' },
   });
   if (!rule) throw ApiError.forbidden('This approval handover is not configured');
+};
+
+// Header model + polymorphic owner column for a given type
+const HEADER = {
+  PI: { model: ProcurementPi, ownerColumn: 'pi_id' },
+  PR: { model: ProcurementPr, ownerColumn: 'pr_id' },
+  PO: { model: ProcurementPo, ownerColumn: 'po_id' },
+};
+
+// Load a document, resolving which header table owns it.
+const resolveDoc = async (uuid, t) => {
+  const type = await procurementRepository.resolveType(uuid);
+  if (!type) return null;
+  const doc = await procurementRepository.findByUuid(uuid, t);
+  return doc ? { type, doc } : null;
 };
 
 // Generate PI/PR/PO-YYYYMMDD-XXXX (mirrors the expense number generator)
@@ -159,11 +174,12 @@ const maskVendorForRequester = (doc, employmentIds) => {
 
 const plainGrandTotal = (doc) => (doc?.grand_total != null ? decrypt(String(doc.grand_total)) : null);
 
-// Write an audit handover row inside a transaction
-const logHandover = async (requestId, actionType, fromRoleId, toRoleId, employmentId, remarks, amount, t) => {
+// Write an audit handover row inside a transaction — polymorphic parent column.
+const logHandover = async ({ type, docId, actionType, fromRoleId, toRoleId, employmentId, remarks, amount, t }) => {
+  const ownerColumn = HEADER[type].ownerColumn;
   await db.ProcurementHandover.create(
     {
-      procurement_request_id: requestId,
+      [ownerColumn]: docId,
       action_type: actionType,
       from_role_id: fromRoleId ?? null,
       to_role_id: toRoleId ?? null,
@@ -205,17 +221,16 @@ export const getVisible = async (user, params = {}) => {
     result = employmentIds.length ? await procurementRepository.findByEmploymentIds(employmentIds, params) : { rows: [], total: 0 };
   }
   result.rows = (result.rows || []).map((r) => {
-    const plain = r.get ? r.get({ plain: true }) : r;
-    decryptRequest(plain);
-    maskVendorForRequester(plain, employmentIds);
-    return plain;
+    decryptRequest(r);
+    maskVendorForRequester(r, employmentIds);
+    return r;
   });
   return result;
 };
 
 export const getByUuid = async (uuid, user) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved) throw ApiError.notFound('Procurement document not found');
 
   const [employmentIds, companyIds] = await Promise.all([
     getEmploymentIdsByUser(user.userId),
@@ -223,16 +238,41 @@ export const getByUuid = async (uuid, user) => {
   ]);
   const visible =
     GLOBAL_ROLES.includes(user.roleCode) ||
-    employmentIds.includes(doc.requested_by_employment_id) ||
-    companyIds.includes(doc.company_id);
+    employmentIds.includes(resolved.doc.requested_by_employment_id) ||
+    companyIds.includes(resolved.doc.company_id);
   if (!visible) throw ApiError.notFound('Procurement document not found');
 
   // Work on a plain object so masking/decryption mutations survive JSON serialization
-  const plain = doc.get ? doc.get({ plain: true }) : doc;
+  const plain = resolved.doc.get({ plain: true });
   decryptDeep(plain);
-  // Tell the frontend whether the current user is the requester (they see the
-  // blind quotation-selection UI and masked vendor).
+  plain.request_type = resolved.type;
   plain.is_requester = employmentIds.includes(plain.requested_by_employment_id);
+
+  // Price-comparison history across PI → PR → quotations → PO
+  const chain = await procurementRepository.findByUuidWithChain(uuid);
+  if (chain) {
+    const toPlain = (v) => (v?.get ? v.get({ plain: true }) : v);
+    const dec = (v) => (v ? (decryptRequest(v), decryptQuotations(v.quotations), v) : null);
+    chain.pi = dec(toPlain(chain.pi));
+    chain.pr = dec(toPlain(chain.pr));
+    chain.po = dec(toPlain(chain.po));
+    chain.quotations = decryptQuotations((chain.quotations || []).map((q) => (q.get ? q.get({ plain: true }) : q)));
+    // hide vendors from the requester across the whole chain
+    if (plain.is_requester) {
+      [chain.pi, chain.pr, chain.po].forEach((v) => {
+        if (v) { v.vendor_id = null; v.vendor = null; }
+      });
+      chain.quotations.forEach((q) => {
+        q.vendor_id = null;
+        q.vendor = null;
+        q.file_path = null;
+        q.original_file_name = null;
+        q.stored_file_name = null;
+      });
+    }
+    plain.price_history = chain;
+  }
+
   return maskVendorForRequester(plain, employmentIds);
 };
 
@@ -253,29 +293,27 @@ export const create = async (user, data) => {
   const documentNumber = await generateDocumentNumber('PI');
 
   return sequelize.transaction(async (t) => {
-    const doc = await db.ProcurementRequest.create(
+    const doc = await ProcurementPi.create(
       {
         ...rest,
-        request_type: 'PI',
         document_number: documentNumber,
         status: 'DRAFT',
         company_id: company.id,
-        vendor_id: null, // vendor is hidden from the requester — set later via quotation selection
         requested_by_employment_id: employment.id,
         current_role_id: null,
         ...totals,
       },
       { transaction: t },
     );
-    await procurementRepository.replaceItems(doc.id, items.map(computeItemAmounts), t);
+    await procurementRepository.replaceItems('pi_id', doc.id, items.map(computeItemAmounts), t);
     return procurementRepository.findByUuid(doc.uuid, t);
   });
 };
 
 export const update = async (uuid, user, data) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
-  if (doc.request_type !== 'PI') throw ApiError.badRequest('Only a PI can be edited');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PI') throw ApiError.notFound('Procurement document not found');
+  const doc = resolved.doc;
   if (doc.status !== 'DRAFT') throw ApiError.badRequest('Only a draft PI can be edited');
 
   const employmentIds = await getEmploymentIdsByUser(user.userId);
@@ -296,16 +334,17 @@ export const update = async (uuid, user, data) => {
   return sequelize.transaction(async (t) => {
     await doc.update({ ...rest, ...totals }, { transaction: t });
     if (items !== undefined) {
-      await procurementRepository.replaceItems(doc.id, items.map(computeItemAmounts), t);
+      await procurementRepository.replaceItems('pi_id', doc.id, items.map(computeItemAmounts), t);
     }
     return procurementRepository.findByUuid(uuid, t);
   });
 };
 
 export const deleteRecord = async (uuid, user) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
-  if (doc.request_type !== 'PI' || doc.status !== 'DRAFT') {
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PI') throw ApiError.notFound('Procurement document not found');
+  const doc = resolved.doc;
+  if (doc.status !== 'DRAFT') {
     throw ApiError.badRequest('Only a draft PI can be deleted');
   }
   const employmentIds = await getEmploymentIdsByUser(user.userId);
@@ -336,23 +375,31 @@ const ensureQuotationAdmin = (user) => {
   }
 };
 
-const findQuotationOn = async (uuid, quotationUuid) => {
-  const request = await procurementRepository.findByUuid(uuid);
-  if (!request) throw ApiError.notFound('Procurement document not found');
-  if (request.request_type !== 'PR') throw ApiError.badRequest('Quotations can only be added to a PR');
-  const quotation = await db.ProcurementQuotation.findOne({
-    where: { uuid: quotationUuid, procurement_request_id: request.id },
+// Quotations may be edited while the PR is still pre-selection: SUBMITTED (admin
+// filling), HOD_APPROVED, or QUOTATION_SELECTION. Once the requester selects
+// (QUOTATION_APPROVED) or beyond, quotations lock.
+const QUOTE_EDITABLE_STATUSES = ['SUBMITTED', 'HOD_APPROVED', 'QUOTATION_SELECTION'];
+
+const loadPrForQuotation = async (uuid) => {
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('Quotations can only be managed on a PR');
+  if (!QUOTE_EDITABLE_STATUSES.includes(resolved.doc.status)) {
+    throw ApiError.badRequest('Quotations can no longer be edited on this request');
+  }
+  return resolved.doc;
+};
+
+const findQuotationOn = async (pr, quotationUuid) => {
+  const quotation = await ProcurementQuotation.findOne({
+    where: { uuid: quotationUuid, pr_id: pr.id },
   });
   if (!quotation) throw ApiError.notFound('Quotation not found on this request');
-  return { request, quotation };
+  return quotation;
 };
 
 export const addQuotation = async (uuid, user, data) => {
   const { vendor_uuid, total_amount, tax_amount, ...rest } = data;
-  const request = await procurementRepository.findByUuid(uuid);
-  if (!request) throw ApiError.notFound('Procurement document not found');
-  if (request.request_type !== 'PR') throw ApiError.badRequest('Quotations can only be added to a PR');
-  if (request.status !== 'HOD_APPROVED') throw ApiError.badRequest('Quotations can only be added after HOD approval');
+  const pr = await loadPrForQuotation(uuid);
   ensureQuotationAdmin(user);
 
   const vendor = await Vendor.findOne({ where: { uuid: vendor_uuid } });
@@ -360,17 +407,17 @@ export const addQuotation = async (uuid, user, data) => {
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
 
   return sequelize.transaction(async (t) => {
-    const quotation = await db.ProcurementQuotation.create(
+    const quotation = await ProcurementQuotation.create(
       {
         ...rest,
-        procurement_request_id: request.id,
+        pr_id: pr.id,
         vendor_id: vendor.id,
         created_by_employment_id: actorEmployment?.id ?? null,
         ...computeQuotationTotals(total_amount, tax_amount),
       },
       { transaction: t },
     );
-    const created = await db.ProcurementQuotation.findOne({
+    const created = await ProcurementQuotation.findOne({
       where: { uuid: quotation.uuid },
       include: [{ model: Vendor, as: 'vendor' }],
       transaction: t,
@@ -380,8 +427,8 @@ export const addQuotation = async (uuid, user, data) => {
 };
 
 export const updateQuotation = async (uuid, quotationUuid, user, data) => {
-  const { request, quotation } = await findQuotationOn(uuid, quotationUuid);
-  if (request.status !== 'HOD_APPROVED') throw ApiError.badRequest('Quotations can only be edited after HOD approval');
+  const pr = await loadPrForQuotation(uuid);
+  const quotation = await findQuotationOn(pr, quotationUuid);
   if (quotation.status !== 'ACTIVE') throw ApiError.badRequest('Only an ACTIVE quotation can be edited');
   ensureQuotationAdmin(user);
 
@@ -401,7 +448,7 @@ export const updateQuotation = async (uuid, quotationUuid, user, data) => {
 
   return sequelize.transaction(async (t) => {
     await quotation.update({ ...patch, ...totals }, { transaction: t });
-    const updated = await db.ProcurementQuotation.findOne({
+    const updated = await ProcurementQuotation.findOne({
       where: { uuid: quotation.uuid },
       include: [{ model: Vendor, as: 'vendor' }],
       transaction: t,
@@ -411,8 +458,8 @@ export const updateQuotation = async (uuid, quotationUuid, user, data) => {
 };
 
 export const deleteQuotation = async (uuid, quotationUuid, user) => {
-  const { request, quotation } = await findQuotationOn(uuid, quotationUuid);
-  if (request.status !== 'HOD_APPROVED') throw ApiError.badRequest('Quotations can only be deleted after HOD approval');
+  const pr = await loadPrForQuotation(uuid);
+  const quotation = await findQuotationOn(pr, quotationUuid);
   if (quotation.status !== 'ACTIVE') throw ApiError.badRequest('Only an ACTIVE quotation can be deleted');
   ensureQuotationAdmin(user);
 
@@ -423,14 +470,14 @@ export const deleteQuotation = async (uuid, quotationUuid, user) => {
 };
 
 export const submitQuotations = async (uuid, user) => {
-  const request = await procurementRepository.findByUuid(uuid);
-  if (!request) throw ApiError.notFound('Procurement document not found');
-  if (request.request_type !== 'PR') throw ApiError.badRequest('Quotations can only be submitted on a PR');
-  if (request.status !== 'HOD_APPROVED') throw ApiError.badRequest('Only a HOD-approved PR can have its quotations submitted');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('Quotations can only be submitted on a PR');
+  const pr = resolved.doc;
+  if (pr.status !== 'HOD_APPROVED') throw ApiError.badRequest('Only a HOD-approved PR can have its quotations submitted');
   ensureQuotationAdmin(user);
 
-  const activeQuotations = await db.ProcurementQuotation.count({
-    where: { procurement_request_id: request.id, status: 'ACTIVE' },
+  const activeQuotations = await ProcurementQuotation.count({
+    where: { pr_id: pr.id, status: 'ACTIVE' },
   });
   if (activeQuotations === 0) throw ApiError.badRequest('Add at least one quotation before submitting');
 
@@ -438,36 +485,37 @@ export const submitQuotations = async (uuid, user) => {
 
   return sequelize.transaction(async (t) => {
     // The requester becomes the handler; they must pick a quotation before CFO.
-    await request.update(
+    await pr.update(
       {
         status: 'QUOTATION_SELECTION',
         current_role_id: null,
-        current_employment_id: request.requested_by_employment_id,
+        current_employment_id: pr.requested_by_employment_id,
       },
       { transaction: t },
     );
-    await logHandover(
-      request.id, 'SUBMIT_QUOTATIONS', ROLE_IDS.ADMIN_MGR, null,
-      actorEmployment?.id, null, plainGrandTotal(request), t,
-    );
+    await logHandover({
+      type: 'PR', docId: pr.id, actionType: 'SUBMIT_QUOTATIONS',
+      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: null,
+      employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
+    });
     return procurementRepository.findByUuid(uuid, t);
   });
 };
 
 export const selectQuotation = async (uuid, user, quotationUuid) => {
-  const request = await procurementRepository.findByUuid(uuid);
-  if (!request) throw ApiError.notFound('Procurement document not found');
-  if (request.request_type !== 'PR') throw ApiError.badRequest('A quotation can only be selected on a PR');
-  if (request.status !== 'QUOTATION_SELECTION') throw ApiError.badRequest('Quotation selection is not open for this request');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('A quotation can only be selected on a PR');
+  const pr = resolved.doc;
+  if (pr.status !== 'QUOTATION_SELECTION') throw ApiError.badRequest('Quotation selection is not open for this request');
 
   const employmentIds = await getEmploymentIdsByUser(user.userId);
-  const isRequester = employmentIds.includes(request.requested_by_employment_id);
+  const isRequester = employmentIds.includes(pr.requested_by_employment_id);
   if (!isRequester && user.roleCode !== 'SUPER_ADMIN') {
     throw ApiError.forbidden('Only the requester can select a quotation');
   }
 
-  const quotation = await db.ProcurementQuotation.findOne({
-    where: { uuid: quotationUuid, procurement_request_id: request.id, status: 'ACTIVE' },
+  const quotation = await ProcurementQuotation.findOne({
+    where: { uuid: quotationUuid, pr_id: pr.id, status: 'ACTIVE' },
   });
   if (!quotation) throw ApiError.notFound('Quotation not found on this request');
 
@@ -475,7 +523,7 @@ export const selectQuotation = async (uuid, user, quotationUuid) => {
 
   return sequelize.transaction(async (t) => {
     await quotation.update({ status: 'SELECTED' }, { transaction: t });
-    await request.update(
+    await pr.update(
       {
         status: 'QUOTATION_APPROVED',
         current_role_id: ROLE_IDS.CFO,
@@ -484,10 +532,11 @@ export const selectQuotation = async (uuid, user, quotationUuid) => {
       },
       { transaction: t },
     );
-    await logHandover(
-      request.id, 'SELECT_QUOTATION', null, ROLE_IDS.CFO,
-      actorEmployment?.id, null, plainGrandTotal(request), t,
-    );
+    await logHandover({
+      type: 'PR', docId: pr.id, actionType: 'SELECT_QUOTATION',
+      fromRoleId: null, toRoleId: ROLE_IDS.CFO,
+      employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
+    });
     return procurementRepository.findByUuid(uuid, t);
   });
 };
@@ -495,9 +544,9 @@ export const selectQuotation = async (uuid, user, quotationUuid) => {
 // ── Workflow actions ──
 
 export const submit = async (uuid, user, remarks) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
-  if (doc.request_type !== 'PI') throw ApiError.badRequest('Only a PI can be submitted');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PI') throw ApiError.badRequest('Only a PI can be submitted');
+  const doc = resolved.doc;
   if (doc.status !== 'DRAFT') throw ApiError.badRequest('Only a draft PI can be submitted');
 
   const employmentIds = await getEmploymentIdsByUser(user.userId);
@@ -516,16 +565,21 @@ export const submit = async (uuid, user, remarks) => {
       { status: 'SUBMITTED', current_role_id: ROLE_IDS.ADMIN_MGR, current_employment_id: null },
       { transaction: t },
     );
-    await logHandover(doc.id, 'SUBMIT', actorRole?.id, ROLE_IDS.ADMIN_MGR, actorEmployment?.id, remarks, plainGrandTotal(doc), t);
+    await logHandover({
+      type: 'PI', docId: doc.id, actionType: 'SUBMIT',
+      fromRoleId: actorRole?.id, toRoleId: ROLE_IDS.ADMIN_MGR,
+      employmentId: actorEmployment?.id, remarks, amount: plainGrandTotal(doc), t,
+    });
     return procurementRepository.findByUuid(uuid, t);
   });
 };
 
 export const approve = async (uuid, user, remarks) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved) throw ApiError.notFound('Procurement document not found');
+  const { type, doc } = resolved;
 
-  const step = APPROVAL_STEPS[`${doc.request_type}:${doc.status}`];
+  const step = APPROVAL_STEPS[`${type}:${doc.status}`];
   if (!step) throw ApiError.badRequest('This document is not pending approval');
 
   const actorRole = await findRoleByCode(user.roleCode);
@@ -543,14 +597,19 @@ export const approve = async (uuid, user, remarks) => {
       { status: step.next_status, current_role_id: step.next_role, current_employment_id: null },
       { transaction: t },
     );
-    await logHandover(doc.id, 'APPROVE', fromRole, step.next_role, actorEmployment?.id, remarks, plainGrandTotal(doc), t);
+    await logHandover({
+      type, docId: doc.id, actionType: 'APPROVE',
+      fromRoleId: fromRole, toRoleId: step.next_role,
+      employmentId: actorEmployment?.id, remarks, amount: plainGrandTotal(doc), t,
+    });
     return procurementRepository.findByUuid(uuid, t);
   });
 };
 
 export const reject = async (uuid, user, remarks) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved) throw ApiError.notFound('Procurement document not found');
+  const { type, doc } = resolved;
   if (doc.status === 'REJECTED' || doc.status === 'PAID') throw ApiError.badRequest('This document is already closed');
 
   const actorRole = await findRoleByCode(user.roleCode);
@@ -562,140 +621,160 @@ export const reject = async (uuid, user, remarks) => {
 
   return sequelize.transaction(async (t) => {
     await doc.update({ status: 'REJECTED', current_role_id: null, current_employment_id: null }, { transaction: t });
-    await logHandover(doc.id, 'REJECT', fromRole, null, actorEmployment?.id, remarks, plainGrandTotal(doc), t);
+    await logHandover({
+      type, docId: doc.id, actionType: 'REJECT',
+      fromRoleId: fromRole, toRoleId: null,
+      employmentId: actorEmployment?.id, remarks, amount: plainGrandTotal(doc), t,
+    });
     return procurementRepository.findByUuid(uuid, t);
   });
 };
 
 export const createPr = async (uuid, user) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
-  if (doc.request_type !== 'PI') throw ApiError.badRequest('A purchase request can only be created from a PI');
-  if (doc.status !== 'APPROVED') throw ApiError.badRequest('The PI must be approved before creating a PR');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PI') throw ApiError.badRequest('A purchase request can only be created from a PI');
+  const pi = resolved.doc;
+  if (pi.status !== 'APPROVED') throw ApiError.badRequest('The PI must be approved before creating a PR');
+
+  // Duplicate guard: only one PR per PI
+  const existingPr = await ProcurementPr.findOne({ where: { pi_id: pi.id } });
+  if (existingPr) throw ApiError.badRequest('A purchase request has already been created for this PI');
 
   await requireHandoverRule(ROLE_IDS.ADMIN_MGR, ROLE_IDS.HOD);
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
   const documentNumber = await generateDocumentNumber('PR');
 
   return sequelize.transaction(async (t) => {
-    const pr = await db.ProcurementRequest.create(
+    const pr = await ProcurementPr.create(
       {
-        request_type: 'PR',
         document_number: documentNumber,
-        parent_id: doc.id,
-        title: doc.title,
-        company_id: doc.company_id,
-        vendor_id: doc.vendor_id,
+        pi_id: pi.id,
+        title: pi.title,
+        company_id: pi.company_id,
         status: 'SUBMITTED',
         current_role_id: ROLE_IDS.HOD,
         current_employment_id: null,
-        requested_by_employment_id: doc.requested_by_employment_id,
-        total_amount: doc.total_amount != null ? decrypt(String(doc.total_amount)) : null,
-        tax_amount: doc.tax_amount != null ? decrypt(String(doc.tax_amount)) : null,
-        grand_total: doc.grand_total != null ? decrypt(String(doc.grand_total)) : null,
-        vendor_contact: doc.vendor_contact,
-        delivery_address: doc.delivery_address,
-        expected_delivery_date: doc.expected_delivery_date,
-        payment_terms: doc.payment_terms,
-        notes: doc.notes,
+        requested_by_employment_id: pi.requested_by_employment_id,
+        total_amount: pi.total_amount != null ? decrypt(String(pi.total_amount)) : null,
+        tax_amount: pi.tax_amount != null ? decrypt(String(pi.tax_amount)) : null,
+        grand_total: pi.grand_total != null ? decrypt(String(pi.grand_total)) : null,
+        expected_delivery_date: pi.expected_delivery_date,
+        notes: pi.notes,
       },
       { transaction: t },
     );
-    const copiedItems = copyItems(doc.items);
+    const copiedItems = copyItems(pi.items);
     if (copiedItems.length) {
       await db.ProcurementItem.bulkCreate(
-        copiedItems.map((it, i) => ({ ...it, procurement_request_id: pr.id, sort_order: i })),
+        copiedItems.map((it, i) => ({ ...it, pr_id: pr.id, sort_order: i })),
         { transaction: t, individualHooks: true },
       );
     }
-    await logHandover(pr.id, 'CREATE_PR', ROLE_IDS.ADMIN_MGR, ROLE_IDS.HOD, actorEmployment?.id, null, plainGrandTotal(doc), t);
+    await logHandover({
+      type: 'PR', docId: pr.id, actionType: 'CREATE_PR',
+      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: ROLE_IDS.HOD,
+      employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pi), t,
+    });
     return procurementRepository.findByUuid(pr.uuid, t);
   });
 };
 
 export const createPo = async (uuid, user) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
-  if (doc.request_type !== 'PR') throw ApiError.badRequest('A purchase order can only be created from a PR');
-  if (doc.status !== 'APPROVED') throw ApiError.badRequest('The PR must be approved before creating a PO');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('A purchase order can only be created from a PR');
+  const pr = resolved.doc;
+  if (pr.status !== 'APPROVED') throw ApiError.badRequest('The PR must be approved before creating a PO');
+  if (!pr.vendor_id) throw ApiError.badRequest('The PR has no selected vendor yet');
+
+  // Duplicate guard: only one PO per PR
+  const existingPo = await ProcurementPo.findOne({ where: { pr_id: pr.id } });
+  if (existingPo) throw ApiError.badRequest('A purchase order has already been created for this PR');
 
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
   const documentNumber = await generateDocumentNumber('PO');
 
   return sequelize.transaction(async (t) => {
-    const po = await db.ProcurementRequest.create(
+    const po = await ProcurementPo.create(
       {
-        request_type: 'PO',
         document_number: documentNumber,
-        parent_id: doc.id,
-        title: doc.title,
-        company_id: doc.company_id,
-        vendor_id: doc.vendor_id,
+        pr_id: pr.id,
+        title: pr.title,
+        company_id: pr.company_id,
+        vendor_id: pr.vendor_id,
         status: 'CREATED',
         current_role_id: ROLE_IDS.ADMIN_MGR,
         current_employment_id: null,
-        requested_by_employment_id: doc.requested_by_employment_id,
-        total_amount: doc.total_amount != null ? decrypt(String(doc.total_amount)) : null,
-        tax_amount: doc.tax_amount != null ? decrypt(String(doc.tax_amount)) : null,
-        grand_total: doc.grand_total != null ? decrypt(String(doc.grand_total)) : null,
-        vendor_contact: doc.vendor_contact,
-        delivery_address: doc.delivery_address,
-        expected_delivery_date: doc.expected_delivery_date,
-        payment_terms: doc.payment_terms,
-        notes: doc.notes,
+        requested_by_employment_id: pr.requested_by_employment_id,
+        total_amount: pr.total_amount != null ? decrypt(String(pr.total_amount)) : null,
+        tax_amount: pr.tax_amount != null ? decrypt(String(pr.tax_amount)) : null,
+        grand_total: pr.grand_total != null ? decrypt(String(pr.grand_total)) : null,
+        expected_delivery_date: pr.expected_delivery_date,
+        notes: pr.notes,
       },
       { transaction: t },
     );
-    const copiedItems = copyItems(doc.items);
+    const copiedItems = copyItems(pr.items);
     if (copiedItems.length) {
       await db.ProcurementItem.bulkCreate(
-        copiedItems.map((it, i) => ({ ...it, procurement_request_id: po.id, sort_order: i })),
+        copiedItems.map((it, i) => ({ ...it, po_id: po.id, sort_order: i })),
         { transaction: t, individualHooks: true },
       );
     }
-    await logHandover(po.id, 'CREATE_PO', ROLE_IDS.ADMIN_MGR, ROLE_IDS.ADMIN_MGR, actorEmployment?.id, null, plainGrandTotal(doc), t);
+    await logHandover({
+      type: 'PO', docId: po.id, actionType: 'CREATE_PO',
+      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: ROLE_IDS.ADMIN_MGR,
+      employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
+    });
     return procurementRepository.findByUuid(po.uuid, t);
   });
 };
 
 export const received = async (uuid, user) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
-  if (doc.request_type !== 'PO') throw ApiError.badRequest('Only a PO can be marked received');
-  if (doc.status !== 'CREATED') throw ApiError.badRequest('Only a CREATED PO can be marked received');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PO') throw ApiError.badRequest('Only a PO can be marked received');
+  const po = resolved.doc;
+  if (po.status !== 'CREATED') throw ApiError.badRequest('Only a CREATED PO can be marked received');
 
   const actorRole = await findRoleByCode(user.roleCode);
-  if (user.roleCode !== 'SUPER_ADMIN' && doc.current_role_id !== actorRole?.id) {
+  if (user.roleCode !== 'SUPER_ADMIN' && po.current_role_id !== actorRole?.id) {
     throw ApiError.forbidden('Only the current handler can mark this PO received');
   }
   await requireHandoverRule(ROLE_IDS.ADMIN_MGR, ROLE_IDS.FINANCE_MGR);
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
 
   return sequelize.transaction(async (t) => {
-    await doc.update(
+    await po.update(
       { status: 'RECEIVED', received_date: new Date(), current_role_id: ROLE_IDS.FINANCE_MGR, current_employment_id: null },
       { transaction: t },
     );
-    await logHandover(doc.id, 'RECEIVED', ROLE_IDS.ADMIN_MGR, ROLE_IDS.FINANCE_MGR, actorEmployment?.id, null, plainGrandTotal(doc), t);
+    await logHandover({
+      type: 'PO', docId: po.id, actionType: 'RECEIVED',
+      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: ROLE_IDS.FINANCE_MGR,
+      employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(po), t,
+    });
     return procurementRepository.findByUuid(uuid, t);
   });
 };
 
 export const pay = async (uuid, user, remarks) => {
-  const doc = await procurementRepository.findByUuid(uuid);
-  if (!doc) throw ApiError.notFound('Procurement document not found');
-  if (doc.request_type !== 'PO') throw ApiError.badRequest('Only a PO can be paid');
-  if (doc.status !== 'APPROVED') throw ApiError.badRequest('Only an APPROVED PO can be paid');
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PO') throw ApiError.badRequest('Only a PO can be paid');
+  const po = resolved.doc;
+  if (po.status !== 'APPROVED') throw ApiError.badRequest('Only an APPROVED PO can be paid');
 
   const actorRole = await findRoleByCode(user.roleCode);
-  if (user.roleCode !== 'SUPER_ADMIN' && doc.current_role_id !== actorRole?.id) {
+  if (user.roleCode !== 'SUPER_ADMIN' && po.current_role_id !== actorRole?.id) {
     throw ApiError.forbidden('Only the payment team can process payment for this PO');
   }
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
 
   return sequelize.transaction(async (t) => {
-    await doc.update({ status: 'PAID', current_role_id: null, current_employment_id: null }, { transaction: t });
-    await logHandover(doc.id, 'PAY', ROLE_IDS.PAYMENT_MGR, null, actorEmployment?.id, remarks, plainGrandTotal(doc), t);
+    await po.update({ status: 'PAID', current_role_id: null, current_employment_id: null }, { transaction: t });
+    await logHandover({
+      type: 'PO', docId: po.id, actionType: 'PAY',
+      fromRoleId: ROLE_IDS.PAYMENT_MGR, toRoleId: null,
+      employmentId: actorEmployment?.id, remarks, amount: plainGrandTotal(po), t,
+    });
     return procurementRepository.findByUuid(uuid, t);
   });
 };
@@ -704,17 +783,18 @@ export const pay = async (uuid, user, remarks) => {
 
 export const addDocument = async (data) => {
   const { procurement_uuid, quotation_uuid, ...docData } = data;
-  const doc = await db.ProcurementRequest.findOne({ where: { uuid: procurement_uuid } });
-  if (!doc) throw ApiError.notFound('Procurement document not found');
+  const resolved = await resolveDoc(procurement_uuid);
+  if (!resolved) throw ApiError.notFound('Procurement document not found');
+  const ownerColumn = HEADER[resolved.type].ownerColumn;
   let quotationId = null;
   if (quotation_uuid) {
-    const quotation = await db.ProcurementQuotation.findOne({
-      where: { uuid: quotation_uuid, procurement_request_id: doc.id },
+    const quotation = await ProcurementQuotation.findOne({
+      where: { uuid: quotation_uuid, pr_id: resolved.doc.id },
     });
     if (!quotation) throw ApiError.notFound('Quotation not found on this request');
     quotationId = quotation.id;
   }
-  return db.ProcurementDocument.create({ ...docData, procurement_request_id: doc.id, procurement_quotation_id: quotationId });
+  return db.ProcurementDocument.create({ ...docData, [ownerColumn]: resolved.doc.id, procurement_quotation_id: quotationId });
 };
 
 export const deleteDocument = async (uuid) => {

@@ -4,7 +4,10 @@ export default (sequelize, DataTypes) => {
     {
       id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
       uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
-      procurement_request_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
+      // polymorphic parent — exactly one of pi_id / pr_id / po_id is set
+      pi_id: DataTypes.BIGINT.UNSIGNED,
+      pr_id: DataTypes.BIGINT.UNSIGNED,
+      po_id: DataTypes.BIGINT.UNSIGNED,
       procurement_quotation_id: DataTypes.BIGINT.UNSIGNED,
       document_type: DataTypes.STRING(50),
       document_number: DataTypes.STRING(100),
@@ -24,7 +27,9 @@ export default (sequelize, DataTypes) => {
   );
 
   ProcurementDocument.associate = (models) => {
-    ProcurementDocument.belongsTo(models.ProcurementRequest, { foreignKey: 'procurement_request_id', as: 'request' });
+    ProcurementDocument.belongsTo(models.ProcurementPi, { foreignKey: 'pi_id', as: 'pi' });
+    ProcurementDocument.belongsTo(models.ProcurementPr, { foreignKey: 'pr_id', as: 'pr' });
+    ProcurementDocument.belongsTo(models.ProcurementPo, { foreignKey: 'po_id', as: 'po' });
     ProcurementDocument.belongsTo(models.ProcurementQuotation, { foreignKey: 'procurement_quotation_id', as: 'quotation' });
   };
 

@@ -49,6 +49,19 @@ export const quotationSchema = Joi.object({
   notes: Joi.string().allow(null, ''),
 });
 
+// Update a quotation — vendor optional, any subset of fields
+export const updateQuotationSchema = Joi.object({
+  vendor_uuid: Joi.string().uuid(),
+  title: Joi.string().max(255).allow(null, ''),
+  total_amount: Joi.number().min(0).allow(null),
+  tax_amount: Joi.number().min(0).allow(null),
+  valid_until: Joi.date().iso().allow(null, ''),
+  terms: Joi.string().allow(null, ''),
+  notes: Joi.string().allow(null, ''),
+})
+  .min(1)
+  .messages({ 'object.min': 'At least one field is required' });
+
 // Requester picks one quotation (blind — vendor not visible to them)
 export const selectQuotationSchema = Joi.object({
   quotation_uuid: Joi.string().uuid().required().messages({ 'string.guid': 'Quotation is required' }),
