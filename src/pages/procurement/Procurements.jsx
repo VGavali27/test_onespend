@@ -13,6 +13,24 @@ const columnHelper = createColumnHelper();
 const TYPES = ['PI', 'PR', 'PO'];
 const STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'HOD_APPROVED', 'QUOTATION_SELECTION', 'QUOTATION_APPROVED', 'CREATED', 'RECEIVED', 'FINANCE_APPROVED', 'PAID'];
 
+// Workflow status colors (dark-mode aware). Mirrors the Profile page's
+// EMPLOYMENT_STATUS_STYLES pattern: status → Tailwind pill classes.
+const PROCUREMENT_STATUS_STYLES = {
+  DRAFT: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20',
+  CREATED: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20',
+  SUBMITTED: 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-400/20',
+  HOD_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  QUOTATION_SELECTION: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  QUOTATION_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  RECEIVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  FINANCE_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  APPROVED: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-400 dark:ring-indigo-400/20',
+  ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
+  SELECTED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
+  PAID: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
+  REJECTED: 'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-400/20',
+};
+
 function TypeBadge({ type }) {
   const palette = { PI: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400', PR: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400', PO: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' };
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${palette[type] || palette.PI}`}>{type}</span>;
@@ -51,7 +69,7 @@ export default function Procurements() {
     columnHelper.accessor('status', {
       header: 'Status',
       enableSorting: false,
-      cell: (info) => <StatusBadge status={info.getValue()} />,
+      cell: (info) => <StatusBadge status={info.getValue()} styles={PROCUREMENT_STATUS_STYLES} />,
     }),
     columnHelper.accessor('currentRole', {
       header: 'Current handler',

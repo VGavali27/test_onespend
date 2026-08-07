@@ -13,6 +13,9 @@ export const createPurchaseOrder = (uuid) => api.post(`/procurement/${uuid}/crea
 export const markReceived = (uuid) => api.post(`/procurement/${uuid}/received`);
 export const markPaid = (uuid, remarks) => api.post(`/procurement/${uuid}/pay`, { remarks });
 
+// ── Admin edits a PR's line items (qty / unit price) while quotations are gathered ──
+export const updateProcurementItems = (uuid, items) => api.put(`/procurement/${uuid}/items`, { items });
+
 // ── Quotations (admin fills them on a PR; requester picks one blind) ──
 export const procurementQuotationApi = {
   add: (prUuid, payload) => api.post(`/procurement/${prUuid}/quotations`, payload),

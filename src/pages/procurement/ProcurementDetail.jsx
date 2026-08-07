@@ -4,7 +4,7 @@ import {
   ShoppingCart, Truck, Users, FileText, Plus, Trash2, Loader2,
   Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil,
 } from 'lucide-react';
-import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation } from '@/services/procurementService';
+import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation, updateProcurementItems } from '@/services/procurementService';
 import { getVendorOptions } from '@/services/vendorService';
 import { uploadImage } from '@/services/uploadService';
 import { useAuth } from '@/context/AuthContext';
@@ -17,6 +17,24 @@ import { useToast } from '@/components/ui/Toast';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
 
 const DOC_TYPES = ['QUOTATION', 'INVOICE', 'DELIVERY', 'OTHER'];
+
+// Workflow status colors (dark-mode aware). Mirrors the list page's map so the
+// detail status pill matches the same palette.
+const PROCUREMENT_STATUS_STYLES = {
+  DRAFT: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20',
+  CREATED: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20',
+  SUBMITTED: 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-400/20',
+  HOD_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  QUOTATION_SELECTION: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  QUOTATION_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  RECEIVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  FINANCE_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  APPROVED: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-400 dark:ring-indigo-400/20',
+  ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
+  SELECTED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
+  PAID: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
+  REJECTED: 'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-400/20',
+};
 
 // Statuses where the current handler can approve/reject.
 // NOTE: HOD_APPROVED is NOT here — after HOD approval the admin fills quotations
@@ -50,6 +68,11 @@ export default function ProcurementDetail() {
   const [savingQuote, setSavingQuote] = useState(false);
   const [submittingQuotes, setSubmittingQuotes] = useState(false);
   const [selectingQuote, setSelectingQuote] = useState(null); // quotation uuid being selected
+
+  // PR line-item editing state (admin adjusts qty / unit price while quotations are gathered)
+  const [editingItems, setEditingItems] = useState(false);
+  const [itemsDraft, setItemsDraft] = useState([]);
+  const [savingItems, setSavingItems] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -188,6 +211,18 @@ export default function ProcurementDetail() {
   };
 
   const runAction = async (key, actionRemarks) => {
+    if (key === 'edit-items') {
+      setItemsDraft((doc.items || []).map((it) => ({
+        uuid: it.uuid,
+        item_name: it.item_name || '',
+        description: it.description || '',
+        category: it.category || '',
+        quantity: it.quantity ?? 1,
+        unit_price: it.unit_price ?? 0,
+      })));
+      setEditingItems(true);
+      return;
+    }
     setActing(true);
     try {
       if (key === 'submit') await submitProcurement(uuid, actionRemarks);
@@ -208,6 +243,29 @@ export default function ProcurementDetail() {
     }
   };
 
+  const saveItems = async () => {
+    if (itemsDraft.length === 0) { toast.error('Add at least one line item.'); return; }
+    setSavingItems(true);
+    try {
+      await updateProcurementItems(uuid, itemsDraft.map((it) => ({
+        item_name: it.item_name.trim(),
+        description: it.description || null,
+        category: it.category || null,
+        quantity: Number(it.quantity) || 0,
+        unit_price: Number(it.unit_price) || 0,
+      })));
+      toast.success('Line items updated');
+      setEditingItems(false);
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to update line items.');
+    } finally {
+      setSavingItems(false);
+    }
+  };
+
+  const patchItem = (i, patch) => setItemsDraft((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+
   // ── Actions available to the current user for this document ──
   const availableActions = [];
   if (doc) {
@@ -221,6 +279,11 @@ export default function ProcurementDetail() {
     }
     if (doc.request_type === 'PI' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.pr) {
       availableActions.push({ key: 'create-pr', label: 'Create PR' });
+    }
+    // Admin may adjust PR line items (qty / unit price) while quotations are gathered
+    const PR_ITEM_EDITABLE = ['SUBMITTED', 'HOD_APPROVED', 'QUOTATION_SELECTION'];
+    if (doc.request_type === 'PR' && PR_ITEM_EDITABLE.includes(doc.status) && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
+      availableActions.push({ key: 'edit-items', label: 'Edit Line Items' });
     }
     if (doc.request_type === 'PR' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po) {
       availableActions.push({ key: 'create-po', label: 'Create PO' });
@@ -262,7 +325,7 @@ export default function ProcurementDetail() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">{doc.title}</h2>
-                  <StatusBadge status={doc.status} />
+                  <StatusBadge status={doc.status} styles={PROCUREMENT_STATUS_STYLES} />
                 </div>
                 <p className="text-sm text-slate-400 mt-1">
                   {doc.request_type} · {doc.company?.name || '—'} · {doc.vendor?.name || '—'}
@@ -526,6 +589,75 @@ export default function ProcurementDetail() {
           placeholder="Remarks (optional)"
           className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
         />
+      </Modal>
+
+      {/* Admin edits PR line items (qty / unit price) while quotations are gathered */}
+      <Modal
+        open={editingItems}
+        onClose={() => setEditingItems(false)}
+        title="Edit Line Items"
+        subtitle="Adjust quantities / unit prices on the PR before the requester selects a quotation"
+        icon={Truck}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setEditingItems(false)}
+              className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingItems}
+              onClick={saveItems}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+            >
+              {savingItems && <Loader2 className="h-4 w-4 animate-spin" />}
+              {savingItems ? 'Saving...' : 'Save items'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {itemsDraft.map((it, i) => (
+            <div key={it.uuid ?? i} className="p-3 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-50/60 dark:bg-gray-800/40 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200">{it.item_name}</p>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => patchItem(i, { quantity: Number(it.quantity || 0) - 1 })} className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20">−</button>
+                  <button type="button" onClick={() => patchItem(i, { quantity: Number(it.quantity || 0) + 1 })} className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20">+</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Quantity</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={it.quantity}
+                    onChange={(e) => patchItem(i, { quantity: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Unit price</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={it.unit_price}
+                    onChange={(e) => patchItem(i, { unit_price: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                  />
+                </div>
+              </div>
+              <p className="text-[12px] text-slate-400 text-right">
+                Line total {formatCurrency((Number(it.quantity) || 0) * (Number(it.unit_price) || 0))}
+              </p>
+            </div>
+          ))}
+          {itemsDraft.length === 0 && <p className="text-[13px] text-slate-400">No line items on this PR.</p>}
+        </div>
       </Modal>
     </div>
   );
