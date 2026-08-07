@@ -219,10 +219,10 @@ export default function ProcurementDetail() {
       availableActions.push({ key: 'approve', label: 'Approve' });
       availableActions.push({ key: 'reject', label: 'Reject', danger: true });
     }
-    if (doc.request_type === 'PI' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
+    if (doc.request_type === 'PI' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.pr) {
       availableActions.push({ key: 'create-pr', label: 'Create PR' });
     }
-    if (doc.request_type === 'PR' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
+    if (doc.request_type === 'PR' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po) {
       availableActions.push({ key: 'create-po', label: 'Create PO' });
     }
     if (doc.request_type === 'PO' && doc.status === 'CREATED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
@@ -299,6 +299,11 @@ export default function ProcurementDetail() {
               </div>
             )}
           </div>
+
+          {/* Price history — stage-by-stage comparison across PI → PR → Quotations → PO */}
+          {doc.price_history && (
+            <PriceHistoryCard history={doc.price_history} />
+          )}
 
           {/* Chain links */}
           {(doc.parent || (doc.children || []).length > 0) && (
@@ -723,6 +728,59 @@ function QuotationsSection({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Price history card ──
+// Stage-by-stage comparison: PI → PR → each quotation → PO, each with its own
+// document number + grand total. Vendors stay masked for the requester (the API
+// already nulls them out on the chain).
+function PriceHistoryCard({ history }) {
+  const { pi, pr, quotations = [], po } = history || {};
+
+  const stages = [
+    { label: 'Purchase Intention', num: pi?.document_number, total: pi?.grand_total },
+    { label: 'Purchase Request', num: pr?.document_number, total: pr?.grand_total },
+    ...quotations.map((q, i) => ({
+      label: `Quotation ${i + 1}`,
+      num: q.title || '—',
+      total: q.grand_total,
+    })),
+    { label: 'Purchase Order', num: po?.document_number, total: po?.grand_total },
+  ].filter((s) => s.total != null);
+
+  if (stages.length === 0) return null;
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+          <ArrowRight className="h-4 w-4" />
+        </div>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Price history</h3>
+        <span className="ml-auto text-[11px] text-slate-400">PI → PR → Quotation → PO</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
+              <th className="px-4 sm:px-6 py-2.5 font-semibold">Stage</th>
+              <th className="px-4 py-2.5 font-semibold">Document</th>
+              <th className="px-4 sm:px-6 py-2.5 font-semibold text-right">Grand total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stages.map((s, i) => (
+              <tr key={i} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
+                <td className="px-4 sm:px-6 py-3 font-medium text-slate-800 dark:text-slate-200">{s.label}</td>
+                <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{s.num || '—'}</td>
+                <td className="px-4 sm:px-6 py-3 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(s.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
