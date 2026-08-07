@@ -2,22 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ShoppingCart, Truck, Users, FileText, Plus, Trash2, Loader2,
-  Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History,
+  Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil,
 } from 'lucide-react';
-import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi } from '@/services/procurementService';
+import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation } from '@/services/procurementService';
+import { getVendorOptions } from '@/services/vendorService';
 import { uploadImage } from '@/services/uploadService';
 import { useAuth } from '@/context/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import ErrorState from '@/components/ui/ErrorState';
 import Modal from '@/components/ui/Modal';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
 
 const DOC_TYPES = ['QUOTATION', 'INVOICE', 'DELIVERY', 'OTHER'];
 
-// Statuses where the current handler can approve/reject
-const APPROVABLE_STATUSES = ['SUBMITTED', 'HOD_APPROVED', 'QUOTATION_APPROVED', 'RECEIVED', 'FINANCE_APPROVED'];
+// Statuses where the current handler can approve/reject.
+// NOTE: HOD_APPROVED is NOT here — after HOD approval the admin fills quotations
+// and runs submit-quotations (there is no plain "approve" step at HOD_APPROVED).
+const APPROVABLE_STATUSES = ['SUBMITTED', 'QUOTATION_APPROVED', 'RECEIVED', 'FINANCE_APPROVED'];
 
 export default function ProcurementDetail() {
   const { uuid } = useParams();
@@ -38,6 +42,14 @@ export default function ProcurementDetail() {
   const [docFile, setDocFile] = useState(null);
   const [addingDoc, setAddingDoc] = useState(false);
   const fileRef = useRef(null);
+
+  // Quotation builder state (admin fills quotations on a PR)
+  const [vendorOptions, setVendorOptions] = useState([]);
+  const [qForm, setQForm] = useState({ vendor_uuid: '', title: '', total_amount: '', tax_amount: '', valid_until: '', terms: '' });
+  const [qEditingId, setQEditingId] = useState(null); // quotation uuid being edited (null = adding new)
+  const [savingQuote, setSavingQuote] = useState(false);
+  const [submittingQuotes, setSubmittingQuotes] = useState(false);
+  const [selectingQuote, setSelectingQuote] = useState(null); // quotation uuid being selected
 
   const load = async () => {
     setLoading(true);
@@ -88,6 +100,90 @@ export default function ProcurementDetail() {
       load();
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Failed to remove document.');
+    }
+  };
+
+  // Load vendor options once for the quotation builder (admin-only)
+  useEffect(() => {
+    getVendorOptions()
+      .then((res) => setVendorOptions(res?.data?.data ?? []))
+      .catch(() => setVendorOptions([]));
+  }, []);
+
+  const startEditQuotation = (q) => {
+    setQEditingId(q.uuid);
+    setQForm({
+      vendor_uuid: q.vendor?.uuid || '',
+      title: q.title || '',
+      total_amount: q.total_amount != null ? String(q.total_amount) : '',
+      tax_amount: q.tax_amount != null ? String(q.tax_amount) : '',
+      valid_until: q.valid_until || '',
+      terms: q.terms || '',
+    });
+  };
+
+  const resetQuoteForm = () => {
+    setQEditingId(null);
+    setQForm({ vendor_uuid: '', title: '', total_amount: '', tax_amount: '', valid_until: '', terms: '' });
+  };
+
+  const saveQuotation = async () => {
+    if (!qForm.vendor_uuid) { toast.error('Select a vendor for the quotation.'); return; }
+    setSavingQuote(true);
+    try {
+      const payload = {
+        vendor_uuid: qForm.vendor_uuid,
+        title: qForm.title || null,
+        total_amount: qForm.total_amount === '' ? null : Number(qForm.total_amount),
+        tax_amount: qForm.tax_amount === '' ? null : Number(qForm.tax_amount),
+        valid_until: qForm.valid_until || null,
+        terms: qForm.terms || null,
+      };
+      if (qEditingId) await procurementQuotationApi.update(uuid, qEditingId, payload);
+      else await procurementQuotationApi.add(uuid, payload);
+      toast.success(qEditingId ? 'Quotation updated' : 'Quotation added');
+      resetQuoteForm();
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to save quotation.');
+    } finally {
+      setSavingQuote(false);
+    }
+  };
+
+  const removeQuotation = async (qUuid) => {
+    try {
+      await procurementQuotationApi.remove(uuid, qUuid);
+      toast.success('Quotation removed');
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to remove quotation.');
+    }
+  };
+
+  const runSubmitQuotations = async () => {
+    setSubmittingQuotes(true);
+    try {
+      await submitQuotations(uuid);
+      toast.success('Quotations submitted for requester selection');
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to submit quotations.');
+    } finally {
+      setSubmittingQuotes(false);
+    }
+  };
+
+  const runSelectQuotation = async (qUuid) => {
+    setSelectingQuote(qUuid);
+    try {
+      await selectQuotation(uuid, qUuid);
+      toast.success('Quotation selected');
+      load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to select quotation.');
+    } finally {
+      setSelectingQuote(null);
     }
   };
 
@@ -284,6 +380,27 @@ export default function ProcurementDetail() {
             )}
           </div>
 
+          {/* Quotations */}
+          {doc.quotations && (
+            <QuotationsSection
+              doc={doc}
+              role={role}
+              vendorOptions={vendorOptions}
+              qForm={qForm}
+              setQForm={setQForm}
+              qEditingId={qEditingId}
+              savingQuote={savingQuote}
+              submittingQuotes={submittingQuotes}
+              selectingQuote={selectingQuote}
+              startEditQuotation={startEditQuotation}
+              resetQuoteForm={resetQuoteForm}
+              saveQuotation={saveQuotation}
+              removeQuotation={removeQuotation}
+              runSubmitQuotations={runSubmitQuotations}
+              runSelectQuotation={runSelectQuotation}
+            />
+          )}
+
           {/* Handover timeline */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
@@ -409,6 +526,207 @@ export default function ProcurementDetail() {
           className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
         />
       </Modal>
+    </div>
+  );
+}
+
+// ── Quotations section ──
+// Admin at HOD_APPROVED fills quotations (vendor visible to them). The requester
+// at QUOTATION_SELECTION picks one blind — vendor + files are masked by the API.
+// Everyone else sees a read-only list (vendor shown to admin/finance roles only).
+function QuotationsSection({
+  doc, role, vendorOptions,
+  qForm, setQForm, qEditingId, savingQuote, submittingQuotes, selectingQuote,
+  startEditQuotation, resetQuoteForm, saveQuotation, removeQuotation,
+  runSubmitQuotations, runSelectQuotation,
+}) {
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_MGR';
+  const isPR = doc.request_type === 'PR';
+  const fillMode = isAdmin && isPR && doc.status === 'HOD_APPROVED';
+  const selectMode = doc.is_requester && isPR && doc.status === 'QUOTATION_SELECTION';
+  const quotations = doc.quotations || [];
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+          <Quote className="h-4 w-4" />
+        </div>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Vendor Quotations</h3>
+        {selectMode && (
+          <span className="ml-auto text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-md">
+            Select one — vendor hidden
+          </span>
+        )}
+      </div>
+
+      {quotations.length === 0 && !fillMode ? (
+        <p className="px-6 py-4 text-[13px] text-slate-400">No quotations yet.</p>
+      ) : (
+        <div className="px-4 sm:px-6 py-4 space-y-3">
+          {/* Admin builder form */}
+          {fillMode && (
+            <div className="rounded-xl border border-dashed border-slate-300 dark:border-gray-600 p-4 space-y-3">
+              <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-400">
+                {qEditingId ? 'Edit quotation' : 'Add a quotation'}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Vendor</label>
+                  <SearchableSelect
+                    value={qForm.vendor_uuid}
+                    onChange={(v) => setQForm((f) => ({ ...f, vendor_uuid: v }))}
+                    options={vendorOptions.map((v) => ({ value: v.uuid, label: v.name }))}
+                    placeholder="Select vendor..."
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Title</label>
+                  <input
+                    value={qForm.title}
+                    onChange={(e) => setQForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. Quotation A"
+                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total amount</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={qForm.total_amount}
+                    onChange={(e) => setQForm((f) => ({ ...f, total_amount: e.target.value }))}
+                    placeholder="0"
+                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tax amount</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={qForm.tax_amount}
+                    onChange={(e) => setQForm((f) => ({ ...f, tax_amount: e.target.value }))}
+                    placeholder="0"
+                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Valid until</label>
+                  <input
+                    type="date"
+                    value={qForm.valid_until}
+                    onChange={(e) => setQForm((f) => ({ ...f, valid_until: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                  />
+                </div>
+                <div className="sm:col-span-2 xl:col-span-1">
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Terms</label>
+                  <input
+                    value={qForm.terms}
+                    onChange={(e) => setQForm((f) => ({ ...f, terms: e.target.value }))}
+                    placeholder="e.g. NET30"
+                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={saveQuotation}
+                  disabled={savingQuote}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+                >
+                  {savingQuote && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {qEditingId ? 'Save changes' : 'Add quotation'}
+                </button>
+                {qEditingId && (
+                  <button
+                    type="button"
+                    onClick={resetQuoteForm}
+                    className="px-3 py-2 rounded-lg text-[12px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel edit
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Quotation list */}
+          {quotations.map((q, i) => (
+            <div key={q.uuid} className="rounded-xl border border-slate-200 dark:border-gray-700 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+                    Quotation {i + 1}
+                    {q.title && <span className="text-slate-400 font-normal"> · {q.title}</span>}
+                  </p>
+                  <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {q.vendor ? q.vendor.name : '—'}
+                    {q.valid_until && <span> · valid until {formatDate(q.valid_until)}</span>}
+                    {q.terms && <span> · {q.terms}</span>}
+                  </p>
+                  {q.notes && <p className="text-[12px] text-slate-400 mt-1">{q.notes}</p>}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(q.grand_total)}</p>
+                    {q.total_amount != null && q.tax_amount != null && (
+                      <p className="text-[11px] text-slate-400">
+                        {formatCurrency(q.total_amount)} + {formatCurrency(q.tax_amount)} tax
+                      </p>
+                    )}
+                    {q.status === 'SELECTED' && (
+                      <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">Selected</p>
+                    )}
+                  </div>
+
+                  {/* Admin: edit/delete */}
+                  {fillMode && (
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => startEditQuotation(q)} title="Edit quotation" className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button type="button" onClick={() => removeQuotation(q.uuid)} title="Remove quotation" className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Requester: blind select */}
+                  {selectMode && q.status === 'ACTIVE' && (
+                    <button
+                      type="button"
+                      disabled={Boolean(selectingQuote)}
+                      onClick={() => runSelectQuotation(q.uuid)}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+                    >
+                      {selectingQuote === q.uuid && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      Select this quotation
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Admin: submit quotations for requester selection */}
+          {fillMode && quotations.length > 0 && (
+            <div className="flex justify-end pt-1 border-t border-slate-100 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={runSubmitQuotations}
+                disabled={submittingQuotes}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+              >
+                {submittingQuotes && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Submit quotations for requester selection
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

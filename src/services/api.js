@@ -12,7 +12,7 @@ import axios from 'axios';
  * NOT here. This file only owns the client + shared helpers.
  */
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3015/api/v1',
   headers: { 'Content-Type': 'application/json' },
 });
 

@@ -9,8 +9,6 @@ import ErrorState from '@/components/ui/ErrorState';
 const toFormValues = (d) => ({
   title: d?.title || '',
   company_uuid: d?.company?.uuid || '',
-  vendor_uuid: d?.vendor?.uuid || '',
-  vendor_contact: d?.vendor_contact || '',
   delivery_address: d?.delivery_address || '',
   expected_delivery_date: d?.expected_delivery_date || '',
   payment_terms: d?.payment_terms || '',

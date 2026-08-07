@@ -9,10 +9,9 @@ import { applyServerErrorsDetailed } from '@/utils/formErrors';
 import { useToast } from '@/components/ui/Toast';
 import { procurementFormSchema } from '@/validations/procurementSchema';
 import { getMyProfile } from '@/services/masterService';
-import { getVendorOptions } from '@/services/vendorService';
 
 const emptyForm = {
-  title: '', company_uuid: '', vendor_uuid: '', vendor_contact: '',
+  title: '', company_uuid: '',
   delivery_address: '', expected_delivery_date: '', payment_terms: '', notes: '', items: [],
 };
 const emptyItem = { item_name: '', description: '', category: '', quantity: 1, unit: '', unit_price: 0, tax_rate: 0 };
@@ -30,7 +29,6 @@ export default function ProcurementForm({
   savingLabel = isEdit ? 'Saving...' : 'Creating...',
 }) {
   const [companies, setCompanies] = useState([]);
-  const [vendors, setVendors] = useState([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [optionsError, setOptionsError] = useState(null);
   const [submitError, setSubmitError] = useState(null);
@@ -67,7 +65,7 @@ export default function ProcurementForm({
   useEffect(() => {
     const load = async () => {
       try {
-        const [prof, v] = await Promise.all([getMyProfile(), getVendorOptions()]);
+        const prof = await getMyProfile();
         // Company dropdown is scoped to the user's ACTIVE employments (like the expense form)
         const seen = new Set();
         const userCompanies = [];
@@ -78,7 +76,6 @@ export default function ProcurementForm({
           }
         }
         setCompanies(userCompanies);
-        setVendors(v?.data?.data ?? []);
       } catch (e) {
         setOptionsError(e?.response?.data?.message || 'Failed to load options.');
       } finally {
@@ -93,8 +90,6 @@ export default function ProcurementForm({
     const payload = {
       title: values.title.trim(),
       company_uuid: values.company_uuid,
-      vendor_uuid: nullIfEmpty(values.vendor_uuid),
-      vendor_contact: nullIfEmpty(values.vendor_contact),
       delivery_address: nullIfEmpty(values.delivery_address),
       expected_delivery_date: nullIfEmpty(values.expected_delivery_date),
       payment_terms: nullIfEmpty(values.payment_terms),
@@ -136,7 +131,7 @@ export default function ProcurementForm({
       )}
 
       <form id="procurement-form" noValidate onSubmit={handleFormSubmit} className="space-y-6">
-        <FormSection icon={ShoppingCart} title="Purchase Intention" subtitle="Details, vendor and delivery">
+        <FormSection icon={ShoppingCart} title="Purchase Intention" subtitle="Details and delivery — vendor is selected later via quotations">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <FormField label="Title" required error={errors.title?.message}>
               <input className={inputClassFor(!!errors.title)} {...register('title')} placeholder="e.g. Office laptops for design team" />
@@ -156,25 +151,6 @@ export default function ProcurementForm({
                   />
                 )}
               />
-            </FormField>
-            <FormField label="Vendor" required error={errors.vendor_uuid?.message}>
-              <Controller
-                control={control}
-                name="vendor_uuid"
-                render={({ field }) => (
-                  <SearchableSelect
-                    value={field.value}
-                    onChange={field.onChange}
-                    options={vendors.map((v) => ({ value: v.uuid, label: v.name }))}
-                    placeholder="Select vendor..."
-                    loading={optionsLoading}
-                    error={!!errors.vendor_uuid}
-                  />
-                )}
-              />
-            </FormField>
-            <FormField label="Vendor contact" error={errors.vendor_contact?.message}>
-              <input className={inputClassFor(!!errors.vendor_contact)} {...register('vendor_contact')} placeholder="e.g. Sales desk" />
             </FormField>
             <FormField label="Expected delivery" error={errors.expected_delivery_date?.message}>
               <input type="date" className={inputClassFor(!!errors.expected_delivery_date)} {...register('expected_delivery_date')} />

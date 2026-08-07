@@ -160,7 +160,7 @@ npm run preview    # Preview production build
 
 ## Environment (.env)
 ```
-VITE_API_URL=http://localhost:3000/api/v1   # Backend base URL
+VITE_API_URL=http://localhost:3015/api/v1   # Backend base URL
 VITE_APP_NAME=FinTrack
 VITE_APP_ENV=development
 ```

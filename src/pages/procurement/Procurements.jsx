@@ -11,7 +11,7 @@ import Modal from '@/components/ui/Modal';
 const columnHelper = createColumnHelper();
 
 const TYPES = ['PI', 'PR', 'PO'];
-const STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'HOD_APPROVED', 'QUOTATION_APPROVED', 'CREATED', 'RECEIVED', 'FINANCE_APPROVED', 'PAID'];
+const STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'HOD_APPROVED', 'QUOTATION_SELECTION', 'QUOTATION_APPROVED', 'CREATED', 'RECEIVED', 'FINANCE_APPROVED', 'PAID'];
 
 function TypeBadge({ type }) {
   const palette = { PI: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400', PR: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400', PO: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400' };
