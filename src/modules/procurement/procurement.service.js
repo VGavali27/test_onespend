@@ -23,10 +23,10 @@ const ROLE_IDS = {
 // e.g. the admin creating the PR/PO).
 const APPROVAL_STEPS = {
   'PI:SUBMITTED': { next_status: 'APPROVED', next_role: null },
-  'PR:SUBMITTED': { next_status: 'HOD_APPROVED', next_role: ROLE_IDS.ADMIN_MGR },
-  // No 'PR:HOD_APPROVED' step: after HOD approval the admin fills quotations and
-  // runs submit-quotations; the requester then picks one blind (select-quotation),
-  // which lands the PR at QUOTATION_APPROVED for CFO.
+  // No separate PR approval: when the admin creates a PR from an approved PI it is
+  // created directly in the quotation-gathering state (HOD_APPROVED), where the
+  // admin fills quotations and runs submit-quotations. The requester's only action
+  // is picking a quotation blind (select-quotation → QUOTATION_APPROVED for CFO).
   'PR:QUOTATION_APPROVED': { next_status: 'APPROVED', next_role: ROLE_IDS.ADMIN_MGR },
   'PO:RECEIVED': { next_status: 'FINANCE_APPROVED', next_role: ROLE_IDS.CFO },
   'PO:FINANCE_APPROVED': { next_status: 'APPROVED', next_role: ROLE_IDS.PAYMENT_MGR },
@@ -340,6 +340,29 @@ export const update = async (uuid, user, data) => {
   });
 };
 
+// Admin may adjust the PR's line items (qty / unit price) while quotations are
+// still being gathered — before the requester selects one. Uses QUOTE_EDITABLE_STATUSES
+// for consistency: the PR is created at HOD_APPROVED and stays editable through
+// QUOTATION_SELECTION.
+export const updateItems = async (uuid, user, items = []) => {
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('Only a PR can have its line items updated');
+  const pr = resolved.doc;
+  if (!QUOTE_EDITABLE_STATUSES.includes(pr.status)) {
+    throw ApiError.badRequest('PR line items can no longer be edited on this request');
+  }
+  if (!['SUPER_ADMIN', 'ADMIN_MGR'].includes(user.roleCode)) {
+    throw ApiError.forbidden('Only admin can edit PR line items');
+  }
+
+  const totals = computeTotals(items);
+  return sequelize.transaction(async (t) => {
+    await pr.update({ ...totals }, { transaction: t });
+    await procurementRepository.replaceItems('pr_id', pr.id, items.map(computeItemAmounts), t);
+    return procurementRepository.findByUuid(uuid, t);
+  });
+};
+
 export const deleteRecord = async (uuid, user) => {
   const resolved = await resolveDoc(uuid);
   if (!resolved || resolved.type !== 'PI') throw ApiError.notFound('Procurement document not found');
@@ -554,10 +577,10 @@ export const submit = async (uuid, user, remarks) => {
     throw ApiError.forbidden('You can only submit your own PI');
   }
 
+  // Raising + submitting a PI is gated by the procurement:create permission at the
+  // route (role_permissions), not by a handover rule — so any role granted the
+  // permission can submit their own PI to admin.
   const actorRole = await findRoleByCode(user.roleCode);
-  if (user.roleCode !== 'SUPER_ADMIN') {
-    await requireHandoverRule(actorRole.id, ROLE_IDS.ADMIN_MGR);
-  }
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
 
   return sequelize.transaction(async (t) => {
@@ -640,7 +663,6 @@ export const createPr = async (uuid, user) => {
   const existingPr = await ProcurementRequest.findOne({ where: { pi_id: pi.id } });
   if (existingPr) throw ApiError.badRequest('A purchase request has already been created for this PI');
 
-  await requireHandoverRule(ROLE_IDS.ADMIN_MGR, ROLE_IDS.HOD);
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
   const documentNumber = await generateDocumentNumber('PR');
 
@@ -651,8 +673,11 @@ export const createPr = async (uuid, user) => {
         pi_id: pi.id,
         title: pi.title,
         company_id: pi.company_id,
-        status: 'SUBMITTED',
-        current_role_id: ROLE_IDS.HOD,
+        // Created directly in the quotation-gathering state — no separate PR approval.
+        // The admin fills quotations + edits line items here, then sends the PR to the
+        // requester to pick a quotation blind.
+        status: 'HOD_APPROVED',
+        current_role_id: null,
         current_employment_id: null,
         requested_by_employment_id: pi.requested_by_employment_id,
         total_amount: pi.total_amount != null ? decrypt(String(pi.total_amount)) : null,
@@ -672,7 +697,7 @@ export const createPr = async (uuid, user) => {
     }
     await logHandover({
       type: 'PR', docId: pr.id, actionType: 'CREATE_PR',
-      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: ROLE_IDS.HOD,
+      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: null,
       employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pi), t,
     });
     return procurementRepository.findByUuid(pr.uuid, t);

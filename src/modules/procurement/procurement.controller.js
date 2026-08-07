@@ -39,6 +39,15 @@ export const updateProcurement = async (req, res, next) => {
   }
 };
 
+export const updateProcurementItems = async (req, res, next) => {
+  try {
+    const doc = await procurementService.updateItems(req.params.uuid, req.user, req.body.items);
+    return ApiResponse.success(res, doc, 'Procurement line items updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteProcurement = async (req, res, next) => {
   try {
     const result = await procurementService.deleteRecord(req.params.uuid, req.user);

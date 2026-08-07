@@ -32,6 +32,11 @@ export const updateProcurementSchema = Joi.object({
   .min(1)
   .messages({ 'object.min': 'At least one field is required' });
 
+// Admin adjusts a PR's line items (quantity / unit price) during quotation gathering.
+export const updateProcurementItemsSchema = Joi.object({
+  items: Joi.array().items(itemSchema).min(1).required().messages({ 'array.min': 'At least one item is required' }),
+});
+
 // Workflow actions (submit / approve / reject / pay) carry an optional remark
 export const actionSchema = Joi.object({
   remarks: Joi.string().allow(null, ''),

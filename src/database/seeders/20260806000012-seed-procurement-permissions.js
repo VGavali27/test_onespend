@@ -19,23 +19,26 @@ export async function up({ context }) {
 
   const row = (role_id, permission_id) => ({ role_id, permission_id, created_at: new Date(), updated_at: new Date() });
 
+  // Any role may raise & submit a PI only if it has procurement:create (135) /
+  // procurement:read (136). We grant create+read to every user role so "anyone" can
+  // raise an intent; tailor per-role by editing role_permissions.
+  const ALL_CREATE_READ_ROLES = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112];
+
   await context.bulkInsert('role_permissions', [
     // SUPER_ADMIN (100) — everything
     ...([135, 136, 137, 138, 139, 140, 141].map((pid) => row(100, pid))),
-    // CFO (101) — read, approve, pay
-    row(101, 136), row(101, 138), row(101, 141),
-    // PAYMENT_MGR (102) — read, pay
-    row(102, 136), row(102, 141),
-    // FINANCE_MGR (104) — read, approve
-    row(104, 136), row(104, 138),
-    // ADMIN_MGR (106) — create/read/update/approve/po/received
-    row(106, 135), row(106, 136), row(106, 137), row(106, 138), row(106, 139), row(106, 140),
-    // HOD (110) — read, approve
-    row(110, 136), row(110, 138),
-    // EMP_MGR (111) — create, read
-    row(111, 135), row(111, 136),
-    // EMPLOYEE (112) — create, read
-    row(112, 135), row(112, 136),
+    // every role — create + read (raise & submit a PI)
+    ...(ALL_CREATE_READ_ROLES.flatMap((roleId) => [row(roleId, 135), row(roleId, 136)])),
+    // CFO (101) — approve, pay
+    row(101, 138), row(101, 141),
+    // PAYMENT_MGR (102) — pay
+    row(102, 141),
+    // FINANCE_MGR (104) — approve
+    row(104, 138),
+    // ADMIN_MGR (106) — update/approve/po/received
+    row(106, 137), row(106, 138), row(106, 139), row(106, 140),
+    // HOD (110) — approve
+    row(110, 138),
   ]);
 }
 
