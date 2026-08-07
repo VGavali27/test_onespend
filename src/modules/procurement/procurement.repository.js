@@ -5,6 +5,7 @@ const {
   ProcurementItem,
   ProcurementHandover,
   ProcurementDocument,
+  ProcurementQuotation,
   Company,
   Vendor,
   Role,
@@ -32,6 +33,14 @@ const detailInclude = [
   ...listInclude,
   { model: ProcurementItem, as: 'items' },
   { model: ProcurementDocument, as: 'documents' },
+  {
+    model: ProcurementQuotation,
+    as: 'quotations',
+    include: [
+      { model: Vendor, as: 'vendor' },
+      { model: ProcurementDocument, as: 'documents' },
+    ],
+  },
   { model: ProcurementRequest, as: 'parent' },
   { model: ProcurementRequest, as: 'children' },
   {

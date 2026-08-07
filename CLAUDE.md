@@ -143,12 +143,14 @@ All API responses follow this shape via `ApiResponse`:
 
 ## Scripts
 ```bash
-npm run dev               # nodemon
+npm run dev               # nodemon (port from .env PORT — dev runs on 3015)
 npm start                 # production
 npm run migrate           # run migrations
 npm run migrate:rollback  # rollback last batch
 npm run seed              # run seeders
 ```
+
+> **Dev port:** backend runs on **3015** (`PORT=3015` in `.env`). The frontend's `VITE_API_URL` and hardcoded fallbacks (`src/services/api.js`, `src/utils/assets.js`, `.env.example`) all point at `http://localhost:3015/api/v1`. Keep these in sync if the port ever changes.
 
 ## What's Built / What's Pending
 
@@ -177,6 +179,7 @@ npm run seed              # run seeders
 - [x] VendorCategory API — CRUD by UUID + **GET /vendor-categories/options**; classifies vendors by the business types they serve
 - [x] VendorDocument API — add/remove documents on a vendor (uploaded files via `/uploads`)
 - [x] **Procurement API** — `/procurement`. One document row per PI/PR/PO chained via `parent_id`. **Workflow actions**: `submit` / `approve` / `reject` / `create-pr` / `create-po` / `received` / `pay`. Totals computed server-side (qty × price × tax); amounts AES-encrypted. Every role→role hop is **validated against `role_handover_rules` (module='procurement')** — the chain (PI → ADMIN_MGR → PR → HOD → quotation → CFO → PO → Received → FINANCE_MGR → CFO → PAYMENT_MGR) stays configurable. Handovers logged with an encrypted `amount_at_step` snapshot. Documents attached per request (quotation/invoice/delivery). Role-scoped list (SUPER_ADMIN/CFO all, managers company-scoped, requesters own).
+- [x] **Procurement quotations (blind vendor)** — PI creation takes **no vendor** (requester must not know who might supply). The vendor enters only via **quotations**: admin fills one or more quotations on a PR at `HOD_APPROVED` (`POST/PUT/DELETE /procurement/:uuid/quotations`, amount totals AES-encrypted in `procurement_quotations`), then `submit-quotations` moves the PR to `QUOTATION_SELECTION` with the requester as handler. The requester then **selects one quotation blind** (`select-quotation`) — vendor and quotation files are masked from them (they see only totals/terms); the chosen quotation sets the PR's `vendor_id` and moves the PR to `QUOTATION_APPROVED` for CFO. The vendor stays hidden from the requester even on the final PO. Quotation files are `procurement_documents` rows linked via `procurement_quotation_id`.
 - [ ] ExpenseHandover API
 
 ### Seeders (14 files)
@@ -218,6 +221,7 @@ npm run seed              # run seeders
 Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Quotation → PO (Purchase Order) → Received → Finance → CFO (re-approval) → Payment`.
 
 - **Schema** (`20260806000003-create-procurement-tables.js`): `procurement_requests` (one row per PI/PR/PO chained via `parent_id`), `procurement_items`, `procurement_handovers`, `procurement_documents`. Encrypted amounts (`total_amount`/`tax_amount`/`grand_total`, item `unit_price`/`total_with_tax`, handover `amount_at_step`) stored as TEXT.
+- **Quotations** (`20260807000001`): `procurement_quotations` — one row per vendor quote on a PR (`vendor_id`, encrypted `total_amount`/`tax_amount`/`grand_total`, `valid_until`, `terms`, status `ACTIVE/SELECTED/REJECTED`). `20260807000002` adds nullable `procurement_documents.procurement_quotation_id` so each quotation carries its own files.
 - **Workflow engine** (`src/modules/procurement/procurement.service.js`): `submit` / `approve` / `reject` / `create-pr` / `create-po` / `received` / `pay`. Each role→role hop is validated against an ACTIVE `role_handover_rules` row with `module='procurement'` (seeded in `20260806000013`). Totals computed server-side from items (qty × price × tax).
 - **Vendor linkage**: `procurement_requests.vendor_id` → `vendors` (link to the Vendors master).
 - **Permissions**: `procurement:*` (ids 135–141) + role grants (seeder `20260806000012`).

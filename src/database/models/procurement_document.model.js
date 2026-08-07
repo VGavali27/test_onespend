@@ -5,6 +5,7 @@ export default (sequelize, DataTypes) => {
       id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
       uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
       procurement_request_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
+      procurement_quotation_id: DataTypes.BIGINT.UNSIGNED,
       document_type: DataTypes.STRING(50),
       document_number: DataTypes.STRING(100),
       issue_date: DataTypes.DATEONLY,
@@ -24,6 +25,7 @@ export default (sequelize, DataTypes) => {
 
   ProcurementDocument.associate = (models) => {
     ProcurementDocument.belongsTo(models.ProcurementRequest, { foreignKey: 'procurement_request_id', as: 'request' });
+    ProcurementDocument.belongsTo(models.ProcurementQuotation, { foreignKey: 'procurement_quotation_id', as: 'quotation' });
   };
 
   return ProcurementDocument;

@@ -7,6 +7,8 @@ import {
   updateProcurementSchema,
   actionSchema,
   procurementDocumentSchema,
+  quotationSchema,
+  selectQuotationSchema,
 } from './procurement.validation.js';
 
 const router = Router();
@@ -24,6 +26,14 @@ router.put('/:uuid', validate(updateProcurementSchema), procurementController.up
 router.post('/:uuid/documents', validate(procurementDocumentSchema), procurementController.addDocument);
 router.delete('/documents/:uuid', procurementController.deleteDocument);
 router.delete('/:uuid', procurementController.deleteProcurement);
+
+// Quotations — admin fills them on a PR; requester picks one blind.
+// (These must precede the generic /:uuid routes above.)
+router.post('/:uuid/quotations', validate(quotationSchema), procurementController.addQuotation);
+router.put('/:uuid/quotations/:quotationUuid', validate(quotationSchema), procurementController.updateQuotation);
+router.delete('/:uuid/quotations/:quotationUuid', procurementController.deleteQuotation);
+router.post('/:uuid/submit-quotations', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), procurementController.submitQuotations);
+router.post('/:uuid/select-quotation', validate(selectQuotationSchema), procurementController.selectQuotation);
 
 // Workflow actions
 router.post('/:uuid/submit', validate(actionSchema), procurementController.submitProcurement);

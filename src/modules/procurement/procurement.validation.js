@@ -10,12 +10,12 @@ const itemSchema = Joi.object({
   tax_rate: Joi.number().min(0).max(100).allow(null),
 });
 
-// Create a PI with line items in one call
+// Create a PI with line items in one call. NOTE: no vendor — the vendor is only
+// introduced later when an admin fills quotations on the PR (the requester must
+// not know the vendor).
 export const createProcurementSchema = Joi.object({
   title: Joi.string().max(255).required().messages({ 'string.empty': 'Title is required' }),
   company_uuid: Joi.string().uuid().required().messages({ 'string.guid': 'Company is required' }),
-  vendor_uuid: Joi.string().uuid().allow(null, ''),
-  vendor_contact: Joi.string().max(150).allow(null, ''),
   delivery_address: Joi.string().allow(null, ''),
   expected_delivery_date: Joi.date().iso().allow(null, ''),
   payment_terms: Joi.string().max(100).allow(null, ''),
@@ -27,8 +27,6 @@ export const createProcurementSchema = Joi.object({
 export const updateProcurementSchema = Joi.object({
   title: Joi.string().max(255),
   company_uuid: Joi.string().uuid(),
-  vendor_uuid: Joi.string().uuid().allow(null, ''),
-  vendor_contact: Joi.string().max(150).allow(null, ''),
   delivery_address: Joi.string().allow(null, ''),
   expected_delivery_date: Joi.date().iso().allow(null, ''),
   payment_terms: Joi.string().max(100).allow(null, ''),
@@ -41,6 +39,23 @@ export const updateProcurementSchema = Joi.object({
 // Workflow actions (submit / approve / reject / pay) carry an optional remark
 export const actionSchema = Joi.object({
   remarks: Joi.string().allow(null, ''),
+});
+
+// One vendor quotation on a PR (admin fills these; the requester picks one blind).
+// Amounts are plain numbers — the service computes + encrypts the stored totals.
+export const quotationSchema = Joi.object({
+  vendor_uuid: Joi.string().uuid().required().messages({ 'string.guid': 'Vendor is required' }),
+  title: Joi.string().max(255).allow(null, ''),
+  total_amount: Joi.number().min(0).allow(null),
+  tax_amount: Joi.number().min(0).allow(null),
+  valid_until: Joi.date().iso().allow(null, ''),
+  terms: Joi.string().allow(null, ''),
+  notes: Joi.string().allow(null, ''),
+});
+
+// Requester picks one quotation (blind — vendor not visible to them)
+export const selectQuotationSchema = Joi.object({
+  quotation_uuid: Joi.string().uuid().required().messages({ 'string.guid': 'Quotation is required' }),
 });
 
 // One attached file (uploaded file metadata from POST /uploads)

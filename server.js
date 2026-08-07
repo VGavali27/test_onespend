@@ -8,8 +8,12 @@ const start = async () => {
     console.log('✓ Database connected successfully');
 
     // ── Sync models (dev only) ──
+    // NOTE: use sync() WITHOUT alter. alter:true re-adds unique indexes on every
+    // boot (model default names `uuid`/`code` vs migration names `idx_*`), so MySQL
+    // keeps appending `uuid_2`, `uuid_3` … until the 64-key table limit is hit.
+    // sync() only creates missing tables and never touches existing ones.
     if (env.isDev) {
-      await sequelize.sync({ alter: true });
+      await sequelize.sync();
       console.log('✓ Models synchronized');
     }
   } catch (error) {

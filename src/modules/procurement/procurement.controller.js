@@ -113,6 +113,53 @@ export const markPaid = async (req, res, next) => {
   }
 };
 
+// ── Quotations ──
+
+export const addQuotation = async (req, res, next) => {
+  try {
+    const quotation = await procurementService.addQuotation(req.params.uuid, req.user, req.body);
+    return ApiResponse.created(res, quotation, 'Quotation added successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateQuotation = async (req, res, next) => {
+  try {
+    const quotation = await procurementService.updateQuotation(req.params.uuid, req.params.quotationUuid, req.user, req.body);
+    return ApiResponse.success(res, quotation, 'Quotation updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteQuotation = async (req, res, next) => {
+  try {
+    const result = await procurementService.deleteQuotation(req.params.uuid, req.params.quotationUuid, req.user);
+    return ApiResponse.success(res, null, result.message);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const submitQuotations = async (req, res, next) => {
+  try {
+    const doc = await procurementService.submitQuotations(req.params.uuid, req.user);
+    return ApiResponse.success(res, doc, 'Quotations submitted for requester selection');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const selectQuotation = async (req, res, next) => {
+  try {
+    const doc = await procurementService.selectQuotation(req.params.uuid, req.user, req.body.quotation_uuid);
+    return ApiResponse.success(res, doc, 'Quotation selected');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ── Documents ──
 
 export const addDocument = async (req, res, next) => {
