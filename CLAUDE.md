@@ -126,13 +126,13 @@ All API responses follow this shape via `ApiResponse`:
 ### Procurement Module (7)
 | Table | Key FKs |
 |---|---|
-| procurement_pis | → companies, user_employments, roles (Purchase Intention — no vendor) |
-| procurement_prs | → procurement_pis, companies, vendors, user_employments, roles (vendor set at quotation selection) |
-| procurement_pos | → procurement_prs, companies, vendors, user_employments, roles (Purchase Order) |
-| procurement_items | polymorphic → procurement_pis / procurement_prs / procurement_pos (`pi_id`/`pr_id`/`po_id`) |
+| procurement_intentions | → companies, user_employments, roles (Purchase Intention — no vendor) |
+| procurement_requests | → procurement_intentions, companies, vendors, user_employments, roles (vendor set at quotation selection) |
+| procurement_orders | → procurement_requests, companies, vendors, user_employments, roles (Purchase Order) |
+| procurement_items | polymorphic → procurement_intentions / procurement_requests / procurement_orders (`pi_id`/`pr_id`/`po_id`) |
 | procurement_handovers | polymorphic parent + roles, user_employments |
 | procurement_documents | polymorphic parent + procurement_quotations (quotation / invoice / delivery files) |
-| procurement_quotations | → procurement_prs, vendors (one vendor quote per PR) |
+| procurement_quotations | → procurement_requests, vendors (one vendor quote per PR) |
 
 ### Future models planned
 - GeneralExpense
@@ -181,7 +181,7 @@ npm run seed              # run seeders
 - [x] Vendor API — CRUD by UUID + **GET /vendors/options**; nested contacts / addresses / bank accounts in one create/update transaction; **vendor category assignment** via `vendor_category_uuids` — resolved to category ids and written to the `vendor_category_mappings` junction in the same transaction (errors on an unknown uuid)
 - [x] VendorCategory API — CRUD by UUID + **GET /vendor-categories/options**; classifies vendors by the business types they serve
 - [x] VendorDocument API — add/remove documents on a vendor (uploaded files via `/uploads`)
-- [x] **Procurement API** — `/procurement`. **Three separate header tables**: `procurement_pis` / `procurement_prs` / `procurement_pos` (chained via `prs.pi_id` / `pos.pr_id`); child tables (items/handovers/documents) are polymorphic (`pi_id`/`pr_id`/`po_id`). **Workflow actions**: `submit` / `approve` / `reject` / `create-pr` / `create-po` / `received` / `pay`. Totals computed server-side (qty × price × tax); amounts AES-encrypted. Every role→role hop is **validated against `role_handover_rules` (module='procurement')** — the chain (PI → ADMIN_MGR → PR → HOD → quotation → CFO → PO → Received → FINANCE_MGR → CFO → PAYMENT_MGR) stays configurable. Handovers logged with an encrypted `amount_at_step` snapshot. Documents attached per request (quotation/invoice/delivery). Role-scoped list (SUPER_ADMIN/CFO all, managers company-scoped, requesters own). **Duplicate guards**: `create-pr` once per PI, `create-po` once per PR. `GET /:uuid` returns a `price_history` chain (PI → PR → quotations → PO totals) for stage-by-stage price comparison.
+- [x] **Procurement API** — `/procurement`. **Three separate header tables**: `procurement_intentions` / `procurement_requests` / `procurement_orders` (chained via `prs.pi_id` / `pos.pr_id`); child tables (items/handovers/documents) are polymorphic (`pi_id`/`pr_id`/`po_id`). **Workflow actions**: `submit` / `approve` / `reject` / `create-pr` / `create-po` / `received` / `pay`. Totals computed server-side (qty × price × tax); amounts AES-encrypted. Every role→role hop is **validated against `role_handover_rules` (module='procurement')** — the chain (PI → ADMIN_MGR → PR → HOD → quotation → CFO → PO → Received → FINANCE_MGR → CFO → PAYMENT_MGR) stays configurable. Handovers logged with an encrypted `amount_at_step` snapshot. Documents attached per request (quotation/invoice/delivery). Role-scoped list (SUPER_ADMIN/CFO all, managers company-scoped, requesters own). **Duplicate guards**: `create-pr` once per PI, `create-po` once per PR. `GET /:uuid` returns a `price_history` chain (PI → PR → quotations → PO totals) for stage-by-stage price comparison.
 - [x] **Procurement quotations (blind vendor)** — PI creation takes **no vendor** (requester must not know who might supply). The vendor enters only via **quotations**: admin fills one or more quotations on a PR (`POST/PUT/DELETE /procurement/:uuid/quotations`, amount totals AES-encrypted in `procurement_quotations`), **editable until the requester selects** (statuses SUBMITTED/HOD_APPROVED/QUOTATION_SELECTION). Then `submit-quotations` moves the PR to `QUOTATION_SELECTION` with the requester as handler. The requester then **selects one quotation blind** (`select-quotation`) — vendor and quotation files are masked from them (they see only totals/terms); the chosen quotation sets the PR's `vendor_id` and moves the PR to `QUOTATION_APPROVED` for CFO. The vendor stays hidden from the requester even on the final PO. Quotation files are `procurement_documents` rows linked via `procurement_quotation_id`. PI line items carry only **quantity + unit price** — no `unit`, no `tax_rate` (tax is applied at the quotation stage, not the intent); the PI create/update schemas also omit `payment_terms` and `delivery_address` (unknown to the requester at intent time).
 - [ ] ExpenseHandover API
 
@@ -223,11 +223,11 @@ npm run seed              # run seeders
 
 Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Quotation → PO (Purchase Order) → Received → Finance → CFO (re-approval) → Payment`.
 
-- **Schema** (`20260806000003-create-procurement-tables.js`): **three header tables** — `procurement_pis`, `procurement_prs`, `procurement_pos` — chained via explicit FKs (`prs.pi_id`, `pos.pr_id`). Child tables (`procurement_items`, `procurement_handovers`, `procurement_documents`) are **polymorphic**: nullable `pi_id`/`pr_id`/`po_id`, exactly one set per row. Encrypted amounts (`total_amount`/`tax_amount`/`grand_total`, item `unit_price`/`total_with_tax`, handover `amount_at_step`) stored as TEXT.
+- **Schema** (`20260806000003-create-procurement-tables.js`): **three header tables** — `procurement_intentions`, `procurement_requests`, `procurement_orders` — chained via explicit FKs (`prs.pi_id`, `pos.pr_id`). Child tables (`procurement_items`, `procurement_handovers`, `procurement_documents`) are **polymorphic**: nullable `pi_id`/`pr_id`/`po_id`, exactly one set per row. Encrypted amounts (`total_amount`/`tax_amount`/`grand_total`, item `unit_price`/`total_with_tax`, handover `amount_at_step`) stored as TEXT.
 - **Quotations**: `procurement_quotations` — one row per vendor quote on a PR (`pr_id`, `vendor_id`, encrypted `total_amount`/`tax_amount`/`grand_total`, `valid_until`, `terms`, status `ACTIVE/SELECTED/REJECTED`). `procurement_documents.procurement_quotation_id` lets each quotation carry its own files. Quotations are **editable until the requester selects one** (statuses SUBMITTED/HOD_APPROVED/QUOTATION_SELECTION), then they lock.
 - **Workflow engine** (`src/modules/procurement/procurement.service.js`): `submit` / `approve` / `reject` / `create-pr` / `create-po` / `received` / `pay`. Each role→role hop is validated against an ACTIVE `role_handover_rules` row with `module='procurement'` (seeded in `20260806000013`). Totals computed server-side from items (qty × price × tax). **Duplicate guards**: `create-pr` rejects if the PI already has a PR (`prs.pi_id`), `create-po` rejects if the PR already has a PO (`pos.pr_id`).
 - **Price history**: `GET /procurement/:uuid` returns a `price_history` payload — the decrypted PI → PR → each quotation → PO totals for stage-by-stage comparison; vendor identity masked from the requester across the whole chain.
-- **Vendor linkage**: `procurement_prs.vendor_id` / `procurement_pos.vendor_id` → `vendors` (link to the Vendors master); set on the PR at quotation selection and copied to the PO.
+- **Vendor linkage**: `procurement_requests.vendor_id` / `procurement_orders.vendor_id` → `vendors` (link to the Vendors master); set on the PR at quotation selection and copied to the PO.
 - **Permissions**: `procurement:*` (ids 135–141) + role grants (seeder `20260806000012`).
 - **Expense category**: `PROCUREMENT` (module='procurement') seeded for future expense conversion.
 

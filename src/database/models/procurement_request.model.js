@@ -12,8 +12,8 @@ const encryptChangedAmounts = (instance) => {
 };
 
 export default (sequelize, DataTypes) => {
-  const ProcurementPr = sequelize.define(
-    'ProcurementPr',
+  const ProcurementRequest = sequelize.define(
+    'ProcurementRequest',
     {
       id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
       uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
@@ -36,7 +36,7 @@ export default (sequelize, DataTypes) => {
       deleted_by: DataTypes.BIGINT.UNSIGNED,
     },
     {
-      tableName: 'procurement_prs',
+      tableName: 'procurement_requests',
       timestamps: true,
       paranoid: true,
       underscored: true,
@@ -47,19 +47,19 @@ export default (sequelize, DataTypes) => {
     },
   );
 
-  ProcurementPr.associate = (models) => {
-    ProcurementPr.belongsTo(models.ProcurementPi, { foreignKey: 'pi_id', as: 'pi' });
-    ProcurementPr.belongsTo(models.Company, { foreignKey: 'company_id', as: 'company' });
-    ProcurementPr.belongsTo(models.Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
-    ProcurementPr.belongsTo(models.UserEmployment, { foreignKey: 'requested_by_employment_id', as: 'requestedByEmployment' });
-    ProcurementPr.belongsTo(models.UserEmployment, { foreignKey: 'current_employment_id', as: 'currentEmployment' });
-    ProcurementPr.belongsTo(models.Role, { foreignKey: 'current_role_id', as: 'currentRole' });
-    ProcurementPr.hasMany(models.ProcurementItem, { foreignKey: 'pr_id', as: 'items' });
-    ProcurementPr.hasMany(models.ProcurementHandover, { foreignKey: 'pr_id', as: 'handovers' });
-    ProcurementPr.hasMany(models.ProcurementDocument, { foreignKey: 'pr_id', as: 'documents' });
-    ProcurementPr.hasMany(models.ProcurementQuotation, { foreignKey: 'pr_id', as: 'quotations' });
-    ProcurementPr.hasMany(models.ProcurementPo, { foreignKey: 'pr_id', as: 'pos' });
+  ProcurementRequest.associate = (models) => {
+    ProcurementRequest.belongsTo(models.ProcurementIntention, { foreignKey: 'pi_id', as: 'pi' });
+    ProcurementRequest.belongsTo(models.Company, { foreignKey: 'company_id', as: 'company' });
+    ProcurementRequest.belongsTo(models.Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
+    ProcurementRequest.belongsTo(models.UserEmployment, { foreignKey: 'requested_by_employment_id', as: 'requestedByEmployment' });
+    ProcurementRequest.belongsTo(models.UserEmployment, { foreignKey: 'current_employment_id', as: 'currentEmployment' });
+    ProcurementRequest.belongsTo(models.Role, { foreignKey: 'current_role_id', as: 'currentRole' });
+    ProcurementRequest.hasMany(models.ProcurementItem, { foreignKey: 'pr_id', as: 'items' });
+    ProcurementRequest.hasMany(models.ProcurementHandover, { foreignKey: 'pr_id', as: 'handovers' });
+    ProcurementRequest.hasMany(models.ProcurementDocument, { foreignKey: 'pr_id', as: 'documents' });
+    ProcurementRequest.hasMany(models.ProcurementQuotation, { foreignKey: 'pr_id', as: 'quotations' });
+    ProcurementRequest.hasMany(models.ProcurementOrder, { foreignKey: 'pr_id', as: 'pos' });
   };
 
-  return ProcurementPr;
+  return ProcurementRequest;
 };

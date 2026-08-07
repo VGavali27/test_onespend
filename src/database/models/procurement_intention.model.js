@@ -14,8 +14,8 @@ const encryptChangedAmounts = (instance) => {
 };
 
 export default (sequelize, DataTypes) => {
-  const ProcurementPi = sequelize.define(
-    'ProcurementPi',
+  const ProcurementIntention = sequelize.define(
+    'ProcurementIntention',
     {
       id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
       uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
@@ -36,7 +36,7 @@ export default (sequelize, DataTypes) => {
       deleted_by: DataTypes.BIGINT.UNSIGNED,
     },
     {
-      tableName: 'procurement_pis',
+      tableName: 'procurement_intentions',
       timestamps: true,
       paranoid: true,
       underscored: true,
@@ -47,16 +47,16 @@ export default (sequelize, DataTypes) => {
     },
   );
 
-  ProcurementPi.associate = (models) => {
-    ProcurementPi.belongsTo(models.Company, { foreignKey: 'company_id', as: 'company' });
-    ProcurementPi.belongsTo(models.UserEmployment, { foreignKey: 'requested_by_employment_id', as: 'requestedByEmployment' });
-    ProcurementPi.belongsTo(models.UserEmployment, { foreignKey: 'current_employment_id', as: 'currentEmployment' });
-    ProcurementPi.belongsTo(models.Role, { foreignKey: 'current_role_id', as: 'currentRole' });
-    ProcurementPi.hasMany(models.ProcurementItem, { foreignKey: 'pi_id', as: 'items' });
-    ProcurementPi.hasMany(models.ProcurementHandover, { foreignKey: 'pi_id', as: 'handovers' });
-    ProcurementPi.hasMany(models.ProcurementDocument, { foreignKey: 'pi_id', as: 'documents' });
-    ProcurementPi.hasMany(models.ProcurementPr, { foreignKey: 'pi_id', as: 'prs' });
+  ProcurementIntention.associate = (models) => {
+    ProcurementIntention.belongsTo(models.Company, { foreignKey: 'company_id', as: 'company' });
+    ProcurementIntention.belongsTo(models.UserEmployment, { foreignKey: 'requested_by_employment_id', as: 'requestedByEmployment' });
+    ProcurementIntention.belongsTo(models.UserEmployment, { foreignKey: 'current_employment_id', as: 'currentEmployment' });
+    ProcurementIntention.belongsTo(models.Role, { foreignKey: 'current_role_id', as: 'currentRole' });
+    ProcurementIntention.hasMany(models.ProcurementItem, { foreignKey: 'pi_id', as: 'items' });
+    ProcurementIntention.hasMany(models.ProcurementHandover, { foreignKey: 'pi_id', as: 'handovers' });
+    ProcurementIntention.hasMany(models.ProcurementDocument, { foreignKey: 'pi_id', as: 'documents' });
+    ProcurementIntention.hasMany(models.ProcurementRequest, { foreignKey: 'pi_id', as: 'prs' });
   };
 
-  return ProcurementPi;
+  return ProcurementIntention;
 };

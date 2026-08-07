@@ -46,9 +46,9 @@ export default (sequelize, DataTypes) => {
   );
 
   ProcurementItem.associate = (models) => {
-    ProcurementItem.belongsTo(models.ProcurementPi, { foreignKey: 'pi_id', as: 'pi' });
-    ProcurementItem.belongsTo(models.ProcurementPr, { foreignKey: 'pr_id', as: 'pr' });
-    ProcurementItem.belongsTo(models.ProcurementPo, { foreignKey: 'po_id', as: 'po' });
+    ProcurementItem.belongsTo(models.ProcurementIntention, { foreignKey: 'pi_id', as: 'pi' });
+    ProcurementItem.belongsTo(models.ProcurementRequest, { foreignKey: 'pr_id', as: 'pr' });
+    ProcurementItem.belongsTo(models.ProcurementOrder, { foreignKey: 'po_id', as: 'po' });
   };
 
   return ProcurementItem;

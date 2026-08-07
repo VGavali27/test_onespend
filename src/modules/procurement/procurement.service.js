@@ -6,7 +6,7 @@ import ApiError from '../../utils/ApiError.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
 import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser, getActiveEmploymentByUserAndCompany } from '../../modules/user_employment/user_employment.service.js';
 
-const { Vendor, RoleHandoverRule, ProcurementPi, ProcurementPr, ProcurementPo, ProcurementQuotation, sequelize } = db;
+const { Vendor, RoleHandoverRule, ProcurementIntention, ProcurementRequest, ProcurementOrder, ProcurementQuotation, sequelize } = db;
 
 // Role ids (see seeders/20260724000002-seed-roles.js)
 const ROLE_IDS = {
@@ -56,9 +56,9 @@ const requireHandoverRule = async (fromRoleId, toRoleId) => {
 
 // Header model + polymorphic owner column for a given type
 const HEADER = {
-  PI: { model: ProcurementPi, ownerColumn: 'pi_id' },
-  PR: { model: ProcurementPr, ownerColumn: 'pr_id' },
-  PO: { model: ProcurementPo, ownerColumn: 'po_id' },
+  PI: { model: ProcurementIntention, ownerColumn: 'pi_id' },
+  PR: { model: ProcurementRequest, ownerColumn: 'pr_id' },
+  PO: { model: ProcurementOrder, ownerColumn: 'po_id' },
 };
 
 // Load a document, resolving which header table owns it.
@@ -293,7 +293,7 @@ export const create = async (user, data) => {
   const documentNumber = await generateDocumentNumber('PI');
 
   return sequelize.transaction(async (t) => {
-    const doc = await ProcurementPi.create(
+    const doc = await ProcurementIntention.create(
       {
         ...rest,
         document_number: documentNumber,
@@ -637,7 +637,7 @@ export const createPr = async (uuid, user) => {
   if (pi.status !== 'APPROVED') throw ApiError.badRequest('The PI must be approved before creating a PR');
 
   // Duplicate guard: only one PR per PI
-  const existingPr = await ProcurementPr.findOne({ where: { pi_id: pi.id } });
+  const existingPr = await ProcurementRequest.findOne({ where: { pi_id: pi.id } });
   if (existingPr) throw ApiError.badRequest('A purchase request has already been created for this PI');
 
   await requireHandoverRule(ROLE_IDS.ADMIN_MGR, ROLE_IDS.HOD);
@@ -645,7 +645,7 @@ export const createPr = async (uuid, user) => {
   const documentNumber = await generateDocumentNumber('PR');
 
   return sequelize.transaction(async (t) => {
-    const pr = await ProcurementPr.create(
+    const pr = await ProcurementRequest.create(
       {
         document_number: documentNumber,
         pi_id: pi.id,
@@ -687,14 +687,14 @@ export const createPo = async (uuid, user) => {
   if (!pr.vendor_id) throw ApiError.badRequest('The PR has no selected vendor yet');
 
   // Duplicate guard: only one PO per PR
-  const existingPo = await ProcurementPo.findOne({ where: { pr_id: pr.id } });
+  const existingPo = await ProcurementOrder.findOne({ where: { pr_id: pr.id } });
   if (existingPo) throw ApiError.badRequest('A purchase order has already been created for this PR');
 
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
   const documentNumber = await generateDocumentNumber('PO');
 
   return sequelize.transaction(async (t) => {
-    const po = await ProcurementPo.create(
+    const po = await ProcurementOrder.create(
       {
         document_number: documentNumber,
         pr_id: pr.id,

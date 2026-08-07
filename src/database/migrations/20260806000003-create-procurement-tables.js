@@ -1,16 +1,16 @@
 /**
  * Migration: procurement module.
  *
- * Three header tables — procurement_pis (Purchase Intention), procurement_prs
- * (Purchase Request), procurement_pos (Purchase Order) — chained via explicit
+ * Three header tables — procurement_intentions (Purchase Intention), procurement_requests
+ * (Purchase Request), procurement_orders (Purchase Order) — chained via explicit
  * FKs (prs.pi_id, pos.pr_id). Child tables (items / documents / handovers) are
  * polymorphic: nullable pi_id / pr_id / po_id, exactly one set per row.
  * procurement_quotations belong to a PR only (pr_id). Amounts are TEXT because
  * they store AES-encrypted values (see src/utils/encryption.js + model hooks).
  */
 export async function up(queryInterface, Sequelize) {
-  // ── procurement_pis ──
-  await queryInterface.createTable('procurement_pis', {
+  // ── procurement_intentions ──
+  await queryInterface.createTable('procurement_intentions', {
     id: { type: Sequelize.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
     uuid: { type: Sequelize.UUID, allowNull: false },
     document_number: { type: Sequelize.STRING(50), allowNull: false },
@@ -32,14 +32,14 @@ export async function up(queryInterface, Sequelize) {
     updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') },
     deleted_at: { type: Sequelize.DATE, allowNull: true },
   });
-  await queryInterface.addIndex('procurement_pis', ['uuid'], { name: 'idx_pc_pi_uuid', unique: true });
-  await queryInterface.addIndex('procurement_pis', ['document_number'], { name: 'uq_pc_pi_document_number', unique: true });
-  await queryInterface.addIndex('procurement_pis', ['status'], { name: 'idx_pc_pi_status' });
-  await queryInterface.addIndex('procurement_pis', ['company_id'], { name: 'idx_pc_pi_company_id' });
-  await queryInterface.addIndex('procurement_pis', ['requested_by_employment_id'], { name: 'idx_pc_pi_requested_by' });
+  await queryInterface.addIndex('procurement_intentions', ['uuid'], { name: 'idx_pc_pi_uuid', unique: true });
+  await queryInterface.addIndex('procurement_intentions', ['document_number'], { name: 'uq_pc_pi_document_number', unique: true });
+  await queryInterface.addIndex('procurement_intentions', ['status'], { name: 'idx_pc_pi_status' });
+  await queryInterface.addIndex('procurement_intentions', ['company_id'], { name: 'idx_pc_pi_company_id' });
+  await queryInterface.addIndex('procurement_intentions', ['requested_by_employment_id'], { name: 'idx_pc_pi_requested_by' });
 
-  // ── procurement_prs ──
-  await queryInterface.createTable('procurement_prs', {
+  // ── procurement_requests ──
+  await queryInterface.createTable('procurement_requests', {
     id: { type: Sequelize.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
     uuid: { type: Sequelize.UUID, allowNull: false },
     document_number: { type: Sequelize.STRING(50), allowNull: false },
@@ -63,16 +63,16 @@ export async function up(queryInterface, Sequelize) {
     updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') },
     deleted_at: { type: Sequelize.DATE, allowNull: true },
   });
-  await queryInterface.addIndex('procurement_prs', ['uuid'], { name: 'idx_pc_pr_uuid', unique: true });
-  await queryInterface.addIndex('procurement_prs', ['document_number'], { name: 'uq_pc_pr_document_number', unique: true });
-  await queryInterface.addIndex('procurement_prs', ['status'], { name: 'idx_pc_pr_status' });
-  await queryInterface.addIndex('procurement_prs', ['pi_id'], { name: 'idx_pc_pr_pi_id' });
-  await queryInterface.addIndex('procurement_prs', ['vendor_id'], { name: 'idx_pc_pr_vendor_id' });
-  await queryInterface.addIndex('procurement_prs', ['company_id'], { name: 'idx_pc_pr_company_id' });
-  await queryInterface.addIndex('procurement_prs', ['requested_by_employment_id'], { name: 'idx_pc_pr_requested_by' });
+  await queryInterface.addIndex('procurement_requests', ['uuid'], { name: 'idx_pc_pr_uuid', unique: true });
+  await queryInterface.addIndex('procurement_requests', ['document_number'], { name: 'uq_pc_pr_document_number', unique: true });
+  await queryInterface.addIndex('procurement_requests', ['status'], { name: 'idx_pc_pr_status' });
+  await queryInterface.addIndex('procurement_requests', ['pi_id'], { name: 'idx_pc_pr_pi_id' });
+  await queryInterface.addIndex('procurement_requests', ['vendor_id'], { name: 'idx_pc_pr_vendor_id' });
+  await queryInterface.addIndex('procurement_requests', ['company_id'], { name: 'idx_pc_pr_company_id' });
+  await queryInterface.addIndex('procurement_requests', ['requested_by_employment_id'], { name: 'idx_pc_pr_requested_by' });
 
-  // ── procurement_pos ──
-  await queryInterface.createTable('procurement_pos', {
+  // ── procurement_orders ──
+  await queryInterface.createTable('procurement_orders', {
     id: { type: Sequelize.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
     uuid: { type: Sequelize.UUID, allowNull: false },
     document_number: { type: Sequelize.STRING(50), allowNull: false },
@@ -97,13 +97,13 @@ export async function up(queryInterface, Sequelize) {
     updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.literal('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP') },
     deleted_at: { type: Sequelize.DATE, allowNull: true },
   });
-  await queryInterface.addIndex('procurement_pos', ['uuid'], { name: 'idx_pc_po_uuid', unique: true });
-  await queryInterface.addIndex('procurement_pos', ['document_number'], { name: 'uq_pc_po_document_number', unique: true });
-  await queryInterface.addIndex('procurement_pos', ['status'], { name: 'idx_pc_po_status' });
-  await queryInterface.addIndex('procurement_pos', ['pr_id'], { name: 'idx_pc_po_pr_id' });
-  await queryInterface.addIndex('procurement_pos', ['vendor_id'], { name: 'idx_pc_po_vendor_id' });
-  await queryInterface.addIndex('procurement_pos', ['company_id'], { name: 'idx_pc_po_company_id' });
-  await queryInterface.addIndex('procurement_pos', ['requested_by_employment_id'], { name: 'idx_pc_po_requested_by' });
+  await queryInterface.addIndex('procurement_orders', ['uuid'], { name: 'idx_pc_po_uuid', unique: true });
+  await queryInterface.addIndex('procurement_orders', ['document_number'], { name: 'uq_pc_po_document_number', unique: true });
+  await queryInterface.addIndex('procurement_orders', ['status'], { name: 'idx_pc_po_status' });
+  await queryInterface.addIndex('procurement_orders', ['pr_id'], { name: 'idx_pc_po_pr_id' });
+  await queryInterface.addIndex('procurement_orders', ['vendor_id'], { name: 'idx_pc_po_vendor_id' });
+  await queryInterface.addIndex('procurement_orders', ['company_id'], { name: 'idx_pc_po_company_id' });
+  await queryInterface.addIndex('procurement_orders', ['requested_by_employment_id'], { name: 'idx_pc_po_requested_by' });
 
   // ── procurement_items (polymorphic) ──
   await queryInterface.createTable('procurement_items', {
@@ -205,17 +205,17 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.addIndex('procurement_documents', ['procurement_quotation_id'], { name: 'idx_pc_doc_quotation_id' });
 
   // ── Foreign keys ──
-  await queryInterface.addConstraint('procurement_prs', {
+  await queryInterface.addConstraint('procurement_requests', {
     fields: ['pi_id'], type: 'foreign key', name: 'fk_pc_pr_pi_id',
-    references: { table: 'procurement_pis', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
+    references: { table: 'procurement_intentions', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
-  await queryInterface.addConstraint('procurement_pos', {
+  await queryInterface.addConstraint('procurement_orders', {
     fields: ['pr_id'], type: 'foreign key', name: 'fk_pc_po_pr_id',
-    references: { table: 'procurement_prs', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
+    references: { table: 'procurement_requests', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
 
-  for (const table of ['procurement_pis', 'procurement_prs', 'procurement_pos']) {
-    const prefix = table === 'procurement_pis' ? 'pi' : table === 'procurement_prs' ? 'pr' : 'po';
+  for (const table of ['procurement_intentions', 'procurement_requests', 'procurement_orders']) {
+    const prefix = table === 'procurement_intentions' ? 'pi' : table === 'procurement_requests' ? 'pr' : 'po';
     await queryInterface.addConstraint(table, {
       fields: ['company_id'], type: 'foreign key', name: `fk_pc_${prefix}_company_id`,
       references: { table: 'companies', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'RESTRICT',
@@ -233,11 +233,11 @@ export async function up(queryInterface, Sequelize) {
       references: { table: 'user_employments', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
     });
   }
-  await queryInterface.addConstraint('procurement_prs', {
+  await queryInterface.addConstraint('procurement_requests', {
     fields: ['vendor_id'], type: 'foreign key', name: 'fk_pc_pr_vendor_id',
     references: { table: 'vendors', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
-  await queryInterface.addConstraint('procurement_pos', {
+  await queryInterface.addConstraint('procurement_orders', {
     fields: ['vendor_id'], type: 'foreign key', name: 'fk_pc_po_vendor_id',
     references: { table: 'vendors', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
@@ -245,20 +245,20 @@ export async function up(queryInterface, Sequelize) {
   for (const [table, idx] of [['procurement_items', 'item'], ['procurement_handovers', 'handover'], ['procurement_documents', 'doc']]) {
     await queryInterface.addConstraint(table, {
       fields: ['pi_id'], type: 'foreign key', name: `fk_pc_${idx}_pi_id`,
-      references: { table: 'procurement_pis', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
+      references: { table: 'procurement_intentions', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
     });
     await queryInterface.addConstraint(table, {
       fields: ['pr_id'], type: 'foreign key', name: `fk_pc_${idx}_pr_id`,
-      references: { table: 'procurement_prs', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
+      references: { table: 'procurement_requests', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
     });
     await queryInterface.addConstraint(table, {
       fields: ['po_id'], type: 'foreign key', name: `fk_pc_${idx}_po_id`,
-      references: { table: 'procurement_pos', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
+      references: { table: 'procurement_orders', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
     });
   }
   await queryInterface.addConstraint('procurement_quotations', {
     fields: ['pr_id'], type: 'foreign key', name: 'fk_pc_quote_pr_id',
-    references: { table: 'procurement_prs', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
+    references: { table: 'procurement_requests', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
   });
   await queryInterface.addConstraint('procurement_quotations', {
     fields: ['vendor_id'], type: 'foreign key', name: 'fk_pc_quote_vendor_id',
@@ -295,7 +295,7 @@ export async function down(queryInterface, _Sequelize) {
   await queryInterface.dropTable('procurement_quotations');
   await queryInterface.dropTable('procurement_handovers');
   await queryInterface.dropTable('procurement_items');
-  await queryInterface.dropTable('procurement_pos');
-  await queryInterface.dropTable('procurement_prs');
-  await queryInterface.dropTable('procurement_pis');
+  await queryInterface.dropTable('procurement_orders');
+  await queryInterface.dropTable('procurement_requests');
+  await queryInterface.dropTable('procurement_intentions');
 }

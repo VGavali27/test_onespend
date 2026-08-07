@@ -1,9 +1,9 @@
 import db from '../../database/models/index.js';
 
 const {
-  ProcurementPi,
-  ProcurementPr,
-  ProcurementPo,
+  ProcurementIntention,
+  ProcurementRequest,
+  ProcurementOrder,
   ProcurementItem,
   ProcurementHandover,
   ProcurementDocument,
@@ -47,7 +47,7 @@ const detailIncludes = {
         { model: UserEmployment, as: 'actionBy', include: [{ model: User, as: 'user' }] },
       ],
     },
-    { model: ProcurementPr, as: 'prs' },
+    { model: ProcurementRequest, as: 'prs' },
   ],
   PR: [
     ...withVendor(baseListInclude),
@@ -70,8 +70,8 @@ const detailIncludes = {
         { model: UserEmployment, as: 'actionBy', include: [{ model: User, as: 'user' }] },
       ],
     },
-    { model: ProcurementPi, as: 'pi' },
-    { model: ProcurementPo, as: 'pos' },
+    { model: ProcurementIntention, as: 'pi' },
+    { model: ProcurementOrder, as: 'pos' },
   ],
   PO: [
     ...withVendor(baseListInclude),
@@ -86,15 +86,15 @@ const detailIncludes = {
         { model: UserEmployment, as: 'actionBy', include: [{ model: User, as: 'user' }] },
       ],
     },
-    { model: ProcurementPr, as: 'pr' },
+    { model: ProcurementRequest, as: 'pr' },
   ],
 };
 
 // header model + the polymorphic column + label per type
 const HEADERS = [
-  { type: 'PI', model: ProcurementPi, idColumn: 'pi_id' },
-  { type: 'PR', model: ProcurementPr, idColumn: 'pr_id' },
-  { type: 'PO', model: ProcurementPo, idColumn: 'po_id' },
+  { type: 'PI', model: ProcurementIntention, idColumn: 'pi_id' },
+  { type: 'PR', model: ProcurementRequest, idColumn: 'pr_id' },
+  { type: 'PO', model: ProcurementOrder, idColumn: 'po_id' },
 ];
 
 const { Op } = db.Sequelize;
@@ -209,37 +209,37 @@ export const findByUuidWithChain = async (uuid) => {
   const chain = { type, pi: null, pr: null, quotations: [], po: null };
 
   if (type === 'PI') {
-    chain.pi = await ProcurementPi.findOne({ where: { uuid }, include: baseListInclude });
-    const pr = await ProcurementPr.findOne({
+    chain.pi = await ProcurementIntention.findOne({ where: { uuid }, include: baseListInclude });
+    const pr = await ProcurementRequest.findOne({
       where: { pi_id: chain.pi?.id },
       include: withVendor([{ model: ProcurementQuotation, as: 'quotations', include: [{ model: Vendor, as: 'vendor' }] }]),
     });
     if (pr) {
       chain.pr = pr;
       chain.quotations = pr.quotations || [];
-      const po = await ProcurementPo.findOne({ where: { pr_id: pr.id }, include: withVendor(baseListInclude) });
+      const po = await ProcurementOrder.findOne({ where: { pr_id: pr.id }, include: withVendor(baseListInclude) });
       chain.po = po;
     }
   } else if (type === 'PR') {
-    const pr = await ProcurementPr.findOne({ where: { uuid }, include: withVendor(baseListInclude) });
+    const pr = await ProcurementRequest.findOne({ where: { uuid }, include: withVendor(baseListInclude) });
     chain.pr = pr;
     chain.quotations = await ProcurementQuotation.findAll({
       where: { pr_id: pr?.id },
       include: [{ model: Vendor, as: 'vendor' }],
     });
-    if (pr?.pi_id) chain.pi = await ProcurementPi.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
-    chain.po = await ProcurementPo.findOne({ where: { pr_id: pr?.id }, include: withVendor(baseListInclude) });
+    if (pr?.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
+    chain.po = await ProcurementOrder.findOne({ where: { pr_id: pr?.id }, include: withVendor(baseListInclude) });
   } else {
-    const po = await ProcurementPo.findOne({ where: { uuid }, include: withVendor(baseListInclude) });
+    const po = await ProcurementOrder.findOne({ where: { uuid }, include: withVendor(baseListInclude) });
     chain.po = po;
     if (po?.pr_id) {
-      const pr = await ProcurementPr.findOne({ where: { id: po.pr_id }, include: withVendor(baseListInclude) });
+      const pr = await ProcurementRequest.findOne({ where: { id: po.pr_id }, include: withVendor(baseListInclude) });
       chain.pr = pr;
       chain.quotations = await ProcurementQuotation.findAll({
         where: { pr_id: po.pr_id },
         include: [{ model: Vendor, as: 'vendor' }],
       });
-      if (pr?.pi_id) chain.pi = await ProcurementPi.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
+      if (pr?.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
     }
   }
 
@@ -257,7 +257,7 @@ export const findLatestDocumentNumber = async (requestType, pattern) => {
   });
 };
 
-export const findById = async (id) => ProcurementPi.findByPk(id);
+export const findById = async (id) => ProcurementIntention.findByPk(id);
 
 // Replace a document's line items in a transaction. The polymorphic column
 // (pi_id/pr_id/po_id) is chosen by the caller via `ownerColumn`.

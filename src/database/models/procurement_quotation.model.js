@@ -44,7 +44,7 @@ export default (sequelize, DataTypes) => {
   );
 
   ProcurementQuotation.associate = (models) => {
-    ProcurementQuotation.belongsTo(models.ProcurementPr, { foreignKey: 'pr_id', as: 'pr' });
+    ProcurementQuotation.belongsTo(models.ProcurementRequest, { foreignKey: 'pr_id', as: 'pr' });
     ProcurementQuotation.belongsTo(models.Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
     ProcurementQuotation.hasMany(models.ProcurementDocument, { foreignKey: 'procurement_quotation_id', as: 'documents' });
   };

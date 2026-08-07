@@ -37,9 +37,9 @@ export default (sequelize, DataTypes) => {
   );
 
   ProcurementHandover.associate = (models) => {
-    ProcurementHandover.belongsTo(models.ProcurementPi, { foreignKey: 'pi_id', as: 'pi' });
-    ProcurementHandover.belongsTo(models.ProcurementPr, { foreignKey: 'pr_id', as: 'pr' });
-    ProcurementHandover.belongsTo(models.ProcurementPo, { foreignKey: 'po_id', as: 'po' });
+    ProcurementHandover.belongsTo(models.ProcurementIntention, { foreignKey: 'pi_id', as: 'pi' });
+    ProcurementHandover.belongsTo(models.ProcurementRequest, { foreignKey: 'pr_id', as: 'pr' });
+    ProcurementHandover.belongsTo(models.ProcurementOrder, { foreignKey: 'po_id', as: 'po' });
     ProcurementHandover.belongsTo(models.Role, { foreignKey: 'from_role_id', as: 'fromRole' });
     ProcurementHandover.belongsTo(models.Role, { foreignKey: 'to_role_id', as: 'toRole' });
     ProcurementHandover.belongsTo(models.UserEmployment, { foreignKey: 'action_by_employment_id', as: 'actionBy' });
