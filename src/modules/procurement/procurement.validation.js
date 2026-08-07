@@ -1,13 +1,13 @@
 import Joi from 'joi';
 
+// Line items carry no unit/tax at the PI stage — quantity + unit price only.
+// Tax is applied at the quotation stage, not on the intent.
 const itemSchema = Joi.object({
   item_name: Joi.string().max(255).required().messages({ 'string.empty': 'Item name is required' }),
   description: Joi.string().allow(null, ''),
   category: Joi.string().max(100).allow(null, ''),
   quantity: Joi.number().min(0).allow(null),
-  unit: Joi.string().max(20).allow(null, ''),
   unit_price: Joi.number().min(0).allow(null),
-  tax_rate: Joi.number().min(0).max(100).allow(null),
 });
 
 // Create a PI with line items in one call. NOTE: no vendor — the vendor is only
@@ -16,9 +16,7 @@ const itemSchema = Joi.object({
 export const createProcurementSchema = Joi.object({
   title: Joi.string().max(255).required().messages({ 'string.empty': 'Title is required' }),
   company_uuid: Joi.string().uuid().required().messages({ 'string.guid': 'Company is required' }),
-  delivery_address: Joi.string().allow(null, ''),
   expected_delivery_date: Joi.date().iso().allow(null, ''),
-  payment_terms: Joi.string().max(100).allow(null, ''),
   notes: Joi.string().allow(null, ''),
   items: Joi.array().items(itemSchema).allow(null),
 });
@@ -27,9 +25,7 @@ export const createProcurementSchema = Joi.object({
 export const updateProcurementSchema = Joi.object({
   title: Joi.string().max(255),
   company_uuid: Joi.string().uuid(),
-  delivery_address: Joi.string().allow(null, ''),
   expected_delivery_date: Joi.date().iso().allow(null, ''),
-  payment_terms: Joi.string().max(100).allow(null, ''),
   notes: Joi.string().allow(null, ''),
   items: Joi.array().items(itemSchema).allow(null),
 })
