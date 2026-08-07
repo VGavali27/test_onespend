@@ -12,9 +12,9 @@ import { getMyProfile } from '@/services/masterService';
 
 const emptyForm = {
   title: '', company_uuid: '',
-  delivery_address: '', expected_delivery_date: '', payment_terms: '', notes: '', items: [],
+  expected_delivery_date: '', notes: '', items: [],
 };
-const emptyItem = { item_name: '', description: '', category: '', quantity: 1, unit: '', unit_price: 0, tax_rate: 0 };
+const emptyItem = { item_name: '', description: '', category: '', quantity: 1, unit_price: 0 };
 
 /**
  * Shared PI form (Add + Edit). React Hook Form + Zod with a dynamic line-items
@@ -50,16 +50,15 @@ export default function ProcurementForm({
   const items = useFieldArray({ control, name: 'items' });
   const watchedItems = watch('items') || [];
 
+  // Tax is handled at the quotation stage, not on the PI — show the plain total here
   const totals = (watchedItems || []).reduce(
     (acc, it) => {
       const qty = Number(it.quantity) || 0;
       const price = Number(it.unit_price) || 0;
-      const rate = Number(it.tax_rate) || 0;
       acc.total += qty * price;
-      acc.tax += (qty * price * rate) / 100;
       return acc;
     },
-    { total: 0, tax: 0 },
+    { total: 0 },
   );
 
   useEffect(() => {
@@ -90,18 +89,14 @@ export default function ProcurementForm({
     const payload = {
       title: values.title.trim(),
       company_uuid: values.company_uuid,
-      delivery_address: nullIfEmpty(values.delivery_address),
       expected_delivery_date: nullIfEmpty(values.expected_delivery_date),
-      payment_terms: nullIfEmpty(values.payment_terms),
       notes: nullIfEmpty(values.notes),
       items: (values.items || []).map((it) => ({
         item_name: it.item_name.trim(),
         description: nullIfEmpty(it.description),
         category: nullIfEmpty(it.category),
         quantity: Number(it.quantity) || 0,
-        unit: nullIfEmpty(it.unit),
         unit_price: Number(it.unit_price) || 0,
-        tax_rate: Number(it.tax_rate) || 0,
       })),
     };
     try {
@@ -131,7 +126,7 @@ export default function ProcurementForm({
       )}
 
       <form id="procurement-form" noValidate onSubmit={handleFormSubmit} className="space-y-6">
-        <FormSection icon={ShoppingCart} title="Purchase Intention" subtitle="Details and delivery — vendor is selected later via quotations">
+        <FormSection icon={ShoppingCart} title="Purchase Intention" subtitle="Details — vendor is selected later via quotations">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <FormField label="Title" required error={errors.title?.message}>
               <input className={inputClassFor(!!errors.title)} {...register('title')} placeholder="e.g. Office laptops for design team" />
@@ -155,14 +150,6 @@ export default function ProcurementForm({
             <FormField label="Expected delivery" error={errors.expected_delivery_date?.message}>
               <input type="date" className={inputClassFor(!!errors.expected_delivery_date)} {...register('expected_delivery_date')} />
             </FormField>
-            <FormField label="Payment terms" error={errors.payment_terms?.message}>
-              <input className={inputClassFor(!!errors.payment_terms)} {...register('payment_terms')} placeholder="e.g. NET30" />
-            </FormField>
-            <div className="sm:col-span-2 xl:col-span-3">
-              <FormField label="Delivery address" error={errors.delivery_address?.message}>
-                <textarea rows={2} className={inputClassFor(!!errors.delivery_address)} {...register('delivery_address')} placeholder="Where should the goods be delivered?" />
-              </FormField>
-            </div>
           </div>
         </FormSection>
 
@@ -210,14 +197,8 @@ export default function ProcurementForm({
                     <FormField label="Quantity" error={errors.items?.[i]?.quantity?.message}>
                       <input type="number" min={0} className={inputClassFor(!!errors.items?.[i]?.quantity)} {...register(`items.${i}.quantity`)} />
                     </FormField>
-                    <FormField label="Unit" error={errors.items?.[i]?.unit?.message}>
-                      <input className={inputClassFor(!!errors.items?.[i]?.unit)} {...register(`items.${i}.unit`)} placeholder="no" />
-                    </FormField>
                     <FormField label="Unit price" error={errors.items?.[i]?.unit_price?.message}>
                       <input type="number" min={0} className={inputClassFor(!!errors.items?.[i]?.unit_price)} {...register(`items.${i}.unit_price`)} placeholder="0" />
-                    </FormField>
-                    <FormField label="Tax rate %" error={errors.items?.[i]?.tax_rate?.message}>
-                      <input type="number" min={0} max={100} className={inputClassFor(!!errors.items?.[i]?.tax_rate)} {...register(`items.${i}.tax_rate`)} placeholder="0" />
                     </FormField>
                     <div className="xl:col-span-6">
                       <FormField label="Description" error={errors.items?.[i]?.description?.message}>
@@ -231,9 +212,7 @@ export default function ProcurementForm({
           )}
 
           <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 justify-end border-t border-slate-200 dark:border-gray-700 pt-4">
-            <p className="text-[13px] text-slate-500 dark:text-slate-400">Total <span className="text-slate-800 dark:text-slate-200 font-medium">{formatCurrency(totals.total)}</span></p>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400">Tax <span className="text-slate-800 dark:text-slate-200 font-medium">{formatCurrency(totals.tax)}</span></p>
-            <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">Grand total <span>{formatCurrency(totals.total + totals.tax)}</span></p>
+            <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">Total <span>{formatCurrency(totals.total)}</span></p>
           </div>
         </FormSection>
       </form>

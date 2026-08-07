@@ -322,9 +322,7 @@ export default function ProcurementDetail() {
               <InfoRow label="Company" value={doc.company?.name || '—'} />
               <InfoRow label="Vendor" value={doc.vendor?.name || '—'} />
               <InfoRow label="Vendor contact" value={doc.vendor_contact || '—'} />
-              <InfoRow label="Delivery address" value={doc.delivery_address || '—'} />
               <InfoRow label="Expected delivery" value={formatDate(doc.expected_delivery_date)} />
-              <InfoRow label="Payment terms" value={doc.payment_terms || '—'} />
               <InfoRow label="Notes" value={doc.notes || '—'} />
             </InfoCard>
 
@@ -356,7 +354,6 @@ export default function ProcurementDetail() {
                       <th className="px-4 py-2.5 font-semibold">Category</th>
                       <th className="px-4 py-2.5 font-semibold text-right">Qty</th>
                       <th className="px-4 py-2.5 font-semibold text-right">Unit price</th>
-                      <th className="px-4 py-2.5 font-semibold text-right">Tax</th>
                       <th className="px-4 sm:px-6 py-2.5 font-semibold text-right">Total</th>
                     </tr>
                   </thead>
@@ -368,9 +365,8 @@ export default function ProcurementDetail() {
                           {it.description && <p className="text-[12px] text-slate-400">{it.description}</p>}
                         </td>
                         <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{it.category || '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{it.quantity} {it.unit || ''}</td>
+                        <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{it.quantity}</td>
                         <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{formatCurrency(it.unit_price)}</td>
-                        <td className="px-4 py-3 text-right text-slate-500 dark:text-slate-400">{it.tax_rate != null ? `${it.tax_rate}%` : '—'}</td>
                         <td className="px-4 sm:px-6 py-3 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(it.total_with_tax)}</td>
                       </tr>
                     ))}

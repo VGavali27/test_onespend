@@ -9,18 +9,14 @@ import ErrorState from '@/components/ui/ErrorState';
 const toFormValues = (d) => ({
   title: d?.title || '',
   company_uuid: d?.company?.uuid || '',
-  delivery_address: d?.delivery_address || '',
   expected_delivery_date: d?.expected_delivery_date || '',
-  payment_terms: d?.payment_terms || '',
   notes: d?.notes || '',
   items: (d?.items || []).map((it) => ({
     item_name: it.item_name || '',
     description: it.description || '',
     category: it.category || '',
     quantity: it.quantity ?? 1,
-    unit: it.unit || '',
     unit_price: it.unit_price ?? 0,
-    tax_rate: it.tax_rate ?? 0,
   })),
 });
 
