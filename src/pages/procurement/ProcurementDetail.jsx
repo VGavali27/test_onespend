@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  ShoppingCart, Truck, Users, FileText, Plus, Trash2, Loader2,
-  Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil,
+  ShoppingCart, Truck, Users, Plus, Trash2, Loader2,
+  Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil, Eye, X, ChevronDown,
 } from 'lucide-react';
 import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation, updateProcurementItems } from '@/services/procurementService';
 import { getVendorOptions } from '@/services/vendorService';
@@ -15,8 +15,6 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
-
-const DOC_TYPES = ['QUOTATION', 'INVOICE', 'DELIVERY', 'OTHER'];
 
 // Workflow status colors (dark-mode aware). Mirrors the list page's map so the
 // detail status pill matches the same palette.
@@ -55,16 +53,12 @@ export default function ProcurementDetail() {
   const [confirmAction, setConfirmAction] = useState(null); // { key, label }
   const [remarks, setRemarks] = useState('');
 
-  // Document upload state
-  const [docType, setDocType] = useState('QUOTATION');
-  const [docFile, setDocFile] = useState(null);
-  const [addingDoc, setAddingDoc] = useState(false);
-  const fileRef = useRef(null);
-
   // Quotation builder state (admin fills quotations on a PR)
   const [vendorOptions, setVendorOptions] = useState([]);
-  const [qForm, setQForm] = useState({ vendor_uuid: '', title: '', total_amount: '', tax_amount: '', valid_until: '', terms: '' });
+  const [qForm, setQForm] = useState({ vendor_uuid: '', valid_until: '', notes: '', items: [] });
   const [qEditingId, setQEditingId] = useState(null); // quotation uuid being edited (null = adding new)
+  const [qFormFile, setQFormFile] = useState(null); // optional vendor quotation document attached with the form
+  const qFormFileRef = useRef(null);
   const [savingQuote, setSavingQuote] = useState(false);
   const [submittingQuotes, setSubmittingQuotes] = useState(false);
   const [selectingQuote, setSelectingQuote] = useState(null); // quotation uuid being selected
@@ -91,41 +85,6 @@ export default function ProcurementDetail() {
     load();
   }, [uuid]);
 
-  const addDocument = async () => {
-    if (!docFile) { toast.error('Choose a file first.'); return; }
-    setAddingDoc(true);
-    try {
-      const { data } = await uploadImage(docFile, 'procurement');
-      const url = data?.data?.url;
-      await procurementDocumentApi.add(uuid, {
-        document_type: docType,
-        original_file_name: docFile.name,
-        stored_file_name: url.split('/').pop(),
-        file_path: url,
-        mime_type: docFile.type,
-        file_size: docFile.size,
-      });
-      toast.success('Document attached');
-      setDocFile(null);
-      if (fileRef.current) fileRef.current.value = '';
-      load();
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Failed to attach document.');
-    } finally {
-      setAddingDoc(false);
-    }
-  };
-
-  const deleteDocument = async (docUuid) => {
-    try {
-      await procurementDocumentApi.remove(docUuid);
-      toast.success('Document removed');
-      load();
-    } catch (e) {
-      toast.error(e?.response?.data?.message || 'Failed to remove document.');
-    }
-  };
-
   // Load vendor options once for the quotation builder (admin-only)
   useEffect(() => {
     getVendorOptions()
@@ -133,37 +92,89 @@ export default function ProcurementDetail() {
       .catch(() => setVendorOptions([]));
   }, []);
 
+  // Pre-fill the "Add a quotation" line items from the PR's items (admin building
+  // a quotation at HOD_APPROVED) — the vendor prices these items per-quotation.
+  useEffect(() => {
+    const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_MGR';
+    const addMode = isAdmin && doc?.request_type === 'PR' && doc?.status === 'HOD_APPROVED' && !qEditingId;
+    if (addMode && qForm.items.length === 0 && doc?.items?.length) {
+      setQForm((f) => ({
+        ...f,
+        items: doc.items.map((it) => ({
+          item_name: it.item_name || '',
+          description: it.description || '',
+          category: it.category || '',
+          quantity: it.quantity ?? 1,
+          unit_price: it.unit_price ?? 0,
+          tax_rate: 0,
+        })),
+      }));
+    }
+  }, [doc, role, qEditingId]);
+
   const startEditQuotation = (q) => {
     setQEditingId(q.uuid);
+    setQFormFile(null);
     setQForm({
       vendor_uuid: q.vendor?.uuid || '',
-      title: q.title || '',
-      total_amount: q.total_amount != null ? String(q.total_amount) : '',
-      tax_amount: q.tax_amount != null ? String(q.tax_amount) : '',
       valid_until: q.valid_until || '',
-      terms: q.terms || '',
+      notes: q.notes || '',
+      items: (q.items || []).map((it) => ({
+        item_name: it.item_name || '',
+        description: it.description || '',
+        category: it.category || '',
+        quantity: it.quantity ?? 1,
+        unit_price: it.unit_price ?? 0,
+        tax_rate: it.tax_rate ?? 0,
+      })),
     });
   };
 
   const resetQuoteForm = () => {
     setQEditingId(null);
-    setQForm({ vendor_uuid: '', title: '', total_amount: '', tax_amount: '', valid_until: '', terms: '' });
+    setQFormFile(null);
+    if (qFormFileRef.current) qFormFileRef.current.value = '';
+    setQForm({ vendor_uuid: '', valid_until: '', notes: '', items: [] });
   };
 
   const saveQuotation = async () => {
     if (!qForm.vendor_uuid) { toast.error('Select a vendor for the quotation.'); return; }
+    if (!qForm.items?.length) { toast.error('Add at least one line item.'); return; }
     setSavingQuote(true);
     try {
       const payload = {
         vendor_uuid: qForm.vendor_uuid,
-        title: qForm.title || null,
-        total_amount: qForm.total_amount === '' ? null : Number(qForm.total_amount),
-        tax_amount: qForm.tax_amount === '' ? null : Number(qForm.tax_amount),
         valid_until: qForm.valid_until || null,
-        terms: qForm.terms || null,
+        notes: qForm.notes || null,
+        items: qForm.items.map((it) => ({
+          item_name: it.item_name.trim(),
+          description: it.description || null,
+          category: it.category || null,
+          quantity: Number(it.quantity) || 0,
+          unit_price: Number(it.unit_price) || 0,
+          tax_rate: Number(it.tax_rate) || 0,
+        })),
       };
+      let quotationUuid = qEditingId;
       if (qEditingId) await procurementQuotationApi.update(uuid, qEditingId, payload);
-      else await procurementQuotationApi.add(uuid, payload);
+      else {
+        const { data } = await procurementQuotationApi.add(uuid, payload);
+        quotationUuid = data?.data?.uuid;
+      }
+      // Attach the vendor's quotation document (uploaded from the builder form)
+      if (qFormFile && quotationUuid) {
+        const { data } = await uploadImage(qFormFile, 'procurement');
+        const url = data?.data?.url;
+        await procurementDocumentApi.add(uuid, {
+          quotation_uuid: quotationUuid,
+          document_type: 'QUOTATION',
+          original_file_name: qFormFile.name,
+          stored_file_name: url.split('/').pop(),
+          file_path: url,
+          mime_type: qFormFile.type,
+          file_size: qFormFile.size,
+        });
+      }
       toast.success(qEditingId ? 'Quotation updated' : 'Quotation added');
       resetQuoteForm();
       load();
@@ -331,7 +342,7 @@ export default function ProcurementDetail() {
                   {doc.request_type} · {doc.company?.name || '—'} · {doc.vendor?.name || '—'}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <p className="text-[12px] text-slate-400">Grand total</p>
                 <p className="text-xl font-bold text-slate-900 dark:text-white">{formatCurrency(doc.grand_total)}</p>
                 <p className="text-[12px] text-slate-400">
@@ -414,37 +425,59 @@ export default function ProcurementDetail() {
             {doc.items.length === 0 ? (
               <p className="px-6 py-4 text-[13px] text-slate-400">No items.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
-                      <th className="px-4 sm:px-6 py-2.5 font-semibold">Item</th>
-                      <th className="px-4 py-2.5 font-semibold">Category</th>
-                      <th className="px-4 py-2.5 font-semibold text-right">Qty</th>
-                      <th className="px-4 py-2.5 font-semibold text-right">Unit price</th>
-                      <th className="px-4 sm:px-6 py-2.5 font-semibold text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {doc.items.map((it, i) => (
-                      <tr key={it.uuid ?? i} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
-                        <td className="px-4 sm:px-6 py-3">
-                          <p className="font-medium text-slate-800 dark:text-slate-200">{it.item_name}</p>
-                          {it.description && <p className="text-[12px] text-slate-400">{it.description}</p>}
-                        </td>
-                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{it.category || '—'}</td>
-                        <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{it.quantity}</td>
-                        <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{formatCurrency(it.unit_price)}</td>
-                        <td className="px-4 sm:px-6 py-3 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(it.total_with_tax)}</td>
+              <>
+                {/* Desktop table */}
+                <div className="hidden md:block w-full">
+                  <table className="w-full text-[13px] table-fixed">
+                    <thead>
+                      <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
+                        <th className="px-4 sm:px-6 py-2.5 font-semibold w-[38%]">Item</th>
+                        <th className="px-4 py-2.5 font-semibold w-[24%]">Category</th>
+                        <th className="px-4 py-2.5 font-semibold text-right w-[12%]">Qty</th>
+                        <th className="px-4 py-2.5 font-semibold text-right w-[13%]">Unit price</th>
+                        <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[13%]">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {doc.items.map((it, i) => (
+                        <tr key={it.uuid ?? i} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
+                          <td className="px-4 sm:px-6 py-3">
+                            <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</p>
+                            {it.description && <p className="text-[12px] text-slate-400 break-words">{it.description}</p>}
+                          </td>
+                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400 break-words">{it.category || '—'}</td>
+                          <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{it.quantity}</td>
+                          <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{formatCurrency(it.unit_price)}</td>
+                          <td className="px-4 sm:px-6 py-3 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(it.total_with_tax)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile cards */}
+                <div className="md:hidden divide-y divide-slate-100 dark:divide-gray-800">
+                  {doc.items.map((it, i) => (
+                    <div key={it.uuid ?? i} className="px-4 py-3 space-y-1.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</p>
+                        <p className="text-[13px] font-semibold text-slate-900 dark:text-white flex-shrink-0">{formatCurrency(it.total_with_tax)}</p>
+                      </div>
+                      {it.description && <p className="text-[12px] text-slate-400 break-words">{it.description}</p>}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-slate-500 dark:text-slate-400">
+                        {it.category && <span>Category: <span className="text-slate-700 dark:text-slate-200">{it.category}</span></span>}
+                        <span>Qty: <span className="text-slate-700 dark:text-slate-200">{it.quantity}</span></span>
+                        <span>Unit: <span className="text-slate-700 dark:text-slate-200">{formatCurrency(it.unit_price)}</span></span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
-          {/* Quotations */}
+          {/* Quotations — the list is always visible; the "Add a quotation" form
+              is hidden until the admin clicks the button */}
           {doc.quotations && (
             <QuotationsSection
               doc={doc}
@@ -453,6 +486,9 @@ export default function ProcurementDetail() {
               qForm={qForm}
               setQForm={setQForm}
               qEditingId={qEditingId}
+              qFormFile={qFormFile}
+              setQFormFile={setQFormFile}
+              qFormFileRef={qFormFileRef}
               savingQuote={savingQuote}
               submittingQuotes={submittingQuotes}
               selectingQuote={selectingQuote}
@@ -462,6 +498,7 @@ export default function ProcurementDetail() {
               removeQuotation={removeQuotation}
               runSubmitQuotations={runSubmitQuotations}
               runSelectQuotation={runSelectQuotation}
+              reload={load}
             />
           )}
 
@@ -501,54 +538,6 @@ export default function ProcurementDetail() {
                 ))}
               </ol>
             )}
-          </div>
-
-          {/* Documents */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                <FileText className="h-4 w-4" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Documents</h3>
-            </div>
-            <div className="px-4 sm:px-6 py-4 space-y-2">
-              {(doc.documents || []).length === 0 ? (
-                <p className="text-[13px] text-slate-400">No documents attached.</p>
-              ) : (
-                doc.documents.map((d) => (
-                  <div key={d.uuid} className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-gray-800 pb-2 last:border-0">
-                    <a href={d.file_path} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline min-w-0">
-                      <Paperclip className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                      <span className="truncate">{d.original_file_name || d.file_path}</span>
-                    </a>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {d.document_type && <span className="text-[11px] text-slate-400">{d.document_type}</span>}
-                      <button type="button" onClick={() => deleteDocument(d.uuid)} title="Remove document" className="p-1 text-slate-400 hover:text-red-600">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-
-              <div className="pt-2 border-t border-slate-100 dark:border-gray-800 space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <select value={docType} onChange={(e) => setDocType(e.target.value)} className="px-3 py-2 rounded-lg text-[13px] text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700">
-                    {DOC_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
-                  </select>
-                  <input ref={fileRef} type="file" onChange={(e) => setDocFile(e.target.files?.[0] || null)} className="px-3 py-2 rounded-lg text-[13px] text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 file:mr-2 file:rounded-md file:border-0 file:bg-indigo-50 file:px-2 file:py-1 file:text-[12px] file:font-semibold file:text-indigo-600" />
-                  <button
-                    type="button"
-                    onClick={addDocument}
-                    disabled={addingDoc}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 disabled:opacity-60 transition-colors"
-                  >
-                    {addingDoc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                    Attach document
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         </>
       ) : null}
@@ -669,37 +658,113 @@ export default function ProcurementDetail() {
 // Everyone else sees a read-only list (vendor shown to admin/finance roles only).
 function QuotationsSection({
   doc, role, vendorOptions,
-  qForm, setQForm, qEditingId, savingQuote, submittingQuotes, selectingQuote,
+  qForm, setQForm, qEditingId, qFormFile, setQFormFile, qFormFileRef,
+  savingQuote, submittingQuotes, selectingQuote,
   startEditQuotation, resetQuoteForm, saveQuotation, removeQuotation,
-  runSubmitQuotations, runSelectQuotation,
+  runSubmitQuotations, runSelectQuotation, reload,
 }) {
+  const toast = useToast();
   const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_MGR';
   const isPR = doc.request_type === 'PR';
   const fillMode = isAdmin && isPR && doc.status === 'HOD_APPROVED';
   const selectMode = doc.is_requester && isPR && doc.status === 'QUOTATION_SELECTION';
   const quotations = doc.quotations || [];
+  // The "Add a quotation" form stays hidden until the admin clicks the button.
+  const [showBuilder, setShowBuilder] = useState(false);
+  // When a quotation is SELECTED, the others are collapsed behind a "Show" toggle.
+  const [showOtherQuotations, setShowOtherQuotations] = useState(false);
+  const builderRef = useRef(null); // scroll target when editing a quotation
+  const editingQuotation = quotations.find((q) => q.uuid === qEditingId) || null;
+  const selectedQuotation = quotations.find((q) => q.status === 'SELECTED') || null;
+  const otherQuotations = quotations.filter((q) => q !== selectedQuotation);
+
+  // When editing starts, bring the builder form into view.
+  useEffect(() => {
+    if (qEditingId && builderRef.current) {
+      builderRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [qEditingId]);
+
+  // Per-quotation document upload state: { [quotationUuid]: { file, uploading } }
+  const [qDoc, setQDoc] = useState({});
+  const qDocRef = useRef(null);
+
+  const attachQuotationDoc = async (quotationUuid) => {
+    const entry = qDoc[quotationUuid];
+    if (!entry?.file) { toast.error('Choose a file first.'); return; }
+    setQDoc((prev) => ({ ...prev, [quotationUuid]: { ...entry, uploading: true } }));
+    try {
+      const { data } = await uploadImage(entry.file, 'procurement');
+      const url = data?.data?.url;
+      await procurementDocumentApi.add(doc.uuid, {
+        quotation_uuid: quotationUuid,
+        document_type: 'QUOTATION',
+        original_file_name: entry.file.name,
+        stored_file_name: url.split('/').pop(),
+        file_path: url,
+        mime_type: entry.file.type,
+        file_size: entry.file.size,
+      });
+      toast.success('Quotation document attached');
+      setQDoc((prev) => ({ ...prev, [quotationUuid]: { file: null, uploading: false } }));
+      if (qDocRef.current) qDocRef.current.value = '';
+      reload();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to attach document.');
+      setQDoc((prev) => ({ ...prev, [quotationUuid]: { ...prev[quotationUuid], uploading: false } }));
+    }
+  };
+
+  const deleteQuotationDoc = async (docUuid) => {
+    try {
+      await procurementDocumentApi.remove(docUuid);
+      toast.success('Document removed');
+      reload();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Failed to remove document.');
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+      <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
         <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
           <Quote className="h-4 w-4" />
         </div>
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Vendor Quotations</h3>
         {selectMode && (
-          <span className="ml-auto text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-md">
+          <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-md">
             Select one — vendor hidden
           </span>
         )}
+        {fillMode && (
+          <button
+            type="button"
+            onClick={() => {
+              if (showBuilder || qEditingId) {
+                setShowBuilder(false);
+                resetQuoteForm();
+              } else {
+                setShowBuilder(true);
+              }
+            }}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+          >
+            {showBuilder || qEditingId ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            {showBuilder || qEditingId ? 'Cancel' : 'Add quotation'}
+          </button>
+        )}
       </div>
 
-      {quotations.length === 0 && !fillMode ? (
-        <p className="px-6 py-4 text-[13px] text-slate-400">No quotations yet.</p>
+      {quotations.length === 0 && !(fillMode && (showBuilder || qEditingId)) ? (
+        <p className="px-6 py-4 text-[13px] text-slate-400">
+          {fillMode ? 'No quotations yet — click "Add quotation" to create one.' : 'No quotations yet.'}
+        </p>
       ) : (
         <div className="px-4 sm:px-6 py-4 space-y-3">
-          {/* Admin builder form */}
-          {fillMode && (
-            <div className="rounded-xl border border-dashed border-slate-300 dark:border-gray-600 p-4 space-y-3">
+          {/* Admin builder form — hidden until "Add quotation" is clicked */}
+          {fillMode && (showBuilder || qEditingId) && (
+            <div ref={builderRef} className="rounded-xl border border-dashed border-slate-300 dark:border-gray-600 p-4 space-y-3">
               <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-400">
                 {qEditingId ? 'Edit quotation' : 'Add a quotation'}
               </p>
@@ -714,37 +779,6 @@ function QuotationsSection({
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Title</label>
-                  <input
-                    value={qForm.title}
-                    onChange={(e) => setQForm((f) => ({ ...f, title: e.target.value }))}
-                    placeholder="e.g. Quotation A"
-                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Total amount</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={qForm.total_amount}
-                    onChange={(e) => setQForm((f) => ({ ...f, total_amount: e.target.value }))}
-                    placeholder="0"
-                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tax amount</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={qForm.tax_amount}
-                    onChange={(e) => setQForm((f) => ({ ...f, tax_amount: e.target.value }))}
-                    placeholder="0"
-                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
-                  />
-                </div>
-                <div>
                   <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Valid until</label>
                   <input
                     type="date"
@@ -753,15 +787,248 @@ function QuotationsSection({
                     className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
                   />
                 </div>
-                <div className="sm:col-span-2 xl:col-span-1">
-                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Terms</label>
-                  <input
-                    value={qForm.terms}
-                    onChange={(e) => setQForm((f) => ({ ...f, terms: e.target.value }))}
-                    placeholder="e.g. NET30"
-                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
-                  />
+              </div>
+
+              {/* Comments */}
+              <div>
+                <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Comments</label>
+                <textarea
+                  value={qForm.notes || ''}
+                  onChange={(e) => setQForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="e.g. NET30, delivery included..."
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                />
+              </div>
+
+              {/* Line items — pre-filled from the PR, priced per vendor */}
+              <div>
+                <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  Line items
+                </label>
+                {/* Desktop editable table */}
+                <div className="hidden md:block mt-1 w-full rounded-lg border border-slate-200 dark:border-gray-700">
+                  <table className="w-full text-[13px] table-fixed">
+                    <thead>
+                      <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
+                        <th className="px-3 py-2 font-semibold w-[38%]">Item</th>
+                        <th className="px-3 py-2 font-semibold text-right w-[13%]">Qty</th>
+                        <th className="px-3 py-2 font-semibold text-right w-[16%]">Unit price</th>
+                        <th className="px-3 py-2 font-semibold text-right w-[12%]">Tax %</th>
+                        <th className="px-3 py-2 font-semibold text-right w-[16%]">Total</th>
+                        <th className="px-2 py-2 w-[5%]" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(qForm.items || []).map((it, idx) => {
+                        const qty = Number(it.quantity) || 0;
+                        const price = Number(it.unit_price) || 0;
+                        const rate = Number(it.tax_rate) || 0;
+                        const lineTotal = qty * price * (1 + rate / 100);
+                        return (
+                          <tr key={idx} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
+                            <td className="px-3 py-2">
+                              <input
+                                value={it.item_name}
+                                onChange={(e) => {
+                                  const items = [...(qForm.items || [])];
+                                  items[idx] = { ...items[idx], item_name: e.target.value };
+                                  setQForm((f) => ({ ...f, items }));
+                                }}
+                                className="w-full px-2 py-1.5 rounded-md text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min={0}
+                                value={it.quantity}
+                                onChange={(e) => {
+                                  const items = [...(qForm.items || [])];
+                                  items[idx] = { ...items[idx], quantity: e.target.value };
+                                  setQForm((f) => ({ ...f, items }));
+                                }}
+                                className="w-full px-2 py-1.5 rounded-md text-right text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={it.unit_price}
+                                onChange={(e) => {
+                                  const items = [...(qForm.items || [])];
+                                  items[idx] = { ...items[idx], unit_price: e.target.value };
+                                  setQForm((f) => ({ ...f, items }));
+                                }}
+                                className="w-full px-2 py-1.5 rounded-md text-right text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={it.tax_rate}
+                                onChange={(e) => {
+                                  const items = [...(qForm.items || [])];
+                                  items[idx] = { ...items[idx], tax_rate: e.target.value };
+                                  setQForm((f) => ({ ...f, items }));
+                                }}
+                                className="w-full px-2 py-1.5 rounded-md text-right text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium text-slate-800 dark:text-slate-200">
+                              {formatCurrency(lineTotal)}
+                            </td>
+                            <td className="px-2 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setQForm((f) => ({ ...f, items: (f.items || []).filter((_, j) => j !== idx) }))}
+                                title="Remove item"
+                                className="p-1 text-slate-400 hover:text-red-600"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(qForm.items || []).length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-3 py-4 text-center text-[12px] text-slate-400">
+                            No line items. The PR's items are pre-filled here.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
+
+                {/* Mobile editable cards */}
+                <div className="md:hidden mt-1 space-y-2">
+                  {(qForm.items || []).map((it, idx) => {
+                    const qty = Number(it.quantity) || 0;
+                    const price = Number(it.unit_price) || 0;
+                    const rate = Number(it.tax_rate) || 0;
+                    const lineTotal = qty * price * (1 + rate / 100);
+                    const patchItem = (patch) => {
+                      const items = [...(qForm.items || [])];
+                      items[idx] = { ...items[idx], ...patch };
+                      setQForm((f) => ({ ...f, items }));
+                    };
+                    return (
+                      <div key={idx} className="rounded-lg border border-slate-200 dark:border-gray-700 p-3 space-y-2">
+                        <div className="flex items-start gap-2">
+                          <input
+                            value={it.item_name}
+                            onChange={(e) => patchItem({ item_name: e.target.value })}
+                            placeholder="Item name"
+                            className="flex-1 min-w-0 px-2 py-1.5 rounded-md text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setQForm((f) => ({ ...f, items: (f.items || []).filter((_, j) => j !== idx) }))}
+                            title="Remove item"
+                            className="p-1.5 text-slate-400 hover:text-red-600 flex-shrink-0"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-400">Qty</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={it.quantity}
+                              onChange={(e) => patchItem({ quantity: e.target.value })}
+                              className="w-full px-2 py-1.5 rounded-md text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-400">Unit price</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={it.unit_price}
+                              onChange={(e) => patchItem({ unit_price: e.target.value })}
+                              className="w-full px-2 py-1.5 rounded-md text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-400">Tax %</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={it.tax_rate}
+                              onChange={(e) => patchItem({ tax_rate: e.target.value })}
+                              className="w-full px-2 py-1.5 rounded-md text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-[12px] text-slate-500 dark:text-slate-400 text-right">
+                          Line total: <span className="font-semibold text-slate-800 dark:text-slate-200">{formatCurrency(lineTotal)}</span>
+                        </p>
+                      </div>
+                    );
+                  })}
+                  {(qForm.items || []).length === 0 && (
+                    <p className="text-center text-[12px] text-slate-400 py-3">
+                      No line items. The PR's items are pre-filled here.
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setQForm((f) => ({ ...f, items: [...(f.items || []), { item_name: '', description: null, category: null, quantity: 1, unit_price: 0, tax_rate: 0 }] }))}
+                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add item
+                  </button>
+                  <div className="text-right">
+                    <span className="text-[11px] text-slate-400 mr-2">Grand total</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">
+                      {formatCurrency((qForm.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0) * (1 + (Number(it.tax_rate) || 0) / 100), 0))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {/* Vendor quotation document — uploaded with the quotation and attached to it */}
+              <div className="sm:col-span-2 xl:col-span-3">
+                <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  Quotation document (optional)
+                </label>
+                <input
+                  ref={qFormFileRef}
+                  type="file"
+                  onChange={(e) => setQFormFile(e.target.files?.[0] || null)}
+                  className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 file:mr-2 file:rounded-md file:border-0 file:bg-indigo-50 file:px-2 file:py-1 file:text-[12px] file:font-semibold file:text-indigo-600"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Attach the quotation document received from the vendor.</p>
+
+                {/* Existing documents on this quotation — shown while editing, with delete */}
+                {(editingQuotation?.documents || []).length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Attached documents</p>
+                    {editingQuotation.documents.map((d) => (
+                      <div key={d.uuid} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 dark:border-gray-700 px-3 py-2">
+                        <a href={d.file_path} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline min-w-0">
+                          <Paperclip className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                          <span className="truncate">{d.original_file_name || d.file_path}</span>
+                        </a>
+                        <button type="button" onClick={() => deleteQuotationDoc(d.uuid)} title="Remove document" className="p-1 text-slate-400 hover:text-red-600 flex-shrink-0">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2 pt-1">
                 <button
@@ -786,45 +1053,43 @@ function QuotationsSection({
             </div>
           )}
 
-          {/* Quotation list */}
-          {quotations.map((q, i) => (
-            <div key={q.uuid} className="rounded-xl border border-slate-200 dark:border-gray-700 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
-                    Quotation {i + 1}
-                    {q.title && <span className="text-slate-400 font-normal"> · {q.title}</span>}
-                  </p>
-                  <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {q.vendor ? q.vendor.name : '—'}
-                    {q.valid_until && <span> · valid until {formatDate(q.valid_until)}</span>}
-                    {q.terms && <span> · {q.terms}</span>}
-                  </p>
-                  {q.notes && <p className="text-[12px] text-slate-400 mt-1">{q.notes}</p>}
+          {/* Quotation list — selected is highlighted and shown first; the rest are
+              collapsed behind a "Show" toggle once one is selected */}
+          {(() => {
+            const list = selectedQuotation
+              ? [selectedQuotation, ...(showOtherQuotations ? otherQuotations : [])]
+              : quotations;
+            return list.map((q) => {
+              const idx = quotations.indexOf(q);
+              const isSelected = q.status === 'SELECTED';
+              return (
+            <div key={q.uuid} className={`rounded-xl border p-4 transition-colors ${
+              isSelected
+                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/10 ring-1 ring-emerald-200 dark:ring-emerald-800'
+                : 'border-slate-200 dark:border-gray-700'
+            }`}>
+              {/* Header: title + actions */}
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex items-center gap-2">
+                  <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">Quotation {idx + 1}</p>
+                  {isSelected && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Selected
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(q.grand_total)}</p>
-                    {q.total_amount != null && q.tax_amount != null && (
-                      <p className="text-[11px] text-slate-400">
-                        {formatCurrency(q.total_amount)} + {formatCurrency(q.tax_amount)} tax
-                      </p>
-                    )}
-                    {q.status === 'SELECTED' && (
-                      <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">Selected</p>
-                    )}
-                  </div>
-
+                <div className="flex items-center gap-1 flex-shrink-0">
                   {/* Admin: edit/delete */}
                   {fillMode && (
-                    <div className="flex items-center gap-1">
-                      <button type="button" onClick={() => startEditQuotation(q)} title="Edit quotation" className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+                    <>
+                      <button type="button" onClick={() => startEditQuotation(q)} title="Edit quotation" className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button type="button" onClick={() => removeQuotation(q.uuid)} title="Remove quotation" className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                      <button type="button" onClick={() => removeQuotation(q.uuid)} title="Remove quotation" className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                         <Trash2 className="h-4 w-4" />
                       </button>
-                    </div>
+                    </>
                   )}
 
                   {/* Requester: blind select */}
@@ -841,8 +1106,131 @@ function QuotationsSection({
                   )}
                 </div>
               </div>
+
+              {/* Vendor + meta */}
+              <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1 break-words">
+                {q.vendor ? q.vendor.name : '—'}
+                {q.valid_until && <span> · valid until {formatDate(q.valid_until)}</span>}
+              </p>
+              {q.notes && <p className="text-[12px] text-slate-400 mt-1 break-words">Comments: {q.notes}</p>}
+
+              {/* Amount — grand total + amount/tax breakdown, stacked on mobile */}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(q.grand_total)}</p>
+                  {q.total_amount != null && q.tax_amount != null && (
+                    <p className="text-[11px] text-slate-400">
+                      {formatCurrency(q.total_amount)} + {formatCurrency(q.tax_amount)} tax
+                    </p>
+                  )}
+                </div>
+                {q.status === 'SELECTED' && (
+                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Selected</span>
+                )}
+              </div>
+
+              {/* Quotation line items (read-only) — table on desktop, cards on mobile */}
+              {(q.items || []).length > 0 && (
+                <>
+                  <div className="hidden md:block mt-3 w-full rounded-lg border border-slate-200 dark:border-gray-700">
+                    <table className="w-full text-[13px] table-fixed">
+                      <thead>
+                        <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
+                          <th className="px-3 py-2 font-semibold w-[38%]">Item</th>
+                          <th className="px-3 py-2 font-semibold text-right w-[13%]">Qty</th>
+                          <th className="px-3 py-2 font-semibold text-right w-[16%]">Unit price</th>
+                          <th className="px-3 py-2 font-semibold text-right w-[13%]">Tax %</th>
+                          <th className="px-3 py-2 font-semibold text-right w-[16%]">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(q.items || []).map((it, idx) => (
+                          <tr key={it.uuid ?? idx} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
+                            <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</td>
+                            <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{it.quantity}</td>
+                            <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{formatCurrency(it.unit_price)}</td>
+                            <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{it.tax_rate != null ? `${it.tax_rate}%` : '—'}</td>
+                            <td className="px-3 py-2 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(it.total_with_tax)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="md:hidden mt-3 space-y-1.5">
+                    {(q.items || []).map((it, idx) => (
+                      <div key={it.uuid ?? idx} className="rounded-lg border border-slate-200 dark:border-gray-700 px-3 py-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</p>
+                          <p className="text-[13px] font-semibold text-slate-900 dark:text-white flex-shrink-0">{formatCurrency(it.total_with_tax)}</p>
+                        </div>
+                        <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                          Qty {it.quantity} · Unit {formatCurrency(it.unit_price)}
+                          {it.tax_rate != null ? ` · Tax ${it.tax_rate}%` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Quotation documents — shown read-only in view; attach/delete only in edit mode */}
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-gray-800 space-y-2">
+                {(q.documents || []).length === 0 ? (
+                  <p className="text-[12px] text-slate-400">No documents on this quotation.</p>
+                ) : (
+                  q.documents.map((d) => (
+                    <div key={d.uuid} className="flex items-center justify-between gap-2">
+                      <a href={d.file_path} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline min-w-0">
+                        <Paperclip className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                        <span className="truncate">{d.original_file_name || d.file_path}</span>
+                      </a>
+                      {isAdmin && qEditingId === q.uuid && (
+                        <button type="button" onClick={() => deleteQuotationDoc(d.uuid)} title="Remove document" className="p-1 text-slate-400 hover:text-red-600 flex-shrink-0">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+
+                {isAdmin && qEditingId === q.uuid && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <input
+                      ref={qDocRef}
+                      type="file"
+                      onChange={(e) => setQDoc((prev) => ({ ...prev, [q.uuid]: { file: e.target.files?.[0] || null, uploading: false } }))}
+                      className="text-[12px] text-slate-600 dark:text-slate-300 file:mr-2 file:rounded-md file:border-0 file:bg-indigo-50 file:px-2 file:py-1 file:text-[12px] file:font-semibold file:text-indigo-600"
+                    />
+                    <button
+                      type="button"
+                      disabled={Boolean(qDoc[q.uuid]?.uploading)}
+                      onClick={() => attachQuotationDoc(q.uuid)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 disabled:opacity-60 transition-colors"
+                    >
+                      {qDoc[q.uuid]?.uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                      Attach document
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
+            );
+            });
+          })()}
+
+          {/* Toggle to reveal the remaining quotations after one is selected */}
+          {selectedQuotation && otherQuotations.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowOtherQuotations((v) => !v)}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${showOtherQuotations ? 'rotate-180' : ''}`} />
+              {showOtherQuotations
+                ? 'Hide other quotations'
+                : `Show ${otherQuotations.length} other quotation${otherQuotations.length > 1 ? 's' : ''}`}
+            </button>
+          )}
 
           {/* Admin: submit quotations for requester selection */}
           {fillMode && quotations.length > 0 && (
@@ -872,14 +1260,15 @@ function PriceHistoryCard({ history }) {
   const { pi, pr, quotations = [], po } = history || {};
 
   const stages = [
-    { label: 'Purchase Intention', num: pi?.document_number, total: pi?.grand_total },
-    { label: 'Purchase Request', num: pr?.document_number, total: pr?.grand_total },
+    { label: 'Purchase Intention', num: pi?.document_number, total: pi?.grand_total, uuid: pi?.uuid },
+    { label: 'Purchase Request', num: pr?.document_number, total: pr?.grand_total, uuid: pr?.uuid },
     ...quotations.map((q, i) => ({
       label: `Quotation ${i + 1}`,
-      num: q.title || '—',
+      num: q.vendor?.name || '—', // quotations no longer carry a title — show vendor
       total: q.grand_total,
+      uuid: null, // quotations live on the PR's detail page, no standalone route
     })),
-    { label: 'Purchase Order', num: po?.document_number, total: po?.grand_total },
+    { label: 'Purchase Order', num: po?.document_number, total: po?.grand_total, uuid: po?.uuid },
   ].filter((s) => s.total != null);
 
   if (stages.length === 0) return null;
@@ -893,25 +1282,58 @@ function PriceHistoryCard({ history }) {
         <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Price history</h3>
         <span className="ml-auto text-[11px] text-slate-400">PI → PR → Quotation → PO</span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px]">
+      {/* Desktop table */}
+      <div className="hidden md:block w-full">
+        <table className="w-full text-[13px] table-fixed">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
-              <th className="px-4 sm:px-6 py-2.5 font-semibold">Stage</th>
-              <th className="px-4 py-2.5 font-semibold">Document</th>
-              <th className="px-4 sm:px-6 py-2.5 font-semibold text-right">Grand total</th>
+              <th className="px-4 sm:px-6 py-2.5 font-semibold w-[34%]">Stage</th>
+              <th className="px-4 py-2.5 font-semibold w-[38%]">Document</th>
+              <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[17%]">Grand total</th>
+              <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[11%]">View</th>
             </tr>
           </thead>
           <tbody>
             {stages.map((s, i) => (
               <tr key={i} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
-                <td className="px-4 sm:px-6 py-3 font-medium text-slate-800 dark:text-slate-200">{s.label}</td>
-                <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{s.num || '—'}</td>
+                <td className="px-4 sm:px-6 py-3 font-medium text-slate-800 dark:text-slate-200 break-words">{s.label}</td>
+                <td className="px-4 py-3 text-slate-500 dark:text-slate-400 break-words">{s.num || '—'}</td>
                 <td className="px-4 sm:px-6 py-3 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(s.total)}</td>
+                <td className="px-4 sm:px-6 py-3 text-right">
+                  {s.uuid ? (
+                    <Link to={`/procurement/${s.uuid}`} className="inline-flex items-center gap-1 text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                      <Eye className="h-3.5 w-3.5" />
+                      View
+                    </Link>
+                  ) : (
+                    <span className="text-slate-300 dark:text-gray-600">—</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden divide-y divide-slate-100 dark:divide-gray-800">
+        {stages.map((s, i) => (
+          <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 break-words">{s.label}</p>
+              <p className="text-[12px] text-slate-400 truncate">{s.num || '—'}</p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-[13px] font-semibold text-slate-900 dark:text-white">{formatCurrency(s.total)}</p>
+              {s.uuid && (
+                <Link to={`/procurement/${s.uuid}`} className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                  <Eye className="h-3 w-3" />
+                  View
+                </Link>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

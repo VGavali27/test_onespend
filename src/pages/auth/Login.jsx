@@ -65,7 +65,7 @@ export default function Login() {
       </div>
 
       {/* Right — Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
+      <div className="w-full lg:w-1/2 flex flex-col items-center p-6 justify-start lg:justify-center overflow-y-auto max-h-screen">
         <div className="w-full max-w-sm animate-fade-in">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
@@ -132,35 +132,48 @@ export default function Login() {
               {isSubmitting ? 'Signing in...' : 'Sign in'}
             </button>
 
-            <div className="relative py-2">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100 dark:border-gray-800" /></div>
-              <div className="relative flex justify-center"><span className="px-3 text-xs text-gray-400 bg-white dark:bg-gray-900">Demo Credentials</span></div>
-            </div>
+          </form>
+        </div>
 
-            <div className="space-y-2">
+        {/* Demo Credentials — full width of the right partition */}
+        <div className="w-full animate-fade-in mt-8">
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100 dark:border-gray-800" /></div>
+            <div className="relative flex justify-center"><span className="px-3 text-xs text-gray-400 bg-gray-50 dark:bg-gray-950">Demo Credentials</span></div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
               {[
                 { role: 'Super Admin', email: 'superadmin@kingsgroup.com' },
                 { role: 'CFO', email: 'cfo@kingsgroup.com' },
+                { role: 'Payment Manager', email: 'payment.mgr@kingsgroup.com' },
+                { role: 'Payment Junior', email: 'payment.jr@kingsgroup.com' },
+                { role: 'Finance Manager', email: 'finance.mgr@kingsgroup.com' },
+                { role: 'Finance Junior', email: 'finance.jr@kingsgroup.com' },
+                { role: 'Admin Manager', email: 'admin.mgr@kingsgroup.com' },
+                { role: 'Admin Junior', email: 'admin.jr@kingsgroup.com' },
+                { role: 'Travel Manager', email: 'travel.mgr@kingsgroup.com' },
+                { role: 'Travel Junior', email: 'travel.jr@kingsgroup.com' },
+                { role: 'HOD', email: 'hod@kingsgroup.com' },
+                { role: 'Employee Manager', email: 'emp.mgr@kingsgroup.com' },
+                { role: 'Employee', email: 'employee@kingsgroup.com' },
               ].map(({ role, email: e }) => (
                 <button
                   key={role}
                   type="button"
+                  title={`${role} · ${e}`}
                   onClick={() => { setValue('email', e); setValue('password', 'Admin@123'); }}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors text-left group"
+                  className="w-full flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors text-center group"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center group-hover:scale-105 transition-transform">
-                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{role[0]}</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{role}</p>
-                    <p className="text-xs text-gray-400">{e}</p>
+                  <div className="w-full min-w-0">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{role}</p>
+                    <p className="text-[10px] text-gray-400 truncate">{e}</p>
                   </div>
                 </button>
               ))}
             </div>
-          </form>
+          </div>
         </div>
       </div>
-    </div>
   );
 }

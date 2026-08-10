@@ -21,9 +21,9 @@ export function InfoCard({ icon: Icon, title, children }) {
 // A label → value row inside an InfoCard.
 export function InfoRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-[13px] text-slate-400">{label}</span>
-      <span className="text-[13px] font-medium text-slate-700 dark:text-slate-200 text-right">{value}</span>
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-[13px] text-slate-400 flex-shrink-0">{label}</span>
+      <span className="text-[13px] font-medium text-slate-700 dark:text-slate-200 text-right min-w-0 break-words">{value}</span>
     </div>
   );
 }
