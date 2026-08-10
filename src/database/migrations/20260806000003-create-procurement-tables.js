@@ -112,11 +112,15 @@ export async function up(queryInterface, Sequelize) {
     pi_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     pr_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     po_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    // quotation-specific items (per-vendor prices/tax on a quotation)
+    quotation_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     item_name: { type: Sequelize.STRING(255), allowNull: false },
     description: { type: Sequelize.TEXT, allowNull: true },
     category: { type: Sequelize.STRING(100), allowNull: true },
     quantity: { type: Sequelize.DECIMAL(18, 2), allowNull: true, defaultValue: 1 },
     unit_price: { type: Sequelize.TEXT, allowNull: true },
+    // tax rate (%) stored plain — only sensitive amounts are encrypted
+    tax_rate: { type: Sequelize.DECIMAL(10, 2), allowNull: true },
     total_amount: { type: Sequelize.TEXT, allowNull: true },
     tax_amount: { type: Sequelize.TEXT, allowNull: true },
     total_with_tax: { type: Sequelize.TEXT, allowNull: true },
@@ -128,6 +132,7 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.addIndex('procurement_items', ['pi_id'], { name: 'idx_pc_item_pi_id' });
   await queryInterface.addIndex('procurement_items', ['pr_id'], { name: 'idx_pc_item_pr_id' });
   await queryInterface.addIndex('procurement_items', ['po_id'], { name: 'idx_pc_item_po_id' });
+  await queryInterface.addIndex('procurement_items', ['quotation_id'], { name: 'idx_pc_item_quotation_id' });
 
   // ── procurement_handovers (polymorphic) ──
   await queryInterface.createTable('procurement_handovers', {
@@ -268,6 +273,10 @@ export async function up(queryInterface, Sequelize) {
     fields: ['created_by_employment_id'], type: 'foreign key', name: 'fk_pc_quote_created_by',
     references: { table: 'user_employments', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
+  await queryInterface.addConstraint('procurement_items', {
+    fields: ['quotation_id'], type: 'foreign key', name: 'fk_pc_item_quotation_id',
+    references: { table: 'procurement_quotations', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
+  });
   await queryInterface.addConstraint('procurement_documents', {
     fields: ['procurement_quotation_id'], type: 'foreign key', name: 'fk_pc_doc_quotation_id',
     references: { table: 'procurement_quotations', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'CASCADE',
@@ -292,9 +301,11 @@ export async function up(queryInterface, Sequelize) {
 
 export async function down(queryInterface, _Sequelize) {
   await queryInterface.dropTable('procurement_documents');
+  // procurement_items references procurement_quotations (quotation_id), so it must
+  // be dropped before the quotations table.
+  await queryInterface.dropTable('procurement_items');
   await queryInterface.dropTable('procurement_quotations');
   await queryInterface.dropTable('procurement_handovers');
-  await queryInterface.dropTable('procurement_items');
   await queryInterface.dropTable('procurement_orders');
   await queryInterface.dropTable('procurement_requests');
   await queryInterface.dropTable('procurement_intentions');

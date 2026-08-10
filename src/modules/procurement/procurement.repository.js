@@ -32,6 +32,13 @@ const baseListInclude = [
 
 const withVendor = (includes) => [{ model: Vendor, as: 'vendor' }, ...includes];
 
+// PO list rows include the parent PR (id + pi_id) so the all-types projection can
+// resolve which chain a PO belongs to (PO → PR → PI).
+const poListInclude = withVendor([
+  ...baseListInclude,
+  { model: ProcurementRequest, as: 'pr', attributes: ['id', 'pi_id'] },
+]);
+
 // Full nested graph used by the detail endpoint, per header type
 const detailIncludes = {
   PI: [
@@ -58,6 +65,7 @@ const detailIncludes = {
       as: 'quotations',
       include: [
         { model: Vendor, as: 'vendor' },
+        { model: ProcurementItem, as: 'items' },
         { model: ProcurementDocument, as: 'documents' },
       ],
     },
@@ -121,6 +129,30 @@ const buildWhere = (where, params = {}) => {
   return w;
 };
 
+// Type precedence for the "latest document per chain" projection — a PO beats a
+// PR beats a PI. Used only when no single request_type filter is applied.
+const CHAIN_PRIORITY = { PO: 3, PR: 2, PI: 1 };
+
+// Collapse a merged PI/PR/PO list down to one row per procurement chain: the most
+// advanced document (PO if it exists, else PR, else PI). A chain is rooted at its
+// PI — a PR links to it via `pi_id`, a PO via its parent PR's `pi_id` (already
+// resolved by `poListInclude`). Rows without a resolvable parent (orphaned) get a
+// unique key so they're never wrongly merged.
+const projectLatestPerChain = (rows = []) => {
+  const best = new Map();
+  for (const row of rows) {
+    const type = row.request_type;
+    const piId = type === 'PI' ? row.id : type === 'PR' ? row.pi_id : row.pr?.pi_id;
+    const chainKey = piId != null ? `pi:${piId}` : `orphan:${type}:${row.id}`;
+    const priority = CHAIN_PRIORITY[type] ?? 0;
+    const current = best.get(chainKey);
+    if (!current || priority > current.priority) {
+      best.set(chainKey, { row, priority });
+    }
+  }
+  return [...best.values()].map((v) => v.row);
+};
+
 // Paginated, filtered, sorted list across the header tables.
 // `where` is the visibility scope (own employments / visible companies);
 // `params` carries page/limit/type/status/search. Rows carry a `request_type`
@@ -138,7 +170,7 @@ export const findAll = async (where = {}, params = {}) => {
 
   const collected = [];
   for (const { type, model } of targets) {
-    const include = type === 'PI' ? baseListInclude : withVendor(baseListInclude);
+    const include = type === 'PI' ? baseListInclude : type === 'PO' ? poListInclude : withVendor(baseListInclude);
     const { count, rows } = await model.findAndCountAll({
       where: w,
       include,
@@ -155,8 +187,12 @@ export const findAll = async (where = {}, params = {}) => {
     }
   }
 
+  // Collapse to one row per chain (PO > PR > PI) unless a single type filter is
+  // active — a filtered view shows every document of that type for auditability.
+  const visibleRows = requestedType ? collected : projectLatestPerChain(collected);
+
   // Merge + sort + paginate in JS (acceptable at this scale; amounts are excluded from sort)
-  collected.sort((a, b) => {
+  visibleRows.sort((a, b) => {
     const av = a[sortBy] ?? a.createdAt;
     const bv = b[sortBy] ?? b.createdAt;
     if (av === bv) return 0;
@@ -164,8 +200,8 @@ export const findAll = async (where = {}, params = {}) => {
     return sortOrder === 'ASC' ? cmp : -cmp;
   });
 
-  const total = collected.length;
-  const rows = collected.slice((page - 1) * limit, page * limit);
+  const total = visibleRows.length;
+  const rows = visibleRows.slice((page - 1) * limit, page * limit);
   return { rows, total };
 };
 
@@ -212,7 +248,7 @@ export const findByUuidWithChain = async (uuid) => {
     chain.pi = await ProcurementIntention.findOne({ where: { uuid }, include: baseListInclude });
     const pr = await ProcurementRequest.findOne({
       where: { pi_id: chain.pi?.id },
-      include: withVendor([{ model: ProcurementQuotation, as: 'quotations', include: [{ model: Vendor, as: 'vendor' }] }]),
+      include: withVendor([{ model: ProcurementQuotation, as: 'quotations', include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }] }]),
     });
     if (pr) {
       chain.pr = pr;
@@ -225,7 +261,7 @@ export const findByUuidWithChain = async (uuid) => {
     chain.pr = pr;
     chain.quotations = await ProcurementQuotation.findAll({
       where: { pr_id: pr?.id },
-      include: [{ model: Vendor, as: 'vendor' }],
+      include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
     });
     if (pr?.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
     chain.po = await ProcurementOrder.findOne({ where: { pr_id: pr?.id }, include: withVendor(baseListInclude) });
@@ -237,7 +273,7 @@ export const findByUuidWithChain = async (uuid) => {
       chain.pr = pr;
       chain.quotations = await ProcurementQuotation.findAll({
         where: { pr_id: po.pr_id },
-        include: [{ model: Vendor, as: 'vendor' }],
+        include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
       });
       if (pr?.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
     }

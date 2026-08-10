@@ -22,7 +22,10 @@ export async function up({ context }) {
   // Any role may raise & submit a PI only if it has procurement:create (135) /
   // procurement:read (136). We grant create+read to every user role so "anyone" can
   // raise an intent; tailor per-role by editing role_permissions.
-  const ALL_CREATE_READ_ROLES = [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112];
+  // SUPER_ADMIN (100) is already granted create+read via the "everything" spread
+  // above, so it must NOT be in this list or the (role_id, permission_id) unique
+  // constraint is violated by duplicate rows.
+  const ALL_CREATE_READ_ROLES = [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112];
 
   await context.bulkInsert('role_permissions', [
     // SUPER_ADMIN (100) — everything

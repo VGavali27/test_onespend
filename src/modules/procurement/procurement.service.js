@@ -6,7 +6,7 @@ import ApiError from '../../utils/ApiError.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
 import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser, getActiveEmploymentByUserAndCompany } from '../../modules/user_employment/user_employment.service.js';
 
-const { Vendor, RoleHandoverRule, ProcurementIntention, ProcurementRequest, ProcurementOrder, ProcurementQuotation, sequelize } = db;
+const { Vendor, RoleHandoverRule, ProcurementIntention, ProcurementRequest, ProcurementOrder, ProcurementQuotation, ProcurementItem, sequelize } = db;
 
 // Role ids (see seeders/20260724000002-seed-roles.js)
 const ROLE_IDS = {
@@ -149,6 +149,7 @@ const decryptQuotations = (quotations = []) => {
     decryptAmountField(q, 'total_amount');
     decryptAmountField(q, 'tax_amount');
     decryptAmountField(q, 'grand_total');
+    decryptItems(q.items); // quotation line items carry encrypted amounts too
   });
   return quotations;
 };
@@ -380,18 +381,6 @@ export const deleteRecord = async (uuid, user) => {
 
 // ── Quotations (admin fills them on a PR; requester picks one blind) ──
 
-// Quoted totals from the (decrypted) total + tax the admin enters. Stored amounts
-// are re-encrypted by the model hooks on create/update.
-const computeQuotationTotals = (total, tax) => {
-  const t = Number(total) || 0;
-  const x = Number(tax) || 0;
-  return {
-    total_amount: t.toFixed(2),
-    tax_amount: x.toFixed(2),
-    grand_total: (t + x).toFixed(2),
-  };
-};
-
 const ensureQuotationAdmin = (user) => {
   if (!['SUPER_ADMIN', 'ADMIN_MGR'].includes(user.roleCode)) {
     throw ApiError.forbidden('Only admin can manage quotations');
@@ -421,13 +410,17 @@ const findQuotationOn = async (pr, quotationUuid) => {
 };
 
 export const addQuotation = async (uuid, user, data) => {
-  const { vendor_uuid, total_amount, tax_amount, ...rest } = data;
+  const { vendor_uuid, items = [], ...rest } = data;
   const pr = await loadPrForQuotation(uuid);
   ensureQuotationAdmin(user);
 
   const vendor = await Vendor.findOne({ where: { uuid: vendor_uuid } });
   if (!vendor) throw ApiError.notFound('Referenced vendor not found');
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
+
+  // Totals are computed server-side from the line items (qty × price × tax rate),
+  // never trusted from the client.
+  const totals = computeTotals(items);
 
   return sequelize.transaction(async (t) => {
     const quotation = await ProcurementQuotation.create(
@@ -436,13 +429,16 @@ export const addQuotation = async (uuid, user, data) => {
         pr_id: pr.id,
         vendor_id: vendor.id,
         created_by_employment_id: actorEmployment?.id ?? null,
-        ...computeQuotationTotals(total_amount, tax_amount),
+        ...totals,
       },
       { transaction: t },
     );
+    if (items.length) {
+      await procurementRepository.replaceItems('quotation_id', quotation.id, items.map(computeItemAmounts), t);
+    }
     const created = await ProcurementQuotation.findOne({
       where: { uuid: quotation.uuid },
-      include: [{ model: Vendor, as: 'vendor' }],
+      include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
       transaction: t,
     });
     return decryptQuotations([created])[0];
@@ -455,25 +451,25 @@ export const updateQuotation = async (uuid, quotationUuid, user, data) => {
   if (quotation.status !== 'ACTIVE') throw ApiError.badRequest('Only an ACTIVE quotation can be edited');
   ensureQuotationAdmin(user);
 
-  const { vendor_uuid, total_amount, tax_amount, ...rest } = data;
+  const { vendor_uuid, items, ...rest } = data;
   const patch = { ...rest };
   if (vendor_uuid !== undefined) {
     const vendor = await Vendor.findOne({ where: { uuid: vendor_uuid } });
     if (!vendor) throw ApiError.notFound('Referenced vendor not found');
     patch.vendor_id = vendor.id;
   }
-  // Fall back to the decrypted stored value when only one of total/tax is sent
-  const existingTotal = quotation.total_amount != null ? decrypt(String(quotation.total_amount)) : null;
-  const existingTax = quotation.tax_amount != null ? decrypt(String(quotation.tax_amount)) : null;
-  const totals = total_amount !== undefined || tax_amount !== undefined
-    ? computeQuotationTotals(total_amount ?? existingTotal, tax_amount ?? existingTax)
-    : {};
+  // Totals are recomputed from the full item list when it's sent (the frontend
+  // always sends it); otherwise the stored totals are kept untouched.
+  const totals = items !== undefined ? computeTotals(items) : {};
 
   return sequelize.transaction(async (t) => {
     await quotation.update({ ...patch, ...totals }, { transaction: t });
+    if (items !== undefined) {
+      await procurementRepository.replaceItems('quotation_id', quotation.id, items.map(computeItemAmounts), t);
+    }
     const updated = await ProcurementQuotation.findOne({
       where: { uuid: quotation.uuid },
-      include: [{ model: Vendor, as: 'vendor' }],
+      include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
       transaction: t,
     });
     return decryptQuotations([updated])[0];
@@ -487,6 +483,9 @@ export const deleteQuotation = async (uuid, quotationUuid, user) => {
   ensureQuotationAdmin(user);
 
   return sequelize.transaction(async (t) => {
+    // Quotations are soft-deleted (paranoid), so the DB-level ON DELETE CASCADE on
+    // quotation items never fires — force-delete them so they're not orphaned.
+    await ProcurementItem.destroy({ where: { quotation_id: quotation.id }, force: true, transaction: t });
     await quotation.destroy({ transaction: t });
     return { message: 'Quotation deleted successfully' };
   });
@@ -810,7 +809,7 @@ export const addDocument = async (data) => {
   const { procurement_uuid, quotation_uuid, ...docData } = data;
   const resolved = await resolveDoc(procurement_uuid);
   if (!resolved) throw ApiError.notFound('Procurement document not found');
-  const ownerColumn = HEADER[resolved.type].ownerColumn;
+
   let quotationId = null;
   if (quotation_uuid) {
     const quotation = await ProcurementQuotation.findOne({
@@ -819,7 +818,16 @@ export const addDocument = async (data) => {
     if (!quotation) throw ApiError.notFound('Quotation not found on this request');
     quotationId = quotation.id;
   }
-  return db.ProcurementDocument.create({ ...docData, [ownerColumn]: resolved.doc.id, procurement_quotation_id: quotationId });
+
+  // A document attached to a quotation lives only under that quotation (linked by
+  // procurement_quotation_id) — it must NOT also carry the parent header's owner
+  // column, otherwise it duplicates into the header's Documents section. Documents
+  // without a quotation attach to the header owner column as before.
+  const owner = quotationId
+    ? { procurement_quotation_id: quotationId }
+    : { [HEADER[resolved.type].ownerColumn]: resolved.doc.id };
+
+  return db.ProcurementDocument.create({ ...docData, ...owner });
 };
 
 export const deleteDocument = async (uuid) => {
