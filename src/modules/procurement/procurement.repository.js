@@ -282,6 +282,29 @@ export const findByUuidWithChain = async (uuid) => {
   return chain;
 };
 
+// Handover include reused by the detail graph and chain-timeline queries
+const handoverInclude = [
+  { model: Role, as: 'fromRole' },
+  { model: Role, as: 'toRole' },
+  { model: UserEmployment, as: 'actionBy', include: [{ model: User, as: 'user' }] },
+];
+
+// All handovers across a chain (PI + PR + PO) so a document's approval timeline
+// shows the full journey (submit PI → approve → create PR → add/submit/select
+// quotation → PO → …) regardless of which document in the chain is being viewed.
+export const findChainHandovers = async ({ piId, prId, poId }) => {
+  const or = [];
+  if (piId != null) or.push({ pi_id: piId });
+  if (prId != null) or.push({ pr_id: prId });
+  if (poId != null) or.push({ po_id: poId });
+  if (or.length === 0) return [];
+  return ProcurementHandover.findAll({
+    where: { [Op.or]: or },
+    include: handoverInclude,
+    order: [['createdAt', 'ASC']],
+  });
+};
+
 // Latest document number for a request type + date prefix (PI-YYYYMMDD-%, PR-…, PO-…)
 export const findLatestDocumentNumber = async (requestType, pattern) => {
   const target = HEADERS.find((h) => h.type === requestType);

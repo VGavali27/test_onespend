@@ -272,6 +272,26 @@ export const getByUuid = async (uuid, user) => {
       });
     }
     plain.price_history = chain;
+
+    // Approval timeline spans the whole chain (PI → PR → PO), not just the
+    // document being viewed — fetch every handover across the chain and merge
+    // with the current document's own handovers, sorted chronologically.
+    const chainHandovers = await procurementRepository.findChainHandovers({
+      piId: chain.pi?.id,
+      prId: chain.pr?.id,
+      poId: chain.po?.id,
+    });
+    const decHandover = (h) => {
+      const p = h?.get ? h.get({ plain: true }) : h;
+      decryptAmountField(p, 'amount_at_step');
+      return p;
+    };
+    const byUuid = new Map((plain.handovers || []).map((h) => [h.uuid, h]));
+    chainHandovers.forEach((h) => {
+      const p = decHandover(h);
+      if (!byUuid.has(p.uuid)) byUuid.set(p.uuid, p);
+    });
+    plain.handovers = [...byUuid.values()].sort((a, b) => new Date(a.createdAt ?? a.created_at) - new Date(b.createdAt ?? b.created_at));
   }
 
   return maskVendorForRequester(plain, employmentIds);
@@ -436,6 +456,11 @@ export const addQuotation = async (uuid, user, data) => {
     if (items.length) {
       await procurementRepository.replaceItems('quotation_id', quotation.id, items.map(computeItemAmounts), t);
     }
+    await logHandover({
+      type: 'PR', docId: pr.id, actionType: 'ADD_QUOTATION',
+      fromRoleId: null, toRoleId: null,
+      employmentId: actorEmployment?.id, remarks: null, amount: totals.grand_total, t,
+    });
     const created = await ProcurementQuotation.findOne({
       where: { uuid: quotation.uuid },
       include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
@@ -461,12 +486,18 @@ export const updateQuotation = async (uuid, quotationUuid, user, data) => {
   // Totals are recomputed from the full item list when it's sent (the frontend
   // always sends it); otherwise the stored totals are kept untouched.
   const totals = items !== undefined ? computeTotals(items) : {};
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
 
   return sequelize.transaction(async (t) => {
     await quotation.update({ ...patch, ...totals }, { transaction: t });
     if (items !== undefined) {
       await procurementRepository.replaceItems('quotation_id', quotation.id, items.map(computeItemAmounts), t);
     }
+    await logHandover({
+      type: 'PR', docId: pr.id, actionType: 'UPDATE_QUOTATION',
+      fromRoleId: null, toRoleId: null,
+      employmentId: actorEmployment?.id, remarks: null, amount: totals.grand_total ?? plainGrandTotal(quotation), t,
+    });
     const updated = await ProcurementQuotation.findOne({
       where: { uuid: quotation.uuid },
       include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
