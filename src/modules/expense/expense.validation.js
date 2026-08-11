@@ -139,6 +139,11 @@ export const createExpenseSchema = Joi.object({
   items: Joi.array().items(reimbursementItemSchema).allow(null),
 });
 
+// Workflow actions (submit / approve / reject) carry an optional remark
+export const actionSchema = Joi.object({
+  remarks: Joi.string().allow(null, ''),
+});
+
 // Schema for updating an expense — basic fields + module children, all optional.
 // Only DRAFT expenses can be updated (enforced in the service).
 export const updateExpenseSchema = Joi.object({

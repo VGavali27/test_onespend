@@ -58,6 +58,8 @@ export default (sequelize, DataTypes) => {
     ProcurementOrder.hasMany(models.ProcurementItem, { foreignKey: 'po_id', as: 'items' });
     ProcurementOrder.hasMany(models.ProcurementHandover, { foreignKey: 'po_id', as: 'handovers' });
     ProcurementOrder.hasMany(models.ProcurementDocument, { foreignKey: 'po_id', as: 'documents' });
+    // PO-created expenses (follow the expense role-handover chain)
+    ProcurementOrder.hasMany(models.Expense, { foreignKey: 'procurement_po_id', as: 'expenses' });
   };
 
   return ProcurementOrder;

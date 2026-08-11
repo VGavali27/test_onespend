@@ -1,6 +1,7 @@
 import * as procurementRepository from './procurement.repository.js';
 import * as companyRepository from '../company/company.repository.js';
 import * as roleRepository from '../role/role.repository.js';
+import * as expenseService from '../expense/expense.service.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
@@ -780,6 +781,9 @@ export const createPo = async (uuid, user) => {
       fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: ROLE_IDS.ADMIN_MGR,
       employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
     });
+    // Auto-create the linked expense (SUBMITTED, handler = ADMIN_MGR) so the PO can
+    // be forwarded through the expense role-handover chain. Same transaction — atomic.
+    await expenseService.createProcurementExpense({ po, t });
     return procurementRepository.findByUuid(po.uuid, t);
   });
 };

@@ -13,6 +13,7 @@ const {
   Role,
   UserEmployment,
   User,
+  Expense,
 } = db;
 
 // Names shown in list views (company, who requested it, current role).
@@ -95,6 +96,8 @@ const detailIncludes = {
       ],
     },
     { model: ProcurementRequest, as: 'pr' },
+    // PO-created expenses (follow the expense role-handover chain)
+    { model: Expense, as: 'expenses' },
   ],
 };
 

@@ -66,3 +66,32 @@ export const deleteExpense = async (req, res, next) => {
     next(error);
   }
 };
+
+// ── Approval workflow (PO-created expenses follow the expense role-handover chain) ──
+
+export const submitExpense = async (req, res, next) => {
+  try {
+    const expense = await expenseService.submit(req.params.uuid, req.user, req.body?.remarks);
+    return ApiResponse.success(res, expense, 'Expense submitted successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveExpense = async (req, res, next) => {
+  try {
+    const expense = await expenseService.approve(req.params.uuid, req.user, req.body?.remarks);
+    return ApiResponse.success(res, expense, 'Expense approved successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const rejectExpense = async (req, res, next) => {
+  try {
+    const expense = await expenseService.reject(req.params.uuid, req.user, req.body?.remarks);
+    return ApiResponse.success(res, expense, 'Expense rejected');
+  } catch (error) {
+    next(error);
+  }
+};

@@ -1,11 +1,20 @@
 import * as expenseRepository from './expense.repository.js';
 import * as companyRepository from '../company/company.repository.js';
+import * as roleRepository from '../role/role.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
-import { decryptResults } from '../../utils/encryption.js';
+import { decrypt, decryptResults } from '../../utils/encryption.js';
 import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser } from '../../modules/user_employment/user_employment.service.js';
 
-const { ExpenseCategory, User, sequelize } = db;
+const {
+  ExpenseCategory,
+  User,
+  Expense,
+  ExpenseHandover,
+  RoleHandoverRule,
+  UserEmployment,
+  sequelize,
+} = db;
 
 // Roles that see every company's expenses (global visibility)
 const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO'];
@@ -467,7 +476,7 @@ export const update = async (uuid, user, data) => {
       }
     }
 
-    return expenseRepository.findByUuid(uuid);
+    return expenseRepository.findByUuid(uuid, t);
   });
 };
 
@@ -476,4 +485,190 @@ export const deleteRecord = async (uuid) => {
   const deleted = await expenseRepository.deleteRecord(uuid);
   if (!deleted) throw ApiError.notFound('Expense not found');
   return { message: 'Expense deleted successfully' };
+};
+
+// ── Approval flow (PO-created expenses follow the expense role-handover chain) ──
+
+const findRoleByCode = async (code) => roleRepository.findByCode(code);
+
+// Every role→role hop must be authorized by an ACTIVE role_handover_rules row for
+// module='expense' — editing those rules reconfigures who can forward to whom.
+const requireHandoverRule = async (fromRoleId, toRoleId) => {
+  const rule = await RoleHandoverRule.findOne({
+    where: { module: 'expense', from_role_id: fromRoleId, to_role_id: toRoleId, status: 'ACTIVE' },
+  });
+  if (!rule) throw ApiError.forbidden('This expense handover is not configured');
+};
+
+// Log an audit handover row inside a transaction. from/to always non-null (the
+// handover table requires them) — fall back across the pair if one is missing.
+const logExpenseHandover = async ({ expenseId, fromRoleId, toRoleId, employmentId, actionType, remarks, t }) => {
+  await ExpenseHandover.create(
+    {
+      expense_id: expenseId,
+      from_role_id: fromRoleId ?? toRoleId,
+      to_role_id: toRoleId ?? fromRoleId,
+      action_by_employment_id: employmentId,
+      action_type: actionType,
+      remarks: remarks || null,
+    },
+    { transaction: t },
+  );
+};
+
+// Create the expense that backs a procurement PO. Called inside createPo's
+// transaction so the PO + expense commit atomically. Status SUBMITTED with the
+// category's first receiver (ADMIN_MGR) as handler — ready to forward through the
+// expense approval chain.
+export const createProcurementExpense = async ({ po, t }) => {
+  const category = await ExpenseCategory.findOne({ where: { module: 'procurement' } });
+  if (!category) throw ApiError.notFound('PROCUREMENT expense category not found');
+
+  const requesterEmployment = await UserEmployment.findByPk(po.requested_by_employment_id, {
+    include: [{ model: User, as: 'user' }],
+    transaction: t,
+  });
+  const requesterRoleId = requesterEmployment?.user?.role_id ?? null;
+  // po.grand_total is already the AES ciphertext (the PO model's beforeCreate hook
+  // encrypts amount fields, mutating the in-memory instance). Decrypt it back to the
+  // plaintext so the expense hook encrypts it exactly once.
+  const grandTotal = po.grand_total != null ? decrypt(String(po.grand_total)) : null;
+  const expenseNumber = await generateExpenseNumber();
+
+  const expense = await Expense.create(
+    {
+      expense_number: expenseNumber,
+      title: po.title,
+      category_id: category.id,
+      company_id: po.company_id,
+      requested_by_employment_id: po.requested_by_employment_id,
+      current_role_id: category.first_receiver_role_id,
+      current_employment_id: null,
+      status: 'SUBMITTED',
+      submitted_at: new Date(),
+      estimated_amount: grandTotal,
+      final_amount: grandTotal,
+      procurement_po_id: po.id,
+    },
+    { transaction: t },
+  );
+
+  // Initial SUBMIT handover: requester → first receiver.
+  await logExpenseHandover({
+    expenseId: expense.id,
+    fromRoleId: requesterRoleId,
+    toRoleId: category.first_receiver_role_id,
+    employmentId: po.requested_by_employment_id,
+    actionType: 'SUBMIT',
+    remarks: null,
+    t,
+  });
+
+  return expense;
+};
+
+// Submit a DRAFT expense — creator-only, moves to SUBMITTED with the category's
+// first receiver as handler (used by manual expenses; PO-created ones start SUBMITTED).
+export const submit = async (uuid, user, remarks) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+  if (expense.status !== 'DRAFT') throw ApiError.badRequest('Only a draft expense can be submitted');
+
+  const employmentIds = await getEmploymentIdsByUser(user.userId);
+  if (!employmentIds.includes(expense.requested_by_employment_id)) {
+    throw ApiError.forbidden('You can only submit your own expenses');
+  }
+
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+  const actorRole = await findRoleByCode(user.roleCode);
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
+  const firstReceiver = category?.first_receiver_role_id ?? null;
+
+  return sequelize.transaction(async (t) => {
+    await expense.update(
+      { status: 'SUBMITTED', current_role_id: firstReceiver, current_employment_id: null, submitted_at: new Date() },
+      { transaction: t },
+    );
+    await logExpenseHandover({
+      expenseId: expense.id,
+      fromRoleId: actorRole?.id,
+      toRoleId: firstReceiver,
+      employmentId: actorEmployment?.id,
+      actionType: 'SUBMIT',
+      remarks,
+      t,
+    });
+    return expenseRepository.findByUuid(uuid, t);
+  });
+};
+
+// Approve a SUBMITTED expense. The current handler forwards to the category's final
+// approver (CFO); the final approver's approve closes the expense as APPROVED.
+export const approve = async (uuid, user, remarks) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+  if (expense.status !== 'SUBMITTED') throw ApiError.badRequest('This expense is not pending approval');
+
+  const actorRole = await findRoleByCode(user.roleCode);
+  if (user.roleCode !== 'SUPER_ADMIN' && expense.current_role_id !== actorRole?.id) {
+    throw ApiError.forbidden('Only the current handler can approve this expense');
+  }
+
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+  const finalApprover = category?.final_approver_role_id ?? null;
+  const fromRole = expense.current_role_id;
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
+
+  return sequelize.transaction(async (t) => {
+    if (fromRole != null && fromRole === finalApprover) {
+      // final approver (CFO) approves → expense is fully approved
+      await expense.update(
+        { status: 'APPROVED', current_role_id: null, current_employment_id: null, closed_at: new Date() },
+        { transaction: t },
+      );
+      await logExpenseHandover({
+        expenseId: expense.id, fromRoleId: fromRole, toRoleId: fromRole,
+        employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
+      });
+    } else {
+      await requireHandoverRule(fromRole, finalApprover);
+      await expense.update(
+        { current_role_id: finalApprover, current_employment_id: null },
+        { transaction: t },
+      );
+      await logExpenseHandover({
+        expenseId: expense.id, fromRoleId: fromRole, toRoleId: finalApprover,
+        employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
+      });
+    }
+    return expenseRepository.findByUuid(uuid, t);
+  });
+};
+
+// Reject a SUBMITTED expense — closes it as REJECTED and clears the handler.
+export const reject = async (uuid, user, remarks) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+  if (expense.status === 'APPROVED' || expense.status === 'REJECTED' || expense.status === 'PAID') {
+    throw ApiError.badRequest('This expense is already closed');
+  }
+
+  const actorRole = await findRoleByCode(user.roleCode);
+  if (user.roleCode !== 'SUPER_ADMIN' && expense.current_role_id !== actorRole?.id) {
+    throw ApiError.forbidden('Only the current handler can reject this expense');
+  }
+  const fromRole = expense.current_role_id;
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
+
+  return sequelize.transaction(async (t) => {
+    await expense.update(
+      { status: 'REJECTED', current_role_id: null, current_employment_id: null, closed_at: new Date() },
+      { transaction: t },
+    );
+    await logExpenseHandover({
+      expenseId: expense.id, fromRoleId: fromRole, toRoleId: fromRole,
+      employmentId: actorEmployment?.id, actionType: 'REJECT', remarks, t,
+    });
+    return expenseRepository.findByUuid(uuid, t);
+  });
 };

@@ -297,9 +297,28 @@ export async function up(queryInterface, Sequelize) {
     fields: ['uploaded_by_employment_id'], type: 'foreign key', name: 'fk_pc_doc_uploaded_by',
     references: { table: 'user_employments', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
+
+  // ── Link PO-created expenses → procurement_orders ──
+  // The `expenses` table exists from an earlier migration; add the PO link here
+  // (last batch) so a PO can auto-create an expense that follows the expense
+  // role-handover chain. FK added after procurement_orders is created above.
+  await queryInterface.addColumn('expenses', 'procurement_po_id', {
+    type: Sequelize.BIGINT.UNSIGNED,
+    allowNull: true,
+  });
+  await queryInterface.addIndex('expenses', ['procurement_po_id'], { name: 'idx_exp_procurement_po_id' });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['procurement_po_id'], type: 'foreign key', name: 'fk_exp_procurement_po_id',
+    references: { table: 'procurement_orders', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
+  });
 }
 
 export async function down(queryInterface, _Sequelize) {
+  // Remove the PO link from `expenses` before dropping procurement_orders (it FKs there).
+  await queryInterface.removeConstraint('expenses', 'fk_exp_procurement_po_id');
+  await queryInterface.removeIndex('expenses', 'idx_exp_procurement_po_id');
+  await queryInterface.removeColumn('expenses', 'procurement_po_id');
+
   await queryInterface.dropTable('procurement_documents');
   // procurement_items references procurement_quotations (quotation_id), so it must
   // be dropped before the quotations table.

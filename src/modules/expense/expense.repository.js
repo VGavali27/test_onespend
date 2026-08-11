@@ -23,6 +23,7 @@ const {
 const listInclude = [
   { model: ExpenseCategory, as: 'category' },
   { model: Company, as: 'company' },
+  { model: Role, as: 'currentRole' },
   {
     model: UserEmployment,
     as: 'requestedByEmployment',
@@ -120,8 +121,11 @@ export const findByCompanyIds = async (companyIds, params = {}) =>
   findAll({ company_id: { [Op.in]: companyIds } }, params);
 
 // Find an expense by its UUID (with the full detail graph)
-export const findByUuid = async (uuid) =>
-  Expense.findOne({ where: { uuid }, include: detailInclude });
+// Accepts a transaction so action handlers (submit/approve/reject) can return the
+// post-update state read inside the same transaction (a separate connection would
+// see the pre-commit row).
+export const findByUuid = async (uuid, transaction) =>
+  Expense.findOne({ where: { uuid }, include: detailInclude, ...(transaction ? { transaction } : {}) });
 
 // Find the latest expense number for a given prefix/date
 export const findLatestExpenseNumber = async (pattern) => {
