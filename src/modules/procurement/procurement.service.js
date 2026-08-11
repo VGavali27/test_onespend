@@ -370,7 +370,7 @@ export const updateItems = async (uuid, user, items = []) => {
   const resolved = await resolveDoc(uuid);
   if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('Only a PR can have its line items updated');
   const pr = resolved.doc;
-  if (!QUOTE_EDITABLE_STATUSES.includes(pr.status)) {
+  if (!PR_ITEM_EDITABLE_STATUSES.includes(pr.status)) {
     throw ApiError.badRequest('PR line items can no longer be edited on this request');
   }
   if (!['SUPER_ADMIN', 'ADMIN_MGR'].includes(user.roleCode)) {
@@ -412,6 +412,11 @@ const ensureQuotationAdmin = (user) => {
 // filling), HOD_APPROVED, or QUOTATION_SELECTION. Once the requester selects
 // (QUOTATION_APPROVED) or beyond, quotations lock.
 const QUOTE_EDITABLE_STATUSES = ['SUBMITTED', 'HOD_APPROVED', 'QUOTATION_SELECTION'];
+
+// PR line items lock earlier: once quotations are submitted to the requester
+// (QUOTATION_SELECTION) the admin can no longer change the qty/prices the
+// requester is comparing. Quotations themselves stay editable through selection.
+const PR_ITEM_EDITABLE_STATUSES = ['SUBMITTED', 'HOD_APPROVED'];
 
 const loadPrForQuotation = async (uuid) => {
   const resolved = await resolveDoc(uuid);
