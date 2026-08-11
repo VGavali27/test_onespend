@@ -4,25 +4,27 @@ import {
   Wallet, Plane, BedDouble, Coins, Bus, MoreHorizontal, FileText,
   ReceiptText, Paperclip, CheckCircle2, XCircle, Send, Banknote, ArrowRightLeft, Inbox, Loader2,
 } from 'lucide-react';
-import { getExpenseById, normalizeExpense } from '@/services/expenseService';
+import { getExpenseById, normalizeExpense, approveExpense, rejectExpense } from '@/services/expenseService';
 import ErrorState from '@/components/ui/ErrorState';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
 import UserDetailsModal from '@/components/ui/UserDetailsModal';
 import { useToast } from '@/components/ui/Toast';
+import { useAuth } from '@/context/AuthContext';
 import { formatDate, formatCurrency, formatNumber, formatType } from '@/utils/format';
 
 export default function ExpenseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [expense, setExpense] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewUser, setViewUser] = useState(null);
+  const [acting, setActing] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // 'approve' | 'reject'
+  const [remarks, setRemarks] = useState('');
   const toast = useToast();
-
-  // Approve/handover/payment endpoints aren't built yet — show a notice until they are.
-  const placeholderAction = () => toast.error('This action is not implemented yet.');
 
   const loadExpense = useCallback(async () => {
     setLoading(true);
@@ -45,6 +47,22 @@ export default function ExpenseDetail() {
   useEffect(() => {
     loadExpense();
   }, [loadExpense]);
+
+  const runAction = async (key, actionRemarks) => {
+    setActing(true);
+    try {
+      if (key === 'approve') await approveExpense(id, actionRemarks);
+      else if (key === 'reject') await rejectExpense(id, actionRemarks);
+      toast.success(key === 'approve' ? 'Expense approved' : 'Expense rejected');
+      setConfirmAction(null);
+      setRemarks('');
+      loadExpense();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Action failed.');
+    } finally {
+      setActing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -106,19 +124,29 @@ export default function ExpenseDetail() {
         </div>
       </div>
 
-      {/* Role-aware actions — creator submits/edits; approvers approve/handover/pay */}
-      <div className="flex flex-wrap items-center gap-2">
-        {expense.canEdit ? (
-          <ActionButton icon={Send} label="Submit" onClick={placeholderAction} tone="primary" />
-        ) : (
-          <>
-            <ActionButton icon={CheckCircle2} label="Approve" onClick={placeholderAction} tone="success" />
-            <ActionButton icon={XCircle} label="Reject" onClick={placeholderAction} tone="danger" />
-            <ActionButton icon={ArrowRightLeft} label="Handover" onClick={placeholderAction} />
-            <ActionButton icon={Banknote} label="Process Payment" onClick={placeholderAction} tone="warning" />
-          </>
-        )}
-      </div>
+      {/* Role-aware actions — the current handler (or SUPER_ADMIN) approves/rejects a SUBMITTED expense.
+          The backend enforces the handler check regardless; this just hides the buttons for onlookers. */}
+      {expense.status === 'SUBMITTED' && (user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === expense.currentRole?.code) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <ActionButton
+            icon={CheckCircle2}
+            label="Approve"
+            tone="success"
+            disabled={acting}
+            onClick={() => setConfirmAction('approve')}
+          />
+          <ActionButton
+            icon={XCircle}
+            label="Reject"
+            tone="danger"
+            disabled={acting}
+            onClick={() => setConfirmAction('reject')}
+          />
+          {(expense.currentRole?.name || expense.currentRole?.code) && (
+            <span className="text-[12px] text-slate-400">Current handler: {expense.currentRole.name || expense.currentRole.code}</span>
+          )}
+        </div>
+      )}
 
       {/* Info cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -478,6 +506,47 @@ export default function ExpenseDetail() {
       </div>
 
       <UserDetailsModal employment={viewUser} onClose={() => setViewUser(null)} />
+
+      {/* Confirm approve/reject with optional remark */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmAction(null)}>
+          <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              {confirmAction === 'approve' ? 'Approve expense' : 'Reject expense'}
+            </h3>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400">
+              {confirmAction === 'approve'
+                ? 'Forward to the next approver (or close as approved at the final approver).'
+                : 'Mark this expense as rejected and clear the current handler.'}
+            </p>
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Remarks (optional)"
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={acting}
+                onClick={() => runAction(confirmAction, remarks)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 transition-colors ${confirmAction === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+              >
+                {acting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {acting ? 'Working...' : confirmAction === 'approve' ? 'Approve' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -571,7 +640,7 @@ function formatDateTime(value) {
 const reimbursementTotal = (re) => (re.items || []).reduce((s, it) => s + (Number(it.total_amount) || 0), 0);
 const reimbursementBalance = (re) => reimbursementTotal(re) - (Number(re.advance_amount) || 0);
 
-function ActionButton({ icon: Icon, label, onClick, tone = 'default' }) {
+function ActionButton({ icon: Icon, label, onClick, tone = 'default', disabled }) {
   const tones = {
     primary: 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20',
     success: 'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/20 dark:border-emerald-800/40',
@@ -583,9 +652,10 @@ function ActionButton({ icon: Icon, label, onClick, tone = 'default' }) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold transition-colors ${tones[tone] || tones.default}`}
+      disabled={disabled}
+      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold transition-colors disabled:opacity-60 ${tones[tone] || tones.default}`}
     >
-      <Icon className="h-4 w-4" />
+      {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
       {label}
     </button>
   );

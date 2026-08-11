@@ -12,6 +12,10 @@ export const getExpenseById = (uuid) => api.get(`/expenses/${uuid}`, { params: {
 export const createExpense = (payload) => api.post('/expenses', payload);
 export const updateExpense = (uuid, payload) => api.put(`/expenses/${uuid}`, payload);
 export const deleteExpense = (uuid) => api.delete(`/expenses/${uuid}`);
+// Expense approval workflow (PO-created expenses follow the expense role-handover chain)
+export const submitExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/submit`, { remarks });
+export const approveExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/approve`, { remarks });
+export const rejectExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/reject`, { remarks });
 
 // Expense documents & handovers — add here when the backend endpoints exist.
 
@@ -141,6 +145,7 @@ export const normalizeExpense = (e) => {
     paid_amount: num(e.paid_amount),
     category: e.category ? { name: e.category.name } : null,
     company: e.company ? { name: e.company.name } : null,
+    currentRole: e.currentRole ? { name: e.currentRole.name, code: e.currentRole.code } : null,
     travel,
     reimbursement,
     handovers: (e.handovers || []).map((h) => ({

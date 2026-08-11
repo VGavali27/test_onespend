@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  ShoppingCart, Truck, Users, Plus, Trash2, Loader2,
+  ShoppingCart, Truck, Users, Plus, Trash2, Loader2, Wallet,
   Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil, Eye, X, ChevronDown,
 } from 'lucide-react';
 import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation, updateProcurementItems } from '@/services/procurementService';
@@ -390,6 +390,17 @@ export default function ProcurementDetail() {
               {(doc.children || []).map((c) => (
                 <Link key={c.uuid} to={`/procurement/${c.uuid}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-slate-300 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
                   <ArrowRight className="h-3.5 w-3.5" /> {c.document_number}
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Linked expense — PO-created expense follows the expense approval chain */}
+          {(doc.expenses || []).length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+              {doc.expenses.map((ex) => (
+                <Link key={ex.uuid} to={`/expenses/${ex.uuid}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
+                  <WalletIcon className="h-3.5 w-3.5" /> Expense {ex.expense_number}
                 </Link>
               ))}
             </div>
