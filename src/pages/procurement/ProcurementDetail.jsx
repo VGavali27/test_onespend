@@ -12,6 +12,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import ErrorState from '@/components/ui/ErrorState';
 import Modal from '@/components/ui/Modal';
 import SearchableSelect from '@/components/ui/SearchableSelect';
+import DatePicker from '@/components/ui/DatePicker';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
 import { useToast } from '@/components/ui/Toast';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
@@ -246,6 +247,8 @@ export default function ProcurementDetail() {
       toast.success('Action completed');
       setConfirmAction(null);
       setRemarks('');
+      // A newly created PR is best reviewed from the all-requests list
+      if (key === 'create-pr') { navigate('/procurement'); return; }
       load();
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Action failed.');
@@ -291,8 +294,9 @@ export default function ProcurementDetail() {
     if (doc.request_type === 'PI' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.pr) {
       availableActions.push({ key: 'create-pr', label: 'Create PR' });
     }
-    // Admin may adjust PR line items (qty / unit price) while quotations are gathered
-    const PR_ITEM_EDITABLE = ['SUBMITTED', 'HOD_APPROVED', 'QUOTATION_SELECTION'];
+    // Admin may adjust PR line items (qty / unit price) while quotations are gathered —
+    // once quotations are submitted to the requester (QUOTATION_SELECTION) the items lock.
+    const PR_ITEM_EDITABLE = ['SUBMITTED', 'HOD_APPROVED'];
     if (doc.request_type === 'PR' && PR_ITEM_EDITABLE.includes(doc.status) && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
       availableActions.push({ key: 'edit-items', label: 'Edit Line Items' });
     }
@@ -791,11 +795,10 @@ function QuotationsSection({
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Valid until</label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={qForm.valid_until}
-                    onChange={(e) => setQForm((f) => ({ ...f, valid_until: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+                    onChange={(v) => setQForm((f) => ({ ...f, valid_until: v }))}
+                    placeholder="Select date"
                   />
                 </div>
               </div>
