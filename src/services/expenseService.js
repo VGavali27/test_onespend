@@ -156,6 +156,8 @@ export const normalizeExpense = (e) => {
       action_by: employmentName(h.actionBy),
       at: h.created_at,
     })),
+    // Source procurement chain for PO-created / converted expenses (PI → PR → quotations → PO)
+    procurement_chain: e.procurement_chain || null,
     documents: (e.documents || []).map((d) => ({ name: d.original_file_name })),
   };
 };

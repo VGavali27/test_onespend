@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Wallet, Plane, BedDouble, Coins, Bus, MoreHorizontal, FileText,
-  ReceiptText, Paperclip, CheckCircle2, XCircle, Send, Banknote, ArrowRightLeft, Inbox, Loader2,
+  ReceiptText, Paperclip, CheckCircle2, XCircle, Send, Banknote, ArrowRightLeft, Inbox, Loader2, ShoppingCart, History,
 } from 'lucide-react';
 import { getExpenseById, normalizeExpense, approveExpense, rejectExpense } from '@/services/expenseService';
 import ErrorState from '@/components/ui/ErrorState';
@@ -475,6 +475,9 @@ export default function ExpenseDetail() {
           </TravelSection>
       )}
 
+      {/* Procurement history — source chain (PI → PR → quotations → PO) with approval logs */}
+      {expense.procurement_chain && <ProcurementHistory chain={expense.procurement_chain} />}
+
       {/* Approval trail */}
       <ApprovalTrail handovers={expense.handovers} />
 
@@ -585,6 +588,14 @@ const ACTION_ICONS = {
   APPROVE: CheckCircle2,
   REJECT: XCircle,
   PAY: Banknote,
+  CREATE_PR: Send,
+  CREATE_PO: ShoppingCart,
+  ADD_QUOTATION: FileText,
+  UPDATE_QUOTATION: FileText,
+  SUBMIT_QUOTATIONS: Send,
+  SELECT_QUOTATION: CheckCircle2,
+  CONVERT_TO_EXPENSE: Wallet,
+  RECEIVED: Inbox,
 };
 
 function ApprovalTrail({ handovers }) {
@@ -627,6 +638,86 @@ function ApprovalTrail({ handovers }) {
             })}
           </ol>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Source procurement chain behind a PO-created / converted expense: the PI → PR →
+// quotations → PO documents plus the chain's approval logs.
+function ProcurementHistory({ chain }) {
+  if (!chain) return null;
+  const steps = [
+    ...(chain.pi ? [{ type: 'PI', doc: chain.pi }] : []),
+    { type: 'PR', doc: chain.pr },
+    ...(chain.quotations || []).map((q) => ({ type: 'QUOTATION', doc: q })),
+    ...(chain.po ? [{ type: 'PO', doc: chain.po }] : []),
+  ];
+  const typeColor = {
+    PI: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400',
+    PR: 'bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400',
+    QUOTATION: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
+    PO: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400',
+  };
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+          <ShoppingCart className="h-4 w-4" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Procurement history</h3>
+          <p className="text-[12px] text-slate-400">Source chain PI → PR → Quotations → PO with approval logs</p>
+        </div>
+      </div>
+      <div className="px-4 sm:px-6 py-5 space-y-6">
+        {/* Documents in the chain */}
+        <ol className="relative border-l border-slate-200 dark:border-gray-700 ml-3 space-y-4">
+          {steps.map((s, i) => (
+            <li key={i} className="ml-6">
+              <span className="absolute -left-[7px] mt-1 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 bg-emerald-500" />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded ${typeColor[s.type] || 'bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-slate-400'}`}>{s.type}</span>
+                <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">
+                  {s.doc.document_number || (s.type === 'QUOTATION' ? 'Vendor quotation' : s.type)}
+                </p>
+                {s.doc.vendor && <span className="text-[12px] text-slate-400">· {s.doc.vendor}</span>}
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-slate-300">{s.doc.status || '—'}</span>
+                {s.doc.grand_total != null && <span className="text-[12px] font-semibold text-slate-600 dark:text-slate-300">{formatCurrency(s.doc.grand_total)}</span>}
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        {/* Approval logs across the chain */}
+        <div>
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Approval logs</p>
+          {(chain.handovers || []).length === 0 ? (
+            <p className="text-[13px] text-slate-400">No approval logs.</p>
+          ) : (
+            <ol className="relative border-l border-slate-200 dark:border-gray-700 ml-3 space-y-5">
+              {chain.handovers.map((h, i) => {
+                const Icon = ACTION_ICONS[h.action_type] ?? History;
+                return (
+                  <li key={i} className="ml-6">
+                    <span className={`absolute -left-[7px] mt-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 ${
+                      h.action_type === 'REJECT' ? 'bg-red-500' : 'bg-indigo-500'
+                    }`} />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Icon className="h-4 w-4 text-slate-400" />
+                      <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">{formatType(h.action_type)}</p>
+                      {(h.from_role || h.to_role) && (
+                        <span className="text-[12px] text-slate-400">{h.from_role || '—'} → {h.to_role || '—'}</span>
+                      )}
+                    </div>
+                    {h.remarks && <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">{h.remarks}</p>}
+                    <p className="text-[11px] text-slate-400 mt-0.5">{h.action_by || '—'} · {formatDateTime(h.created_at)}</p>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
       </div>
     </div>
   );
