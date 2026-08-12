@@ -1,8 +1,8 @@
 import { useEffect, useCallback, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   Wallet, Plane, BedDouble, Coins, Bus, MoreHorizontal, FileText,
-  ReceiptText, Paperclip, CheckCircle2, XCircle, Send, Banknote, ArrowRightLeft, Inbox, Loader2, ShoppingCart, History,
+  ReceiptText, Paperclip, CheckCircle2, XCircle, Send, Banknote, ArrowRightLeft, Inbox, Loader2, ShoppingCart, History, Eye,
 } from 'lucide-react';
 import { getExpenseById, normalizeExpense, approveExpense, rejectExpense } from '@/services/expenseService';
 import ErrorState from '@/components/ui/ErrorState';
@@ -661,14 +661,21 @@ function ProcurementHistory({ chain }) {
   };
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
-        <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-          <ShoppingCart className="h-4 w-4" />
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <ShoppingCart className="h-4 w-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Procurement history</h3>
+            <p className="text-[12px] text-slate-400">Source chain PI → PR → Quotations → PO with approval logs</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Procurement history</h3>
-          <p className="text-[12px] text-slate-400">Source chain PI → PR → Quotations → PO with approval logs</p>
-        </div>
+        {chain.pr?.uuid && (
+          <Link to={`/procurement/${chain.pr.uuid}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors text-[13px] font-semibold">
+            <Eye className="h-3.5 w-3.5" /> View PR
+          </Link>
+        )}
       </div>
       <div className="px-4 sm:px-6 py-5 space-y-6">
         {/* Documents in the chain */}
