@@ -9,6 +9,9 @@ export const getExpenses = (params, config) =>
 export const getMyExpenses = (params, config) =>
   api.get('/expenses/my', { ...config, params: { decrypt: 'true', ...params } });
 export const getExpenseById = (uuid) => api.get(`/expenses/${uuid}`, { params: { decrypt: 'true' } });
+// Lazy-load the source procurement chain (PI → PR → quotations → PO + approval logs) —
+// called when the user expands the "Procurement history" section on the expense detail.
+export const getExpenseProcurementChain = (uuid) => api.get(`/expenses/${uuid}/procurement-chain`);
 export const createExpense = (payload) => api.post('/expenses', payload);
 export const updateExpense = (uuid, payload) => api.put(`/expenses/${uuid}`, payload);
 export const deleteExpense = (uuid) => api.delete(`/expenses/${uuid}`);
@@ -156,8 +159,9 @@ export const normalizeExpense = (e) => {
       action_by: employmentName(h.actionBy),
       at: h.created_at,
     })),
-    // Source procurement chain for PO-created / converted expenses (PI → PR → quotations → PO)
-    procurement_chain: e.procurement_chain || null,
+    // Is this expense tied to a procurement chain? (PO-created or converted) — gates the
+    // "Procurement history" toggle on the detail; the chain itself is lazy-loaded on expand.
+    isProcurement: Boolean(e.procurement_pr_id || e.procurement_po_id),
     documents: (e.documents || []).map((d) => ({ name: d.original_file_name })),
   };
 };
