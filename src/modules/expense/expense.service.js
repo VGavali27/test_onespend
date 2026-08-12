@@ -16,13 +16,16 @@ const {
   sequelize,
 } = db;
 
-// Roles that see every company's expenses (global visibility)
-const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO'];
+// Roles that see every company's expenses (global visibility). ADMIN_MGR is included
+// because the procurement admin converts quotes into expenses (Convert to Expense) and
+// must be able to see the result in All Expenses.
+const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR'];
 
-// Roles allowed to view the company-scoped "all expenses" list (everyone else uses /expenses/my)
+// Roles allowed to view the "all expenses" list (everyone else uses /expenses/my)
 export const EXPENSE_MANAGER_ROLES = [
   'SUPER_ADMIN',
   'CFO',
+  'ADMIN_MGR',
   'PAYMENT_MGR',
   'PAYMENT_JR',
   'FINANCE_MGR',
