@@ -644,21 +644,22 @@ function ApprovalTrail({ handovers }) {
 }
 
 // Source procurement chain behind a PO-created / converted expense: the PI → PR →
-// quotations → PO documents plus the chain's approval logs.
+// quotations → PO documents (as a stage table like the PR price-history card) plus
+// the chain's approval logs.
 function ProcurementHistory({ chain }) {
   if (!chain) return null;
-  const steps = [
-    ...(chain.pi ? [{ type: 'PI', doc: chain.pi }] : []),
-    { type: 'PR', doc: chain.pr },
-    ...(chain.quotations || []).map((q) => ({ type: 'QUOTATION', doc: q })),
-    ...(chain.po ? [{ type: 'PO', doc: chain.po }] : []),
-  ];
-  const typeColor = {
-    PI: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400',
-    PR: 'bg-sky-50 dark:bg-sky-900/20 text-sky-600 dark:text-sky-400',
-    QUOTATION: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
-    PO: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400',
-  };
+  const stages = [
+    ...(chain.pi ? [{ label: 'Purchase Intention', num: chain.pi.document_number, total: chain.pi.grand_total, uuid: chain.pi.uuid }] : []),
+    { label: 'Purchase Request', num: chain.pr?.document_number, total: chain.pr?.grand_total, uuid: chain.pr?.uuid },
+    ...(chain.quotations || []).map((q, i) => ({
+      label: `Quotation ${i + 1}`,
+      num: q.vendor || '—',
+      total: q.grand_total,
+      uuid: null, // quotations live on the PR page, no standalone route
+    })),
+    ...(chain.po ? [{ label: 'Purchase Order', num: chain.po.document_number, total: chain.po.grand_total, uuid: chain.po.uuid }] : []),
+  ].filter((s) => s.total != null);
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
@@ -678,23 +679,63 @@ function ProcurementHistory({ chain }) {
         )}
       </div>
       <div className="px-4 sm:px-6 py-5 space-y-6">
-        {/* Documents in the chain */}
-        <ol className="relative border-l border-slate-200 dark:border-gray-700 ml-3 space-y-4">
-          {steps.map((s, i) => (
-            <li key={i} className="ml-6">
-              <span className="absolute -left-[7px] mt-1 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 bg-emerald-500" />
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded ${typeColor[s.type] || 'bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-slate-400'}`}>{s.type}</span>
-                <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">
-                  {s.doc.document_number || (s.type === 'QUOTATION' ? 'Vendor quotation' : s.type)}
-                </p>
-                {s.doc.vendor && <span className="text-[12px] text-slate-400">· {s.doc.vendor}</span>}
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-slate-300">{s.doc.status || '—'}</span>
-                {s.doc.grand_total != null && <span className="text-[12px] font-semibold text-slate-600 dark:text-slate-300">{formatCurrency(s.doc.grand_total)}</span>}
-              </div>
-            </li>
-          ))}
-        </ol>
+        {/* Documents in the chain — stage / document / grand total / view */}
+        {stages.length > 0 && (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block w-full">
+              <table className="w-full text-[13px] table-fixed">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
+                    <th className="px-4 sm:px-6 py-2.5 font-semibold w-[34%]">Stage</th>
+                    <th className="px-4 py-2.5 font-semibold w-[38%]">Document</th>
+                    <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[17%]">Grand total</th>
+                    <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[11%]">View</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stages.map((s, i) => (
+                    <tr key={i} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
+                      <td className="px-4 sm:px-6 py-3 font-medium text-slate-800 dark:text-slate-200 break-words">{s.label}</td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400 break-words">{s.num || '—'}</td>
+                      <td className="px-4 sm:px-6 py-3 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(s.total)}</td>
+                      <td className="px-4 sm:px-6 py-3 text-right">
+                        {s.uuid ? (
+                          <Link to={`/procurement/${s.uuid}`} className="inline-flex items-center gap-1 text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                            <Eye className="h-3.5 w-3.5" />
+                            View
+                          </Link>
+                        ) : (
+                          <span className="text-slate-300 dark:text-gray-600">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Mobile cards */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-gray-800">
+              {stages.map((s, i) => (
+                <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 break-words">{s.label}</p>
+                    <p className="text-[12px] text-slate-400 truncate">{s.num || '—'}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-[13px] font-semibold text-slate-900 dark:text-white">{formatCurrency(s.total)}</p>
+                    {s.uuid && (
+                      <Link to={`/procurement/${s.uuid}`} className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                        <Eye className="h-3 w-3" />
+                        View
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Approval logs across the chain */}
         <div>
