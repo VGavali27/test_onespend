@@ -37,6 +37,16 @@ export const getExpenseByUuid = async (req, res, next) => {
   }
 };
 
+// Lazy-load the source procurement chain (PI → PR → quotations → PO + approval logs)
+export const getExpenseProcurementChain = async (req, res, next) => {
+  try {
+    const data = await expenseService.getProcurementChain(req.params.uuid, req.user);
+    return ApiResponse.success(res, data, 'Procurement history loaded');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Create a new expense
 export const createExpense = async (req, res, next) => {
   try {

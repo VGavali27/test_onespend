@@ -10,6 +10,8 @@ router.use(authMiddleware);
 router.get('/', requireRole(...EXPENSE_MANAGER_ROLES), expenseController.getAllExpenses);
 // Expenses created by the logged-in user — any authenticated user
 router.get('/my', expenseController.getMyExpenses);
+// Lazy-load the source procurement chain for a procurement-linked expense
+router.get('/:uuid/procurement-chain', expenseController.getExpenseProcurementChain);
 // Get a single expense by UUID (visibility-checked)
 router.get('/:uuid', expenseController.getExpenseByUuid);
 // Create a new expense (validate body first)

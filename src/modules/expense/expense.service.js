@@ -203,15 +203,33 @@ export const getByUuid = async (uuid, user, decrypt = false) => {
 
   expense.setDataValue('canEdit', expense.status === 'DRAFT' && employmentIds.includes(expense.requested_by_employment_id));
 
-  // Procurement-linked expenses carry their source chain (PI → PR → quotations → PO)
-  // with the chain's approval logs, so the expense detail shows the full history.
-  if (expense.procurement_pr_id || expense.procurement_po_id) {
-    const requesterIsOwner = employmentIds.includes(expense.requested_by_employment_id);
-    const chain = await buildProcurementChain(expense, requesterIsOwner);
-    expense.setDataValue('procurement_chain', chain ?? null);
+  return decrypt ? decryptExpenseDeep(expense) : expense;
+};
+
+// Lazy-load the source procurement chain for a procurement-linked expense (PO-created or
+// converted). Called only when the frontend expands the "Procurement history" section —
+// the detail response no longer carries it, keeping the default detail call light.
+export const getProcurementChain = async (uuid, user) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+
+  const [employmentIds, companyIds] = await Promise.all([
+    getEmploymentIdsByUser(user.userId),
+    getActiveCompanyIdsByUser(user.userId),
+  ]);
+  const visible =
+    EXPENSE_GLOBAL_ROLES.includes(user.roleCode) ||
+    employmentIds.includes(expense.requested_by_employment_id) ||
+    companyIds.includes(expense.company_id);
+  if (!visible) throw ApiError.notFound('Expense not found');
+
+  if (!(expense.procurement_pr_id || expense.procurement_po_id)) {
+    return { procurement_chain: null };
   }
 
-  return decrypt ? decryptExpenseDeep(expense) : expense;
+  const requesterIsOwner = employmentIds.includes(expense.requested_by_employment_id);
+  const chain = await buildProcurementChain(expense, requesterIsOwner);
+  return { procurement_chain: chain };
 };
 
 // Create an expense — handles nested module data based on category (travel, etc.)
