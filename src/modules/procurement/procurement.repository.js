@@ -287,6 +287,22 @@ export const findByUuidWithChain = async (uuid) => {
   return chain;
 };
 
+// Chain (PI → PR → quotations → PO) rooted at a PR id — used by the expense detail
+// to render the procurement history behind a PO-created / converted expense.
+export const findChainByPrId = async (prId) => {
+  if (prId == null) return null;
+  const pr = await ProcurementRequest.findOne({ where: { id: prId }, include: withVendor(baseListInclude) });
+  if (!pr) return null;
+  const chain = { type: 'PR', pi: null, pr, quotations: [], po: null };
+  if (pr.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
+  chain.quotations = await ProcurementQuotation.findAll({
+    where: { pr_id: pr.id },
+    include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
+  });
+  chain.po = await ProcurementOrder.findOne({ where: { pr_id: pr.id }, include: withVendor(baseListInclude) });
+  return chain;
+};
+
 // Handover include reused by the detail graph and chain-timeline queries
 const handoverInclude = [
   { model: Role, as: 'fromRole' },

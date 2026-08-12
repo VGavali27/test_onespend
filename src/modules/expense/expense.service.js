@@ -1,6 +1,7 @@
 import * as expenseRepository from './expense.repository.js';
 import * as companyRepository from '../company/company.repository.js';
 import * as roleRepository from '../role/role.repository.js';
+import * as procurementRepository from '../procurement/procurement.repository.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
@@ -13,6 +14,7 @@ const {
   ExpenseHandover,
   RoleHandoverRule,
   UserEmployment,
+  ProcurementOrder,
   sequelize,
 } = db;
 
@@ -135,6 +137,53 @@ const decryptExpenseDeep = (expense) => {
   return expense;
 };
 
+// Build a compact procurement-chain summary (PI → PR → quotations → PO) plus the chain's
+// approval logs, shown on the expense detail of a PO-created / converted expense. Vendor
+// is masked for the requester (consistent with the procurement module); amounts decrypted.
+const buildProcurementChain = async (expense, requesterIsOwner) => {
+  let prId = expense.procurement_pr_id;
+  if (!prId && expense.procurement_po_id) {
+    const po = await ProcurementOrder.findByPk(expense.procurement_po_id);
+    prId = po?.pr_id;
+  }
+  if (!prId) return null;
+
+  const chain = await procurementRepository.findChainByPrId(prId);
+  if (!chain) return null;
+  const { pi, pr, quotations, po } = chain;
+
+  const fin = (v) => (v != null ? Number(decrypt(String(v))) || null : null);
+  const vendorOf = (doc) => (requesterIsOwner ? null : doc?.vendor?.name || null);
+  const handovers = await procurementRepository.findChainHandovers({ piId: pi?.id, prId: pr.id, poId: po?.id });
+
+  return {
+    pi: pi ? { uuid: pi.uuid, document_number: pi.document_number, title: pi.title, status: pi.status, grand_total: fin(pi.grand_total) } : null,
+    pr: { uuid: pr.uuid, document_number: pr.document_number, title: pr.title, status: pr.status, vendor: vendorOf(pr), grand_total: fin(pr.grand_total) },
+    quotations: (quotations || []).map((q) => ({
+      uuid: q.uuid,
+      vendor: vendorOf(q),
+      status: q.status,
+      valid_until: q.valid_until,
+      total_amount: fin(q.total_amount),
+      tax_amount: fin(q.tax_amount),
+      grand_total: fin(q.grand_total),
+    })),
+    po: po ? { uuid: po.uuid, document_number: po.document_number, status: po.status, vendor: vendorOf(po), grand_total: fin(po.grand_total) } : null,
+    handovers: (handovers || []).map((h) => {
+      const p = h.get ? h.get({ plain: true }) : h;
+      const u = p.actionBy?.user;
+      return {
+        action_type: p.action_type,
+        remarks: p.remarks,
+        from_role: p.fromRole?.name,
+        to_role: p.toRole?.name,
+        action_by: u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : null,
+        created_at: p.created_at ?? p.createdAt,
+      };
+    }),
+  };
+};
+
 // Fetch a single expense by UUID — visible only to the creator, global roles, or users
 // employed in the expense's company. Returns 404 (not 403) so hidden expenses don't leak.
 export const getByUuid = async (uuid, user, decrypt = false) => {
@@ -153,6 +202,14 @@ export const getByUuid = async (uuid, user, decrypt = false) => {
   if (!visible) throw ApiError.notFound('Expense not found');
 
   expense.setDataValue('canEdit', expense.status === 'DRAFT' && employmentIds.includes(expense.requested_by_employment_id));
+
+  // Procurement-linked expenses carry their source chain (PI → PR → quotations → PO)
+  // with the chain's approval logs, so the expense detail shows the full history.
+  if (expense.procurement_pr_id || expense.procurement_po_id) {
+    const requesterIsOwner = employmentIds.includes(expense.requested_by_employment_id);
+    const chain = await buildProcurementChain(expense, requesterIsOwner);
+    expense.setDataValue('procurement_chain', chain ?? null);
+  }
 
   return decrypt ? decryptExpenseDeep(expense) : expense;
 };
