@@ -237,12 +237,13 @@ export default function ProcurementDetail() {
     }
     setActing(true);
     try {
+      let convertedExpenseUuid = null;
       if (key === 'submit') await submitProcurement(uuid, actionRemarks);
       else if (key === 'approve') await approveProcurement(uuid, actionRemarks);
       else if (key === 'reject') await rejectProcurement(uuid, actionRemarks);
       else if (key === 'create-pr') await createPurchaseRequest(uuid);
       else if (key === 'create-po') await createPurchaseOrder(uuid);
-      else if (key === 'convert-expense') await convertToExpense(uuid);
+      else if (key === 'convert-expense') { const _r = await convertToExpense(uuid); convertedExpenseUuid = _r?.data?.data?.expenses?.[0]?.uuid || null; }
       else if (key === 'received') await markReceived(uuid);
       else if (key === 'pay') await markPaid(uuid, actionRemarks);
       toast.success('Action completed');
@@ -250,6 +251,8 @@ export default function ProcurementDetail() {
       setRemarks('');
       // A newly created PR is best reviewed from the all-requests list
       if (key === 'create-pr') { navigate('/procurement'); return; }
+      // A converted expense jumps straight to its expense detail
+      if (key === 'convert-expense') { navigate(convertedExpenseUuid ? `/expenses/${convertedExpenseUuid}` : '/expenses/all'); return; }
       load();
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Action failed.');
