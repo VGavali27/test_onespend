@@ -414,7 +414,7 @@ export default function ProcurementDetail() {
             <div className="flex flex-wrap items-center gap-2 text-[13px]">
               {doc.expenses.map((ex) => (
                 <Link key={ex.uuid} to={`/expenses/${ex.uuid}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
-                  <WalletIcon className="h-3.5 w-3.5" /> Expense {ex.expense_number}
+                  <Wallet className="h-3.5 w-3.5" /> Expense {ex.expense_number}
                 </Link>
               ))}
             </div>
