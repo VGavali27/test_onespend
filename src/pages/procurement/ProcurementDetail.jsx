@@ -4,7 +4,7 @@ import {
   ShoppingCart, Truck, Users, Plus, Trash2, Loader2, Wallet,
   Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil, Eye, X, ChevronDown,
 } from 'lucide-react';
-import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation, updateProcurementItems } from '@/services/procurementService';
+import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, convertToExpense, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation, updateProcurementItems } from '@/services/procurementService';
 import { getVendorOptions } from '@/services/vendorService';
 import { uploadImage } from '@/services/uploadService';
 import { useAuth } from '@/context/AuthContext';
@@ -242,6 +242,7 @@ export default function ProcurementDetail() {
       else if (key === 'reject') await rejectProcurement(uuid, actionRemarks);
       else if (key === 'create-pr') await createPurchaseRequest(uuid);
       else if (key === 'create-po') await createPurchaseOrder(uuid);
+      else if (key === 'convert-expense') await convertToExpense(uuid);
       else if (key === 'received') await markReceived(uuid);
       else if (key === 'pay') await markPaid(uuid, actionRemarks);
       toast.success('Action completed');
@@ -302,6 +303,12 @@ export default function ProcurementDetail() {
     }
     if (doc.request_type === 'PR' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po) {
       availableActions.push({ key: 'create-po', label: 'Create PO' });
+    }
+    // Admin may convert an approved quotation into an expense (category PROCUREMENT) —
+    // shown once the quotation is approved and until a PO exists (the PO auto-creates
+    // its own expense; one expense per chain).
+    if (doc.request_type === 'PR' && ['QUOTATION_APPROVED', 'APPROVED'].includes(doc.status) && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po && (doc.expenses || []).length === 0) {
+      availableActions.push({ key: 'convert-expense', label: 'Convert to Expense' });
     }
     if (doc.request_type === 'PO' && doc.status === 'CREATED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
       availableActions.push({ key: 'received', label: 'Mark Received' });
@@ -370,7 +377,7 @@ export default function ProcurementDetail() {
                         : 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20'
                     }`}
                   >
-                    {a.key === 'reject' ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {a.key === 'reject' ? <XCircle className="h-4 w-4" /> : a.key === 'convert-expense' ? <Wallet className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                     {a.label}
                   </button>
                 ))}

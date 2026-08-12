@@ -10,6 +10,8 @@ export const approveProcurement = (uuid, remarks) => api.post(`/procurement/${uu
 export const rejectProcurement = (uuid, remarks) => api.post(`/procurement/${uuid}/reject`, { remarks });
 export const createPurchaseRequest = (uuid) => api.post(`/procurement/${uuid}/create-pr`);
 export const createPurchaseOrder = (uuid) => api.post(`/procurement/${uuid}/create-po`);
+// Admin converts a quotation-approved PR into an expense (category PROCUREMENT)
+export const convertToExpense = (uuid) => api.post(`/procurement/${uuid}/convert-to-expense`);
 export const markReceived = (uuid) => api.post(`/procurement/${uuid}/received`);
 export const markPaid = (uuid, remarks) => api.post(`/procurement/${uuid}/pay`, { remarks });
 
