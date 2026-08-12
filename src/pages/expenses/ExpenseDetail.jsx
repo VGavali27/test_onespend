@@ -687,21 +687,30 @@ function ProcurementHistorySection({ expense }) {
             <p className="text-[12px] text-slate-400">Source chain PI → PR → Quotations → PO with approval logs</p>
           </div>
         </div>
-        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-[12px] font-semibold transition-colors">
+          {open ? 'Hide' : 'Show'}
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+        </span>
       </button>
-      {open && (
-        <div className="px-4 sm:px-6 py-5">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 text-indigo-500 animate-spin" />
-            </div>
-          ) : chain ? (
-            <ProcurementHistory chain={chain} />
-          ) : (
-            <p className="text-[13px] text-slate-400">No procurement history available.</p>
-          )}
+      {/* Smooth height reveal via grid-template-rows — big payloads open gently instead of jumping in */}
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden">
+          <div className="px-4 sm:px-6 py-5">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 text-indigo-500 animate-spin" />
+              </div>
+            ) : chain ? (
+              <ProcurementHistory chain={chain} />
+            ) : (
+              <p className="text-[13px] text-slate-400">No procurement history available.</p>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
