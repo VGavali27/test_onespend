@@ -516,39 +516,37 @@ const logExpenseHandover = async ({ expenseId, fromRoleId, toRoleId, employmentI
   );
 };
 
-// Create the expense that backs a procurement PO. Called inside createPo's
-// transaction so the PO + expense commit atomically. Status SUBMITTED with the
-// category's first receiver (ADMIN_MGR) as handler — ready to forward through the
-// expense approval chain.
-export const createProcurementExpense = async ({ po, t }) => {
+// Shared: create a SUBMITTED PROCUREMENT-category expense + its initial SUBMIT
+// handover (requester → first receiver). Used by both the PO auto-creation and the
+// PR quotation conversion. Runs inside the caller's transaction (atomic with it).
+const createProcurementExpenseRecord = async ({
+  title, companyId, requestedByEmploymentId, grandTotal, procurementPoId, procurementPrId, t,
+}) => {
   const category = await ExpenseCategory.findOne({ where: { module: 'procurement' } });
   if (!category) throw ApiError.notFound('PROCUREMENT expense category not found');
 
-  const requesterEmployment = await UserEmployment.findByPk(po.requested_by_employment_id, {
+  const requesterEmployment = await UserEmployment.findByPk(requestedByEmploymentId, {
     include: [{ model: User, as: 'user' }],
     transaction: t,
   });
   const requesterRoleId = requesterEmployment?.user?.role_id ?? null;
-  // po.grand_total is already the AES ciphertext (the PO model's beforeCreate hook
-  // encrypts amount fields, mutating the in-memory instance). Decrypt it back to the
-  // plaintext so the expense hook encrypts it exactly once.
-  const grandTotal = po.grand_total != null ? decrypt(String(po.grand_total)) : null;
   const expenseNumber = await generateExpenseNumber();
 
   const expense = await Expense.create(
     {
       expense_number: expenseNumber,
-      title: po.title,
+      title,
       category_id: category.id,
-      company_id: po.company_id,
-      requested_by_employment_id: po.requested_by_employment_id,
+      company_id: companyId,
+      requested_by_employment_id: requestedByEmploymentId,
       current_role_id: category.first_receiver_role_id,
       current_employment_id: null,
       status: 'SUBMITTED',
       submitted_at: new Date(),
       estimated_amount: grandTotal,
       final_amount: grandTotal,
-      procurement_po_id: po.id,
+      procurement_po_id: procurementPoId ?? null,
+      procurement_pr_id: procurementPrId ?? null,
     },
     { transaction: t },
   );
@@ -558,7 +556,7 @@ export const createProcurementExpense = async ({ po, t }) => {
     expenseId: expense.id,
     fromRoleId: requesterRoleId,
     toRoleId: category.first_receiver_role_id,
-    employmentId: po.requested_by_employment_id,
+    employmentId: requestedByEmploymentId,
     actionType: 'SUBMIT',
     remarks: null,
     t,
@@ -566,6 +564,36 @@ export const createProcurementExpense = async ({ po, t }) => {
 
   return expense;
 };
+
+// Create the expense that backs a procurement PO. Called inside createPo's
+// transaction so the PO + expense commit atomically.
+export const createProcurementExpense = async ({ po, t }) =>
+  createProcurementExpenseRecord({
+    title: po.title,
+    companyId: po.company_id,
+    requestedByEmploymentId: po.requested_by_employment_id,
+    // po.grand_total is already the AES ciphertext (the PO model's beforeCreate hook
+    // encrypts amount fields, mutating the in-memory instance). Decrypt it back to the
+    // plaintext so the expense hook encrypts it exactly once.
+    grandTotal: po.grand_total != null ? decrypt(String(po.grand_total)) : null,
+    procurementPoId: po.id,
+    procurementPrId: po.pr_id ?? null,
+    t,
+  });
+
+// Create the expense for a PR whose quotation was approved (admin's "Convert to
+// Expense"). The SELECTED quotation's grand_total is the agreed amount — since the
+// quotation row holds AES ciphertext, decrypt it once before passing to the expense
+// hook (which encrypts exactly once).
+export const createProcurementExpenseFromQuotation = async ({ pr, quotation, t }) =>
+  createProcurementExpenseRecord({
+    title: pr.title,
+    companyId: pr.company_id,
+    requestedByEmploymentId: pr.requested_by_employment_id,
+    grandTotal: quotation?.grand_total != null ? decrypt(String(quotation.grand_total)) : null,
+    procurementPrId: pr.id,
+    t,
+  });
 
 // Submit a DRAFT expense — creator-only, moves to SUBMITTED with the category's
 // first receiver as handler (used by manual expenses; PO-created ones start SUBMITTED).

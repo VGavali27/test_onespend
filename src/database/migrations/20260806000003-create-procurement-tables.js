@@ -298,10 +298,11 @@ export async function up(queryInterface, Sequelize) {
     references: { table: 'user_employments', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
 
-  // ── Link PO-created expenses → procurement_orders ──
-  // The `expenses` table exists from an earlier migration; add the PO link here
-  // (last batch) so a PO can auto-create an expense that follows the expense
-  // role-handover chain. FK added after procurement_orders is created above.
+  // ── Link procurement-created expenses → procurement_orders / procurement_requests ──
+  // The `expenses` table exists from an earlier migration; add the PR + PO links here
+  // (last batch) so a PO auto-creates an expense, or an admin converts an approved
+  // quotation into one, that follows the expense role-handover chain. FKs added after
+  // procurement_orders / procurement_requests are created above.
   await queryInterface.addColumn('expenses', 'procurement_po_id', {
     type: Sequelize.BIGINT.UNSIGNED,
     allowNull: true,
@@ -311,10 +312,22 @@ export async function up(queryInterface, Sequelize) {
     fields: ['procurement_po_id'], type: 'foreign key', name: 'fk_exp_procurement_po_id',
     references: { table: 'procurement_orders', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
+  await queryInterface.addColumn('expenses', 'procurement_pr_id', {
+    type: Sequelize.BIGINT.UNSIGNED,
+    allowNull: true,
+  });
+  await queryInterface.addIndex('expenses', ['procurement_pr_id'], { name: 'idx_exp_procurement_pr_id' });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['procurement_pr_id'], type: 'foreign key', name: 'fk_exp_procurement_pr_id',
+    references: { table: 'procurement_requests', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
+  });
 }
 
 export async function down(queryInterface, _Sequelize) {
-  // Remove the PO link from `expenses` before dropping procurement_orders (it FKs there).
+  // Remove the PR + PO links from `expenses` before dropping the procurement tables (they FK there).
+  await queryInterface.removeConstraint('expenses', 'fk_exp_procurement_pr_id');
+  await queryInterface.removeIndex('expenses', 'idx_exp_procurement_pr_id');
+  await queryInterface.removeColumn('expenses', 'procurement_pr_id');
   await queryInterface.removeConstraint('expenses', 'fk_exp_procurement_po_id');
   await queryInterface.removeIndex('expenses', 'idx_exp_procurement_po_id');
   await queryInterface.removeColumn('expenses', 'procurement_po_id');

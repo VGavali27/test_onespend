@@ -81,6 +81,8 @@ const detailIncludes = {
     },
     { model: ProcurementIntention, as: 'pi' },
     { model: ProcurementOrder, as: 'pos' },
+    // Expenses converted from this PR (Convert to Expense) / linked via its PO
+    { model: Expense, as: 'expenses' },
   ],
   PO: [
     ...withVendor(baseListInclude),

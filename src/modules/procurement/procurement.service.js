@@ -7,7 +7,7 @@ import ApiError from '../../utils/ApiError.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
 import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser, getActiveEmploymentByUserAndCompany } from '../../modules/user_employment/user_employment.service.js';
 
-const { Vendor, RoleHandoverRule, ProcurementIntention, ProcurementRequest, ProcurementOrder, ProcurementQuotation, ProcurementItem, sequelize } = db;
+const { Vendor, RoleHandoverRule, ProcurementIntention, ProcurementRequest, ProcurementOrder, ProcurementQuotation, ProcurementItem, Expense, sequelize } = db;
 
 // Role ids (see seeders/20260724000002-seed-roles.js)
 const ROLE_IDS = {
@@ -786,10 +786,55 @@ export const createPo = async (uuid, user) => {
       fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: ROLE_IDS.ADMIN_MGR,
       employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
     });
-    // Auto-create the linked expense (SUBMITTED, handler = ADMIN_MGR) so the PO can
-    // be forwarded through the expense role-handover chain. Same transaction — atomic.
-    await expenseService.createProcurementExpense({ po, t });
+    // Link the expense to this PO. If the PR was already converted to an expense
+    // (Convert to Expense), reuse it and just attach the PO link — never duplicate.
+    // Same transaction as the PO — atomic.
+    const existingExpense = await Expense.findOne({ where: { procurement_pr_id: pr.id }, transaction: t });
+    if (existingExpense) {
+      await existingExpense.update({ procurement_po_id: po.id }, { transaction: t });
+    } else {
+      await expenseService.createProcurementExpense({ po, t });
+    }
     return procurementRepository.findByUuid(po.uuid, t);
+  });
+};
+
+// Admin converts a quotation-approved PR into an expense (category PROCUREMENT) so it
+// shows in All Expenses and flows through the expense approval chain. Only valid once
+// a quotation is approved (selected) and before a PO is created (the PO auto-creates
+// its own expense). One expense per chain — guarded against duplicates.
+export const convertToExpense = async (uuid, user) => {
+  const resolved = await resolveDoc(uuid);
+  if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('Only a PR can be converted to an expense');
+  const pr = resolved.doc;
+
+  if (!['QUOTATION_APPROVED', 'APPROVED'].includes(pr.status)) {
+    throw ApiError.badRequest('Convert the request to an expense only after its quotation is approved');
+  }
+  if (!['SUPER_ADMIN', 'ADMIN_MGR'].includes(user.roleCode)) {
+    throw ApiError.forbidden('Only admin can convert this request to an expense');
+  }
+
+  // The approved quotation carries the agreed amount
+  const quotation = await ProcurementQuotation.findOne({ where: { pr_id: pr.id, status: 'SELECTED' } });
+  if (!quotation) throw ApiError.badRequest('This request has no approved quotation to convert');
+
+  const existingPo = await ProcurementOrder.findOne({ where: { pr_id: pr.id } });
+  if (existingPo) throw ApiError.badRequest('The PO already created the expense for this chain — use the linked expense');
+
+  const existingExpense = await Expense.findOne({ where: { procurement_pr_id: pr.id } });
+  if (existingExpense) throw ApiError.badRequest('This request has already been converted to an expense');
+
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
+
+  return sequelize.transaction(async (t) => {
+    await expenseService.createProcurementExpenseFromQuotation({ pr, quotation, t });
+    await logHandover({
+      type: 'PR', docId: pr.id, actionType: 'CONVERT_TO_EXPENSE',
+      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: ROLE_IDS.ADMIN_MGR,
+      employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
+    });
+    return procurementRepository.findByUuid(uuid, t);
   });
 };
 

@@ -104,6 +104,15 @@ export const createPo = async (req, res, next) => {
   }
 };
 
+export const convertToExpense = async (req, res, next) => {
+  try {
+    const doc = await procurementService.convertToExpense(req.params.uuid, req.user);
+    return ApiResponse.created(res, doc, 'Expense created from the approved quotation');
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const markReceived = async (req, res, next) => {
   try {
     const doc = await procurementService.received(req.params.uuid, req.user);
