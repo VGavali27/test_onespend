@@ -4,7 +4,7 @@ import {
   ShoppingCart, Truck, Users, Plus, Trash2, Loader2, Wallet,
   Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil, Eye, X, ChevronDown,
 } from 'lucide-react';
-import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, convertToExpense, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation, updateProcurementItems } from '@/services/procurementService';
+import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation, updateProcurementItems } from '@/services/procurementService';
 import { getVendorOptions } from '@/services/vendorService';
 import { uploadImage } from '@/services/uploadService';
 import { useAuth } from '@/context/AuthContext';
@@ -237,13 +237,11 @@ export default function ProcurementDetail() {
     }
     setActing(true);
     try {
-      let convertedExpenseUuid = null;
       if (key === 'submit') await submitProcurement(uuid, actionRemarks);
       else if (key === 'approve') await approveProcurement(uuid, actionRemarks);
       else if (key === 'reject') await rejectProcurement(uuid, actionRemarks);
       else if (key === 'create-pr') await createPurchaseRequest(uuid);
       else if (key === 'create-po') await createPurchaseOrder(uuid);
-      else if (key === 'convert-expense') { const _r = await convertToExpense(uuid); convertedExpenseUuid = _r?.data?.data?.expenses?.[0]?.uuid || null; }
       else if (key === 'received') await markReceived(uuid);
       else if (key === 'pay') await markPaid(uuid, actionRemarks);
       toast.success('Action completed');
@@ -251,8 +249,6 @@ export default function ProcurementDetail() {
       setRemarks('');
       // A newly created PR is best reviewed from the all-requests list
       if (key === 'create-pr') { navigate('/procurement'); return; }
-      // A converted expense jumps straight to its expense detail
-      if (key === 'convert-expense') { navigate(convertedExpenseUuid ? `/expenses/${convertedExpenseUuid}` : '/expenses/all'); return; }
       load();
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Action failed.');
@@ -306,12 +302,6 @@ export default function ProcurementDetail() {
     }
     if (doc.request_type === 'PR' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po) {
       availableActions.push({ key: 'create-po', label: 'Create PO' });
-    }
-    // Admin may convert an approved quotation into an expense (category PROCUREMENT) —
-    // shown once the quotation is approved and until a PO exists (the PO auto-creates
-    // its own expense; one expense per chain).
-    if (doc.request_type === 'PR' && ['QUOTATION_APPROVED', 'APPROVED'].includes(doc.status) && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po && (doc.expenses || []).length === 0) {
-      availableActions.push({ key: 'convert-expense', label: 'Convert to Expense' });
     }
     if (doc.request_type === 'PO' && doc.status === 'CREATED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
       availableActions.push({ key: 'received', label: 'Mark Received' });
@@ -410,13 +400,11 @@ export default function ProcurementDetail() {
           )}
 
           {/* Linked expense — PO-created expense follows the expense approval chain */}
-          {(doc.expenses || []).length > 0 && (
+          {doc.expense && (
             <div className="flex flex-wrap items-center gap-2 text-[13px]">
-              {doc.expenses.map((ex) => (
-                <Link key={ex.uuid} to={`/expenses/${ex.uuid}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
-                  <Wallet className="h-3.5 w-3.5" /> Expense {ex.expense_number}
-                </Link>
-              ))}
+              <Link key={doc.expense.uuid} to={`/expenses/${doc.expense.uuid}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors">
+                <Wallet className="h-3.5 w-3.5" /> Expense {doc.expense.expense_number}
+              </Link>
             </div>
           )}
 
