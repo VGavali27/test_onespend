@@ -138,23 +138,21 @@ const decryptExpenseDeep = (expense) => {
 };
 
 // Build a compact procurement-chain summary (PI → PR → quotations → PO) plus the chain's
-// approval logs, shown on the expense detail of a PO-created / converted expense. Vendor
+// approval logs, shown on the expense detail of a PO-created expense. Vendor
 // is masked for the requester (consistent with the procurement module); amounts decrypted.
+// Now expense is the parent: we find the PO via expense_id, then follow PR → PI.
 const buildProcurementChain = async (expense, requesterIsOwner) => {
-  let prId = expense.procurement_pr_id;
-  if (!prId && expense.procurement_po_id) {
-    const po = await ProcurementOrder.findByPk(expense.procurement_po_id);
-    prId = po?.pr_id;
-  }
-  if (!prId) return null;
+  // Find the PO linked to this expense (expense is parent, PO has expense_id)
+  const po = await ProcurementOrder.findOne({ where: { expense_id: expense.id } });
+  if (!po) return null;
 
-  const chain = await procurementRepository.findChainByPrId(prId);
+  const chain = await procurementRepository.findChainByPrId(po.pr_id);
   if (!chain) return null;
-  const { pi, pr, quotations, po } = chain;
+  const { pi, pr, quotations, po: chainPo } = chain;
 
   const fin = (v) => (v != null ? Number(decrypt(String(v))) || null : null);
   const vendorOf = (doc) => (requesterIsOwner ? null : doc?.vendor?.name || null);
-  const handovers = await procurementRepository.findChainHandovers({ piId: pi?.id, prId: pr.id, poId: po?.id });
+  const handovers = await procurementRepository.findChainHandovers({ piId: pi?.id, prId: pr.id, poId: chainPo?.id });
 
   return {
     pi: pi ? { uuid: pi.uuid, document_number: pi.document_number, title: pi.title, status: pi.status, grand_total: fin(pi.grand_total) } : null,
@@ -168,7 +166,7 @@ const buildProcurementChain = async (expense, requesterIsOwner) => {
       tax_amount: fin(q.tax_amount),
       grand_total: fin(q.grand_total),
     })),
-    po: po ? { uuid: po.uuid, document_number: po.document_number, status: po.status, vendor: vendorOf(po), grand_total: fin(po.grand_total) } : null,
+    po: chainPo ? { uuid: chainPo.uuid, document_number: chainPo.document_number, status: chainPo.status, vendor: vendorOf(chainPo), grand_total: fin(chainPo.grand_total) } : null,
     handovers: (handovers || []).map((h) => {
       const p = h.get ? h.get({ plain: true }) : h;
       const u = p.actionBy?.user;
@@ -206,8 +204,8 @@ export const getByUuid = async (uuid, user, decrypt = false) => {
   return decrypt ? decryptExpenseDeep(expense) : expense;
 };
 
-// Lazy-load the source procurement chain for a procurement-linked expense (PO-created or
-// converted). Called only when the frontend expands the "Procurement history" section —
+// Lazy-load the source procurement chain for a procurement-linked expense (PO-created).
+// Called only when the frontend expands the "Procurement history" section —
 // the detail response no longer carries it, keeping the default detail call light.
 export const getProcurementChain = async (uuid, user) => {
   const expense = await expenseRepository.findByUuid(uuid);
@@ -223,7 +221,9 @@ export const getProcurementChain = async (uuid, user) => {
     companyIds.includes(expense.company_id);
   if (!visible) throw ApiError.notFound('Expense not found');
 
-  if (!(expense.procurement_pr_id || expense.procurement_po_id)) {
+  // Check if this expense has a linked procurement order (via expense_id on PO)
+  const po = await ProcurementOrder.findOne({ where: { expense_id: expense.id } });
+  if (!po) {
     return { procurement_chain: null };
   }
 
@@ -595,10 +595,10 @@ const logExpenseHandover = async ({ expenseId, fromRoleId, toRoleId, employmentI
 };
 
 // Shared: create a SUBMITTED PROCUREMENT-category expense + its initial SUBMIT
-// handover (requester → first receiver). Used by both the PO auto-creation and the
-// PR quotation conversion. Runs inside the caller's transaction (atomic with it).
+// handover (requester → first receiver). Used by PO auto-creation.
+// Runs inside the caller's transaction (atomic with it).
 const createProcurementExpenseRecord = async ({
-  title, companyId, requestedByEmploymentId, grandTotal, procurementPoId, procurementPrId, t,
+  title, companyId, requestedByEmploymentId, grandTotal, t,
 }) => {
   const category = await ExpenseCategory.findOne({ where: { module: 'procurement' } });
   if (!category) throw ApiError.notFound('PROCUREMENT expense category not found');
@@ -623,8 +623,6 @@ const createProcurementExpenseRecord = async ({
       submitted_at: new Date(),
       estimated_amount: grandTotal,
       final_amount: grandTotal,
-      procurement_po_id: procurementPoId ?? null,
-      procurement_pr_id: procurementPrId ?? null,
     },
     { transaction: t },
   );
@@ -645,6 +643,7 @@ const createProcurementExpenseRecord = async ({
 
 // Create the expense that backs a procurement PO. Called inside createPo's
 // transaction so the PO + expense commit atomically.
+// The PO is updated with expense_id after the expense is created (in procurement service).
 export const createProcurementExpense = async ({ po, t }) =>
   createProcurementExpenseRecord({
     title: po.title,
@@ -654,22 +653,6 @@ export const createProcurementExpense = async ({ po, t }) =>
     // encrypts amount fields, mutating the in-memory instance). Decrypt it back to the
     // plaintext so the expense hook encrypts it exactly once.
     grandTotal: po.grand_total != null ? decrypt(String(po.grand_total)) : null,
-    procurementPoId: po.id,
-    procurementPrId: po.pr_id ?? null,
-    t,
-  });
-
-// Create the expense for a PR whose quotation was approved (admin's "Convert to
-// Expense"). The SELECTED quotation's grand_total is the agreed amount — since the
-// quotation row holds AES ciphertext, decrypt it once before passing to the expense
-// hook (which encrypts exactly once).
-export const createProcurementExpenseFromQuotation = async ({ pr, quotation, t }) =>
-  createProcurementExpenseRecord({
-    title: pr.title,
-    companyId: pr.company_id,
-    requestedByEmploymentId: pr.requested_by_employment_id,
-    grandTotal: quotation?.grand_total != null ? decrypt(String(quotation.grand_total)) : null,
-    procurementPrId: pr.id,
     t,
   });
 

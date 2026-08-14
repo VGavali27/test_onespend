@@ -1,0 +1,78 @@
+◇ injected env (11) from .env // tip: ⌘ override existing { override: true }
+Executing (default): SELECT 1+1 AS result
+✓ Database connected successfully
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'groups' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `groups`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'companies' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `companies`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'departments' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `departments`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'roles' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `roles`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'expense_categories' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `expense_categories`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'users' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `users`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'user_employments' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `user_employments`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'expenses' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `expenses`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'expense_documents' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `expense_documents`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'expense_handovers' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `expense_handovers`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'permissions' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `permissions`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'procurement_intentions' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `procurement_intentions`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'vendors' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `vendors`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'procurement_requests' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `procurement_requests`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'procurement_orders' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `procurement_orders`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'procurement_quotations' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `procurement_quotations`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'procurement_documents' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `procurement_documents`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'procurement_handovers' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `procurement_handovers`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'procurement_items' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `procurement_items`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'reimbursement_expenses' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `reimbursement_expenses`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'reimbursement_expense_items' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `reimbursement_expense_items`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'role_handover_rules' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `role_handover_rules`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'role_permissions' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `role_permissions`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'travel_expenses' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `travel_expenses`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'travel_expense_accommodations' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `travel_expense_accommodations`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'travel_expense_forex' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `travel_expense_forex`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'travel_expense_local_transports' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `travel_expense_local_transports`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'travel_expense_misc_expenses' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `travel_expense_misc_expenses`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'travel_expense_segments' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `travel_expense_segments`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'vendor_addresses' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `vendor_addresses`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'vendor_bank_accounts' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `vendor_bank_accounts`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'vendor_categories' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `vendor_categories`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'vendor_category_mappings' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `vendor_category_mappings`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'vendor_contacts' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `vendor_contacts`
+Executing (default): SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME = 'vendor_documents' AND TABLE_SCHEMA = 'claude_onespend'
+Executing (default): SHOW INDEX FROM `vendor_documents`
+✓ Models synchronized
+
+  🚀 Server running on port 3015
+  📦 Environment: development
+

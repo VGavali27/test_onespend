@@ -59,7 +59,6 @@ export default (sequelize, DataTypes) => {
     ProcurementRequest.hasMany(models.ProcurementDocument, { foreignKey: 'pr_id', as: 'documents' });
     ProcurementRequest.hasMany(models.ProcurementQuotation, { foreignKey: 'pr_id', as: 'quotations' });
     ProcurementRequest.hasMany(models.ProcurementOrder, { foreignKey: 'pr_id', as: 'pos' });
-    ProcurementRequest.hasMany(models.Expense, { foreignKey: 'procurement_pr_id', as: 'expenses' });
   };
 
   return ProcurementRequest;

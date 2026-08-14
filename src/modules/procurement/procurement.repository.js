@@ -81,8 +81,6 @@ const detailIncludes = {
     },
     { model: ProcurementIntention, as: 'pi' },
     { model: ProcurementOrder, as: 'pos' },
-    // Expenses converted from this PR (Convert to Expense) / linked via its PO
-    { model: Expense, as: 'expenses' },
   ],
   PO: [
     ...withVendor(baseListInclude),
@@ -98,8 +96,8 @@ const detailIncludes = {
       ],
     },
     { model: ProcurementRequest, as: 'pr' },
-    // PO-created expenses (follow the expense role-handover chain)
-    { model: Expense, as: 'expenses' },
+    // PO-created expense (expense is parent, PO has expense_id)
+    { model: Expense, as: 'expense' },
   ],
 };
 

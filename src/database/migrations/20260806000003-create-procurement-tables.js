@@ -77,6 +77,7 @@ export async function up(queryInterface, Sequelize) {
     uuid: { type: Sequelize.UUID, allowNull: false },
     document_number: { type: Sequelize.STRING(50), allowNull: false },
     pr_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    expense_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     title: { type: Sequelize.STRING(255), allowNull: false },
     status: { type: Sequelize.STRING(50), allowNull: false, defaultValue: 'CREATED' },
     company_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
@@ -104,6 +105,7 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.addIndex('procurement_orders', ['vendor_id'], { name: 'idx_pc_po_vendor_id' });
   await queryInterface.addIndex('procurement_orders', ['company_id'], { name: 'idx_pc_po_company_id' });
   await queryInterface.addIndex('procurement_orders', ['requested_by_employment_id'], { name: 'idx_pc_po_requested_by' });
+  await queryInterface.addIndex('procurement_orders', ['expense_id'], { name: 'idx_pc_po_expense_id', unique: true });
 
   // ── procurement_items (polymorphic) ──
   await queryInterface.createTable('procurement_items', {
@@ -298,33 +300,17 @@ export async function up(queryInterface, Sequelize) {
     references: { table: 'user_employments', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
 
-  // ── Link procurement-created expenses → procurement_orders / procurement_requests ──
-  // The `expenses` table exists from an earlier migration; add the PR + PO links here
-  // (last batch) so a PO auto-creates an expense, or an admin converts an approved
-  // quotation into one, that follows the expense role-handover chain. FKs added after
-  // procurement_orders / procurement_requests are created above.
-  await queryInterface.addColumn('expenses', 'procurement_po_id', {
-    type: Sequelize.BIGINT.UNSIGNED,
-    allowNull: true,
-  });
-  await queryInterface.addIndex('expenses', ['procurement_po_id'], { name: 'idx_exp_procurement_po_id' });
-  await queryInterface.addConstraint('expenses', {
-    fields: ['procurement_po_id'], type: 'foreign key', name: 'fk_exp_procurement_po_id',
-    references: { table: 'procurement_orders', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
-  });
-  await queryInterface.addColumn('expenses', 'procurement_pr_id', {
-    type: Sequelize.BIGINT.UNSIGNED,
-    allowNull: true,
-  });
-  await queryInterface.addIndex('expenses', ['procurement_pr_id'], { name: 'idx_exp_procurement_pr_id' });
-  await queryInterface.addConstraint('expenses', {
-    fields: ['procurement_pr_id'], type: 'foreign key', name: 'fk_exp_procurement_pr_id',
-    references: { table: 'procurement_requests', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
+  // ── Link procurement-created expenses ← procurement_orders ──
+  // Expense is the parent (just like travel / reimbursement): the procurement PO
+  // carries the `expense_id` FK. The PO points back at the expense it spawned.
+  await queryInterface.addConstraint('procurement_orders', {
+    fields: ['expense_id'], type: 'foreign key', name: 'fk_pc_po_expense_id',
+    references: { table: 'expenses', field: 'id' }, onUpdate: 'CASCADE', onDelete: 'SET NULL',
   });
 }
 
 export async function down(queryInterface, _Sequelize) {
-  // Remove the PR + PO links from `expenses` before dropping the procurement tables (they FK there).
+  // Remove the expense links from `expenses` before dropping procurement tables.
   await queryInterface.removeConstraint('expenses', 'fk_exp_procurement_pr_id');
   await queryInterface.removeIndex('expenses', 'idx_exp_procurement_pr_id');
   await queryInterface.removeColumn('expenses', 'procurement_pr_id');

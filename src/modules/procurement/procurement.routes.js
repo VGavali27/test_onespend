@@ -47,7 +47,6 @@ router.post('/:uuid/approve', validate(actionSchema), procurementController.appr
 router.post('/:uuid/reject', validate(actionSchema), procurementController.rejectProcurement);
 router.post('/:uuid/create-pr', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), procurementController.createPr);
 router.post('/:uuid/create-po', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), procurementController.createPo);
-router.post('/:uuid/convert-to-expense', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), procurementController.convertToExpense);
 router.post('/:uuid/received', requireRole('SUPER_ADMIN', 'ADMIN_MGR', 'FINANCE_MGR'), procurementController.markReceived);
 router.post('/:uuid/pay', requireRole('SUPER_ADMIN', 'CFO', 'PAYMENT_MGR'), procurementController.markPaid);
 

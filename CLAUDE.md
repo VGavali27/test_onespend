@@ -221,6 +221,7 @@ npm run seed              # run seeders
 - **Per-employment email** — `user_employments.email` column (a user can have a different email per company)
 - **Lightweight options** — `/roles|companies|departments/options` return only `[{ uuid, name }]` for dropdowns
 - **Shared data-access lives in owning modules** — employment helpers (`getEmploymentIdsByUser`, `getActiveCompanyIdsByUser`, `getActiveEmploymentByUser`, `getActiveEmploymentByUserAndCompany`) live in the **`user_employment`** module; company/role uuid resolution goes through the **`company`**/**`role`** repositories; `decryptResults` lives in **`encryption.js`**. Other modules import these instead of re-querying models inline (see `user_employment.service.js`, `company.repository.js`, `role.repository.js`, `utils/encryption.js`).
+- **Procurement→Expense FK direction** — Expense is the **parent**; `procurement_orders` has `expense_id` FK (no `procurement_po_id`/`procurement_pr_id` on expenses). PO creation: create PO first, then expense, then set `po.expense_id = expense.id` atomically. Matches travel/reimbursement pattern (expense_id on child table).
 
 ## Procurement Module — BUILT
 

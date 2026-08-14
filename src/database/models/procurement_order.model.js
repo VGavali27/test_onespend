@@ -19,6 +19,7 @@ export default (sequelize, DataTypes) => {
       uuid: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, allowNull: false, unique: true },
       document_number: { type: DataTypes.STRING(50), allowNull: false, unique: true },
       pr_id: DataTypes.BIGINT.UNSIGNED,
+      expense_id: DataTypes.BIGINT.UNSIGNED,
       title: { type: DataTypes.STRING(255), allowNull: false },
       status: { type: DataTypes.STRING(50), allowNull: false, defaultValue: 'CREATED' },
       company_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
@@ -50,6 +51,7 @@ export default (sequelize, DataTypes) => {
 
   ProcurementOrder.associate = (models) => {
     ProcurementOrder.belongsTo(models.ProcurementRequest, { foreignKey: 'pr_id', as: 'pr' });
+    ProcurementOrder.belongsTo(models.Expense, { foreignKey: 'expense_id', as: 'expense' });
     ProcurementOrder.belongsTo(models.Company, { foreignKey: 'company_id', as: 'company' });
     ProcurementOrder.belongsTo(models.Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
     ProcurementOrder.belongsTo(models.UserEmployment, { foreignKey: 'requested_by_employment_id', as: 'requestedByEmployment' });
@@ -58,8 +60,6 @@ export default (sequelize, DataTypes) => {
     ProcurementOrder.hasMany(models.ProcurementItem, { foreignKey: 'po_id', as: 'items' });
     ProcurementOrder.hasMany(models.ProcurementHandover, { foreignKey: 'po_id', as: 'handovers' });
     ProcurementOrder.hasMany(models.ProcurementDocument, { foreignKey: 'po_id', as: 'documents' });
-    // PO-created expenses (follow the expense role-handover chain)
-    ProcurementOrder.hasMany(models.Expense, { foreignKey: 'procurement_po_id', as: 'expenses' });
   };
 
   return ProcurementOrder;

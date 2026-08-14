@@ -32,10 +32,6 @@ export default (sequelize, DataTypes) => {
       requested_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       current_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       current_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
-      // Optional links to the procurement chain this expense was created from
-      // (PO auto-creation and/or PR quotation conversion)
-      procurement_po_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
-      procurement_pr_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       estimated_amount: { type: DataTypes.TEXT, allowNull: true },
       final_amount: { type: DataTypes.TEXT, allowNull: true },
       paid_amount: { type: DataTypes.TEXT, allowNull: true },
@@ -66,10 +62,9 @@ export default (sequelize, DataTypes) => {
     Expense.belongsTo(models.Role, { foreignKey: 'current_role_id', as: 'currentRole' });
     Expense.hasOne(models.TravelExpense, { foreignKey: 'expense_id', as: 'travelExpense' });
     Expense.hasOne(models.ReimbursementExpense, { foreignKey: 'expense_id', as: 'reimbursementExpense' });
+    Expense.hasOne(models.ProcurementOrder, { foreignKey: 'expense_id', as: 'procurementOrder' });
     Expense.hasMany(models.ExpenseDocument, { foreignKey: 'expense_id', as: 'documents' });
     Expense.hasMany(models.ExpenseHandover, { foreignKey: 'expense_id', as: 'handovers' });
-    Expense.belongsTo(models.ProcurementOrder, { foreignKey: 'procurement_po_id', as: 'procurementOrder' });
-    Expense.belongsTo(models.ProcurementRequest, { foreignKey: 'procurement_pr_id', as: 'procurementRequest' });
   };
 
   return Expense;
