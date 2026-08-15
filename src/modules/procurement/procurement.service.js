@@ -7,7 +7,8 @@ import ApiError from '../../utils/ApiError.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
 import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser, getActiveEmploymentByUserAndCompany } from '../../modules/user_employment/user_employment.service.js';
 
-const { Vendor, RoleHandoverRule, ProcurementIntention, ProcurementRequest, ProcurementOrder, ProcurementQuotation, ProcurementItem, Expense, sequelize } = db;
+const { Vendor, RoleHandoverRule, ProcurementIntention, ProcurementRequest, ProcurementOrder, ProcurementQuotation, ProcurementItem, Expense, sequelize, Sequelize } = db;
+const { Op } = Sequelize;
 
 // Role ids (see seeders/20260724000002-seed-roles.js)
 const ROLE_IDS = {
@@ -214,14 +215,36 @@ const copyItems = (sourceItems = []) =>
 export const getVisible = async (user, params = {}) => {
   const employmentIds = await getEmploymentIdsByUser(user.userId);
   let result;
+
+  // Build the visibility scope (which documents this user can see at all)
+  let scopeWhere = {};
   if (GLOBAL_ROLES.includes(user.roleCode)) {
-    result = await procurementRepository.findAll({}, params);
+    scopeWhere = {};
   } else if (MANAGER_ROLES.includes(user.roleCode)) {
     const companyIds = await getActiveCompanyIdsByUser(user.userId);
-    result = companyIds.length ? await procurementRepository.findByCompanyIds(companyIds, params) : { rows: [], total: 0 };
+    if (companyIds.length === 0) return { rows: [], total: 0 };
+    scopeWhere = { company_id: { [Op.in]: companyIds } };
   } else {
-    result = employmentIds.length ? await procurementRepository.findByEmploymentIds(employmentIds, params) : { rows: [], total: 0 };
+    if (employmentIds.length === 0) return { rows: [], total: 0 };
+    scopeWhere = { requested_by_employment_id: { [Op.in]: employmentIds } };
   }
+
+  // DRAFT PIs are hidden from everyone EXCEPT their creator (the requester).
+  // This applies to ALL role types (global, manager, requester).
+  // Non-DRAFT PIs (and all PR/PO of any status) are visible per the scope above.
+  const draftPiFilter = employmentIds.length
+    ? {
+        [Op.or]: [
+          { status: { [Op.ne]: 'DRAFT' } }, // any non-draft doc is visible
+          { requested_by_employment_id: { [Op.in]: employmentIds } }, // own drafts are visible
+        ],
+      }
+    : { status: { [Op.ne]: 'DRAFT' } }; // users with no employments see no drafts
+
+  const combinedWhere = { [Op.and]: [scopeWhere, draftPiFilter] };
+
+  result = await procurementRepository.findAll(combinedWhere, params);
+
   result.rows = (result.rows || []).map((r) => {
     decryptRequest(r);
     maskVendorForRequester(r, employmentIds);

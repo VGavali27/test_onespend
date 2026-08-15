@@ -216,12 +216,14 @@ npm run seed              # run seeders
 - **Combined endpoints** — `POST /api/expenses` creates expense + travel + child items in one transaction
 - **Per-item attachments** — `expense_documents` link each uploaded file to its own sub-part record (`module_name` = travel_segment / travel_accommodation / travel_forex / travel_local_transport / travel_misc_expense / reimbursement_item)
 - **Approval chain** — `expense_categories` define first/final approver roles, `role_handover_rules` define handover paths
-- **Password hashing** — passwords bcrypt-hashed on create and update (fixed plaintext bug)
+- **Password hashing** — passwords bcrypt-hashed on create and update (fixed plaintext bug). **All seeded users use password "Admin@123"**
 - **UUID auto-generation** — every model's `uuid` has `defaultValue: UUIDV4` (fixed "uuid cannot be null" on create)
 - **Per-employment email** — `user_employments.email` column (a user can have a different email per company)
 - **Lightweight options** — `/roles|companies|departments/options` return only `[{ uuid, name }]` for dropdowns
 - **Shared data-access lives in owning modules** — employment helpers (`getEmploymentIdsByUser`, `getActiveCompanyIdsByUser`, `getActiveEmploymentByUser`, `getActiveEmploymentByUserAndCompany`) live in the **`user_employment`** module; company/role uuid resolution goes through the **`company`**/**`role`** repositories; `decryptResults` lives in **`encryption.js`**. Other modules import these instead of re-querying models inline (see `user_employment.service.js`, `company.repository.js`, `role.repository.js`, `utils/encryption.js`).
 - **Procurement→Expense FK direction** — Expense is the **parent**; `procurement_orders` has `expense_id` FK (no `procurement_po_id`/`procurement_pr_id` on expenses). PO creation: create PO first, then expense, then set `po.expense_id = expense.id` atomically. Matches travel/reimbursement pattern (expense_id on child table).
+- **DRAFT PI visibility** — `procurement.repository.js:buildWhere()` combines the draft exclusion filter (`draftPiFilter` from service) with any additional status filters using `Op.and` instead of overwriting. DRAFT PIs are visible **only to their creator** in "All Requests" list.
+- **Parent-child expense architecture confirmed** — `expenses` is parent; `travel_expenses`, `reimbursement_expenses`, and `procurement_orders` are children via `expense_id` FK (on child tables). PO creation auto-creates linked expense in same transaction; PR conversion to expense reuses existing expense if PO already created.
 
 ## Procurement Module — BUILT
 

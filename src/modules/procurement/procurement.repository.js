@@ -121,7 +121,15 @@ const buildWhere = (where, params = {}) => {
   const status = params.status || '';
   const search = (params.search || '').trim();
 
-  if (status) w.status = status;
+  if (status) {
+    // If there's already a status condition (e.g., from draftPiFilter with Op.or/Op.ne),
+    // combine them with Op.and instead of overwriting.
+    if (w.status != null) {
+      w.status = { [Op.and]: [w.status, status] };
+    } else {
+      w.status = status;
+    }
+  }
   if (search) {
     w[Op.or] = [
       { document_number: { [Op.like]: `%${search}%` } },

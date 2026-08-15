@@ -310,13 +310,15 @@ export async function up(queryInterface, Sequelize) {
 }
 
 export async function down(queryInterface, _Sequelize) {
-  // Remove the expense links from `expenses` before dropping procurement tables.
-  await queryInterface.removeConstraint('expenses', 'fk_exp_procurement_pr_id');
-  await queryInterface.removeIndex('expenses', 'idx_exp_procurement_pr_id');
-  await queryInterface.removeColumn('expenses', 'procurement_pr_id');
-  await queryInterface.removeConstraint('expenses', 'fk_exp_procurement_po_id');
-  await queryInterface.removeIndex('expenses', 'idx_exp_procurement_po_id');
-  await queryInterface.removeColumn('expenses', 'procurement_po_id');
+  // Remove the expense FKs from `procurement_orders` before dropping procurement tables.
+  // (defensive: only remove if they exist — the schema may predate this addition)
+  const [expenseFk] = await queryInterface.sequelize.query(
+    "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_NAME = 'procurement_orders' AND CONSTRAINT_NAME = 'fk_pc_po_expense_id' AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
+  );
+  if (expenseFk.length > 0) {
+    await queryInterface.removeConstraint('procurement_orders', 'fk_pc_po_expense_id');
+    await queryInterface.removeIndex('procurement_orders', 'idx_pc_po_expense_id');
+  }
 
   await queryInterface.dropTable('procurement_documents');
   // procurement_items references procurement_quotations (quotation_id), so it must
