@@ -11,7 +11,7 @@ import Modal from '@/components/ui/Modal';
 const columnHelper = createColumnHelper();
 
 const TYPES = ['PI', 'PR', 'PO'];
-const STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'HOD_APPROVED', 'QUOTATION_SELECTION', 'QUOTATION_APPROVED', 'CREATED', 'RECEIVED', 'FINANCE_APPROVED', 'PAID'];
+const STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PR_CREATED', 'QUOTATION_SELECTION', 'QUOTATION_APPROVED', 'CREATED', 'RECEIVED', 'FINANCE_APPROVED', 'PAID'];
 
 // Workflow status colors (dark-mode aware). Mirrors the Profile page's
 // EMPLOYMENT_STATUS_STYLES pattern: status → Tailwind pill classes.
@@ -19,7 +19,7 @@ const PROCUREMENT_STATUS_STYLES = {
   DRAFT: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20',
   CREATED: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20',
   SUBMITTED: 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-400/20',
-  HOD_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  PR_CREATED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
   QUOTATION_SELECTION: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
   QUOTATION_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
   RECEIVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',

@@ -23,7 +23,7 @@ const PROCUREMENT_STATUS_STYLES = {
   DRAFT: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20',
   CREATED: 'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20',
   SUBMITTED: 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-400/20',
-  HOD_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
+  PR_CREATED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
   QUOTATION_SELECTION: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
   QUOTATION_APPROVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
   RECEIVED: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-400/20',
@@ -36,8 +36,8 @@ const PROCUREMENT_STATUS_STYLES = {
 };
 
 // Statuses where the current handler can approve/reject.
-// NOTE: HOD_APPROVED is NOT here — after HOD approval the admin fills quotations
-// and runs submit-quotations (there is no plain "approve" step at HOD_APPROVED).
+// NOTE: PR_CREATED is NOT here — after PR creation the admin fills quotations
+// and runs submit-quotations (there is no plain "approve" step at PR_CREATED).
 const APPROVABLE_STATUSES = ['SUBMITTED', 'QUOTATION_APPROVED', 'RECEIVED', 'FINANCE_APPROVED'];
 
 export default function ProcurementDetail() {
@@ -94,10 +94,10 @@ export default function ProcurementDetail() {
   }, []);
 
   // Pre-fill the "Add a quotation" line items from the PR's items (admin building
-  // a quotation at HOD_APPROVED) — the vendor prices these items per-quotation.
+  // a quotation at PR_CREATED) — the vendor prices these items per-quotation.
   useEffect(() => {
     const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_MGR';
-    const addMode = isAdmin && doc?.request_type === 'PR' && doc?.status === 'HOD_APPROVED' && !qEditingId;
+    const addMode = isAdmin && doc?.request_type === 'PR' && doc?.status === 'PR_CREATED' && !qEditingId;
     if (addMode && qForm.items.length === 0 && doc?.items?.length) {
       setQForm((f) => ({
         ...f,
@@ -296,7 +296,7 @@ export default function ProcurementDetail() {
     }
     // Admin may adjust PR line items (qty / unit price) while quotations are gathered —
     // once quotations are submitted to the requester (QUOTATION_SELECTION) the items lock.
-    const PR_ITEM_EDITABLE = ['SUBMITTED', 'HOD_APPROVED'];
+    const PR_ITEM_EDITABLE = ['SUBMITTED', 'PR_CREATED'];
     if (doc.request_type === 'PR' && PR_ITEM_EDITABLE.includes(doc.status) && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
       availableActions.push({ key: 'edit-items', label: 'Edit Line Items' });
     }
@@ -666,7 +666,7 @@ export default function ProcurementDetail() {
 }
 
 // ── Quotations section ──
-// Admin at HOD_APPROVED fills quotations (vendor visible to them). The requester
+// Admin at PR_CREATED fills quotations (vendor visible to them). The requester
 // at QUOTATION_SELECTION picks one blind — vendor + files are masked by the API.
 // Everyone else sees a read-only list (vendor shown to admin/finance roles only).
 function QuotationsSection({
@@ -679,7 +679,7 @@ function QuotationsSection({
   const toast = useToast();
   const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_MGR';
   const isPR = doc.request_type === 'PR';
-  const fillMode = isAdmin && isPR && doc.status === 'HOD_APPROVED';
+  const fillMode = isAdmin && isPR && doc.status === 'PR_CREATED';
   const selectMode = doc.is_requester && isPR && doc.status === 'QUOTATION_SELECTION';
   const quotations = doc.quotations || [];
   // The "Add a quotation" form stays hidden until the admin clicks the button.
