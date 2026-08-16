@@ -26,7 +26,7 @@ const ROLE_IDS = {
 const APPROVAL_STEPS = {
   'PI:SUBMITTED': { next_status: 'APPROVED', next_role: null },
   // No separate PR approval: when the admin creates a PR from an approved PI it is
-  // created directly in the quotation-gathering state (HOD_APPROVED), where the
+  // created directly in the quotation-gathering state (PR_CREATED), where the
   // admin fills quotations and runs submit-quotations. The requester's only action
   // is picking a quotation blind (select-quotation → QUOTATION_APPROVED for CFO).
   'PR:QUOTATION_APPROVED': { next_status: 'APPROVED', next_role: ROLE_IDS.ADMIN_MGR },
@@ -387,7 +387,7 @@ export const update = async (uuid, user, data) => {
 
 // Admin may adjust the PR's line items (qty / unit price) while quotations are
 // still being gathered — before the requester selects one. Uses QUOTE_EDITABLE_STATUSES
-// for consistency: the PR is created at HOD_APPROVED and stays editable through
+// for consistency: the PR is created at PR_CREATED and stays editable through
 // QUOTATION_SELECTION.
 export const updateItems = async (uuid, user, items = []) => {
   const resolved = await resolveDoc(uuid);
@@ -432,14 +432,14 @@ const ensureQuotationAdmin = (user) => {
 };
 
 // Quotations may be edited while the PR is still pre-selection: SUBMITTED (admin
-// filling), HOD_APPROVED, or QUOTATION_SELECTION. Once the requester selects
+// filling), PR_CREATED, or QUOTATION_SELECTION. Once the requester selects
 // (QUOTATION_APPROVED) or beyond, quotations lock.
-const QUOTE_EDITABLE_STATUSES = ['SUBMITTED', 'HOD_APPROVED', 'QUOTATION_SELECTION'];
+const QUOTE_EDITABLE_STATUSES = ['SUBMITTED', 'PR_CREATED', 'QUOTATION_SELECTION'];
 
 // PR line items lock earlier: once quotations are submitted to the requester
 // (QUOTATION_SELECTION) the admin can no longer change the qty/prices the
 // requester is comparing. Quotations themselves stay editable through selection.
-const PR_ITEM_EDITABLE_STATUSES = ['SUBMITTED', 'HOD_APPROVED'];
+const PR_ITEM_EDITABLE_STATUSES = ['SUBMITTED', 'PR_CREATED'];
 
 const loadPrForQuotation = async (uuid) => {
   const resolved = await resolveDoc(uuid);
@@ -555,7 +555,7 @@ export const submitQuotations = async (uuid, user) => {
   const resolved = await resolveDoc(uuid);
   if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('Quotations can only be submitted on a PR');
   const pr = resolved.doc;
-  if (pr.status !== 'HOD_APPROVED') throw ApiError.badRequest('Only a HOD-approved PR can have its quotations submitted');
+  if (pr.status !== 'PR_CREATED') throw ApiError.badRequest('Only a PR-created PR can have its quotations submitted');
   ensureQuotationAdmin(user);
 
   const activeQuotations = await ProcurementQuotation.count({
@@ -735,7 +735,7 @@ export const createPr = async (uuid, user) => {
         // Created directly in the quotation-gathering state — no separate PR approval.
         // The admin fills quotations + edits line items here, then sends the PR to the
         // requester to pick a quotation blind.
-        status: 'HOD_APPROVED',
+        status: 'PR_CREATED',
         current_role_id: null,
         current_employment_id: null,
         requested_by_employment_id: pi.requested_by_employment_id,
