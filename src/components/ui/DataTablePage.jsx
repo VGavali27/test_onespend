@@ -37,6 +37,7 @@ export default function DataTablePage({
   onClearFilters,
   searchPlaceholder = 'Search...',
   emptyIcon,
+  tabs,
 }) {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -82,6 +83,11 @@ export default function DataTablePage({
           {actions}
         </div>
       </div>
+
+      {/* Tabs (optional) */}
+      {tabs && (
+        <div className="w-full">{tabs}</div>
+      )}
 
       {/* Table */}
       <DataTable

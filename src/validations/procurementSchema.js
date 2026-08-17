@@ -4,7 +4,7 @@ const itemSchema = z.object({
   item_name: z.string().trim().min(1, 'Item name is required').max(255, 'At most 255 characters'),
   description: z.string(),
   category: z.string().max(100, 'At most 100 characters'),
-  quantity: z.coerce.number({ invalid_type_error: 'Quantity must be a number' }).min(0, 'Quantity cannot be negative').default(1),
+  quantity: z.coerce.number({ invalid_type_error: 'Quantity must be a number' }).int('Quantity must be a whole number').min(0, 'Quantity cannot be negative').default(1),
   unit_price: z.coerce.number({ invalid_type_error: 'Unit price must be a number' }).min(0, 'Unit price cannot be negative').default(0),
 });
 

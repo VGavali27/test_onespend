@@ -16,19 +16,44 @@ const activeParentId = (menus, pathname) =>
 
 // How much of a leaf's `to` matches the current path (-1 = no match). A leaf matches
 // when the path IS its `to`, or descends beneath it (to + '/').
-const matchLen = (to, pathname) =>
-  pathname === to ? to.length + 1 : pathname.startsWith(`${to}/`) ? to.length : -1;
+// Also considers query parameters if present in the menu item's `to`.
+const matchLen = (to, pathname, search) => {
+  // Split the menu item's `to` into path and query parts
+  const [toPath, toQuery] = to.split('?');
+
+  // First check path match
+  const pathMatch = pathname === toPath ? toPath.length + 1 : pathname.startsWith(`${toPath}/`) ? toPath.length : -1;
+
+  if (pathMatch === -1) return -1;
+
+  // If the menu item has query params, also check they match
+  if (toQuery) {
+    const currentParams = new URLSearchParams(search);
+    const toParams = new URLSearchParams(toQuery);
+    // Check if all query params in menu item are present and matching in current URL
+    for (const [key, value] of toParams.entries()) {
+      if (currentParams.get(key) !== value) {
+        return -1; // Query param doesn't match
+      }
+    }
+    // Query params match, add extra priority for exact match
+    return pathMatch + toQuery.length + 1;
+  }
+
+  return pathMatch;
+};
 
 // The single leaf to highlight — the most-specific prefix match, so e.g. on
 // /procurement/new only "Create New" is active, not "All Requests" (/procurement).
-const activeLeafId = (menus, pathname) => {
+// Passes both pathname and search (query string) for query-aware matching.
+const activeLeafId = (menus, pathname, search) => {
   let best = null;
   let bestLen = -1;
   const walk = (items) => {
     for (const item of items) {
       if (item.children) walk(item.children);
       else if (item.to) {
-        const len = matchLen(item.to, pathname);
+        const len = matchLen(item.to, pathname, search);
         if (len > bestLen) {
           bestLen = len;
           best = item.id;
@@ -117,8 +142,8 @@ export default function Sidebar() {
 
   // The section to keep open (based on which child matches the current path)
   const parentId = useMemo(() => activeParentId(menuConfig, location.pathname), [location.pathname]);
-  // The single leaf to highlight (most-specific prefix match)
-  const leafActive = useMemo(() => activeLeafId(visibleMenus, location.pathname), [visibleMenus, location.pathname]);
+  // The single leaf to highlight (most-specific prefix match, including query params)
+  const leafActive = useMemo(() => activeLeafId(visibleMenus, location.pathname, location.search), [visibleMenus, location.pathname, location.search]);
 
   // Open the section of the current page when it changes. A manual close is kept
   // until the user navigates to a different section.

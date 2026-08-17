@@ -199,6 +199,15 @@ VITE_APP_ENV=development
 - [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
 - [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
 
+### Today's Updates (2026-08-17)
+- **Procurement tabs**: Added three tabs to Procurement list — "All Requests", "My Requests", and reserved "Role-based" (commented out for future).
+- **Sidebar highlighting fixed**: "My Requests" tab now properly highlights when URL contains `?scope=mine`.
+- **Quotation builder uses latest PR items**: When admin clicks "Add quotation", form resets and pre-fills from current `doc.items` (PR line items). Edits to PR line items reflect immediately in new quotations.
+- **Quantity as integer (DB + UI)**: `procurement_items.quantity` changed from `DECIMAL(18,2)` to `INTEGER` in migration `20260806000003`. Added `.int()` validation in schema. Form inputs use `step="1"` for quantity, `step="0.01"` for unit price.
+- **Currency always shows .00**: Updated `formatCurrency()` in `format.js` to use `minimumFractionDigits: 2, maximumFractionDigits: 2`.
+- **Create PO from QUOTATION_APPROVED**: "Create PO" button now appears when PR status = `QUOTATION_APPROVED` (was checking for `APPROVED`).
+- **Quotation selection → ADMIN_MGR**: After requester selects quotation, PR handler is now ADMIN_MGR (not CFO) so admin can create PO.
+
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
 - [ ] Employments list/create pages (`/master/employments`)

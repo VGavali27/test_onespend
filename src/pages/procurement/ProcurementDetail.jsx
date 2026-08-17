@@ -98,7 +98,10 @@ export default function ProcurementDetail() {
   useEffect(() => {
     const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN_MGR';
     const addMode = isAdmin && doc?.request_type === 'PR' && doc?.status === 'PR_CREATED' && !qEditingId;
-    if (addMode && qForm.items.length === 0 && doc?.items?.length) {
+    // Pre-fill from the PR items whenever we're in ADD mode — the PR items are the
+    // source of truth (so an admin who edited PR line items sees the latest values),
+    // not what was previously typed into the builder form.
+    if (addMode && doc?.items?.length) {
       setQForm((f) => ({
         ...f,
         items: doc.items.map((it) => ({
@@ -300,7 +303,7 @@ export default function ProcurementDetail() {
     if (doc.request_type === 'PR' && PR_ITEM_EDITABLE.includes(doc.status) && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
       availableActions.push({ key: 'edit-items', label: 'Edit Line Items' });
     }
-    if (doc.request_type === 'PR' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po) {
+    if (doc.request_type === 'PR' && doc.status === 'QUOTATION_APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po) {
       availableActions.push({ key: 'create-po', label: 'Create PO' });
     }
     if (doc.request_type === 'PO' && doc.status === 'CREATED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
@@ -759,6 +762,19 @@ function QuotationsSection({
                 resetQuoteForm();
               } else {
                 setShowBuilder(true);
+                // Reset form with fresh PR items (in case admin edited PR items after a previous open)
+                resetQuoteForm();
+                setQForm((f) => ({
+                  ...f,
+                  items: (doc?.items || []).map((it) => ({
+                    item_name: it.item_name || '',
+                    description: it.description || '',
+                    category: it.category || '',
+                    quantity: it.quantity ?? 1,
+                    unit_price: it.unit_price ?? 0,
+                    tax_rate: it.tax_rate ?? 0,
+                  })),
+                }));
               }
             }}
             className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
@@ -854,10 +870,11 @@ function QuotationsSection({
                               <input
                                 type="number"
                                 min={0}
-                                value={it.quantity}
+                                step="1"
+                                value={Number(it.quantity) || 0}
                                 onChange={(e) => {
                                   const items = [...(qForm.items || [])];
-                                  items[idx] = { ...items[idx], quantity: e.target.value };
+                                  items[idx] = { ...items[idx], quantity: Number(e.target.value) || 0 };
                                   setQForm((f) => ({ ...f, items }));
                                 }}
                                 className="w-full px-2 py-1.5 rounded-md text-right text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
@@ -954,8 +971,9 @@ function QuotationsSection({
                             <input
                               type="number"
                               min={0}
-                              value={it.quantity}
-                              onChange={(e) => patchItem({ quantity: e.target.value })}
+                              step="1"
+                              value={Number(it.quantity) || 0}
+                              onChange={(e) => patchItem({ quantity: Number(e.target.value) || 0 })}
                               className="w-full px-2 py-1.5 rounded-md text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
                             />
                           </div>
@@ -965,8 +983,8 @@ function QuotationsSection({
                               type="number"
                               min={0}
                               step="0.01"
-                              value={it.unit_price}
-                              onChange={(e) => patchItem({ unit_price: e.target.value })}
+                              value={Number(it.unit_price) || 0}
+                              onChange={(e) => patchItem({ unit_price: Number(e.target.value) || 0 })}
                               className="w-full px-2 py-1.5 rounded-md text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
                             />
                           </div>

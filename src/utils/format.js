@@ -15,9 +15,9 @@ export const formatDateTime = (iso, locale = 'en-IN') =>
 // "PERMANENT" -> "Permanent"
 export const formatType = (t) => (t ? t.charAt(0) + t.slice(1).toLowerCase() : '—');
 
-// ₹ amount formatting (Indian locale)
+// ₹ amount formatting (Indian locale) — always show 2 decimal places
 export const formatCurrency = (amount) =>
-  amount == null ? '—' : `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+  amount == null ? '—' : `₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // Plain number formatting (no currency symbol — e.g. foreign amounts / exchange rates)
 export const formatNumber = (n) =>

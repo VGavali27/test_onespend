@@ -182,10 +182,10 @@ export default function ProcurementForm({
                       <input className={inputClassFor(!!errors.items?.[i]?.category)} {...register(`items.${i}.category`)} placeholder="e.g. Hardware" />
                     </FormField>
                     <FormField label="Quantity" error={errors.items?.[i]?.quantity?.message}>
-                      <input type="number" min={0} className={inputClassFor(!!errors.items?.[i]?.quantity)} {...register(`items.${i}.quantity`)} />
+                      <input type="number" min={0} step="1" className={inputClassFor(!!errors.items?.[i]?.quantity)} {...register(`items.${i}.quantity`)} />
                     </FormField>
                     <FormField label="Unit price" error={errors.items?.[i]?.unit_price?.message}>
-                      <input type="number" min={0} className={inputClassFor(!!errors.items?.[i]?.unit_price)} {...register(`items.${i}.unit_price`)} placeholder="0" />
+                      <input type="number" min={0} step="0.01" className={inputClassFor(!!errors.items?.[i]?.unit_price)} {...register(`items.${i}.unit_price`)} placeholder="0.00" />
                     </FormField>
                     <div className="xl:col-span-5">
                       <FormField label="Description" error={errors.items?.[i]?.description?.message}>

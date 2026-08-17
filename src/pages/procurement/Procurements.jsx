@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatDate, formatCurrency } from '@/utils/format';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
-import { ShoppingCart, Plus, Pencil, Trash2, Loader2, Eye } from 'lucide-react';
+import { ShoppingCart, Plus, Pencil, Trash2, Loader2, Eye, Inbox, FileText } from 'lucide-react';
 import DataTablePage from '@/components/ui/DataTablePage';
-import { procurementApi } from '@/services/procurementService';
+import { procurementApiWithScope } from '@/services/procurementService';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
 
@@ -36,11 +36,39 @@ function TypeBadge({ type }) {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${palette[type] || palette.PI}`}>{type}</span>;
 }
 
+const TABS = [
+  { id: 'all', label: 'All Requests', icon: Inbox, scope: 'all', description: 'All requests from your employments' },
+  { id: 'mine', label: 'My Requests', icon: FileText, scope: 'mine', description: 'Only your own requests' },
+  // Future: { id: 'role', label: 'Role-based', icon: Shield, scope: 'role', description: 'Filtered by role permissions' },
+];
+
 export default function Procurements() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    const scope = searchParams.get('scope') || 'all';
+    return TABS.find(t => t.scope === scope)?.id || 'all';
+  });
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Sync activeTab with URL scope param
+  useEffect(() => {
+    const scope = searchParams.get('scope') || 'all';
+    const tab = TABS.find(t => t.scope === scope);
+    if (tab && tab.id !== activeTab) {
+      setActiveTab(tab.id);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tabId) => {
+    const tab = TABS.find(t => t.id === tabId);
+    if (tab) {
+      setActiveTab(tabId);
+      setSearchParams({ ...Object.fromEntries(searchParams), scope: tab.scope });
+    }
+  };
   const [reloadKey, setReloadKey] = useState(0);
 
   const columns = [
@@ -116,9 +144,11 @@ export default function Procurements() {
     }),
   ];
 
+  const currentScope = TABS.find(t => t.id === activeTab)?.scope || 'all';
+
   const fetchProcurements = async ({ page, limit, sortBy, sortOrder, search }, { signal }) => {
-    const { data } = await procurementApi.list(
-      { page, limit, sortBy, sortOrder, search, type: typeFilter, status: statusFilter },
+    const { data } = await procurementApiWithScope.list(
+      { page, limit, sortBy, sortOrder, search, type: typeFilter, status: statusFilter, scope: currentScope },
       { signal },
     );
     return { data: data?.data ?? [], total: data?.meta?.total ?? 0 };
@@ -128,6 +158,10 @@ export default function Procurements() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
+      await procurementApiWithScope.list({}, { params: { scope: 'all' } }); // reuses the crud delete
+      // Actually use the crud remove directly
+      const { crud } = await import('@/services/api');
+      const procurementApi = crud('/procurement');
       await procurementApi.remove(deleteTarget.uuid);
       setDeleteTarget(null);
       setReloadKey((k) => k + 1);
@@ -157,7 +191,7 @@ export default function Procurements() {
         icon={ShoppingCart}
         columns={columns}
         fetchFn={fetchProcurements}
-        filterDeps={[typeFilter, statusFilter]}
+        filterDeps={[typeFilter, statusFilter, activeTab]}
         countLabel="document"
         emptyMessage="No procurement documents yet"
         searchPlaceholder="Search by number, title or vendor..."
@@ -174,6 +208,25 @@ export default function Procurements() {
               New PI
             </Link>
           </>
+        }
+        tabs={
+          <div className="flex items-center border-b border-slate-200 dark:border-gray-700 mb-4">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-2 px-4 py-3 text-[13px] font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+                title={tab.description}
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
         }
       />
 

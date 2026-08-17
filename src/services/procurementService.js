@@ -4,6 +4,11 @@ import { crud } from '@/services/api';
 // ── Procurement (PI → PR → PO → Received → Finance → CFO → Payment) ──
 export const procurementApi = crud('/procurement');
 
+// Extended list with scope support
+export const procurementApiWithScope = {
+  list: (params = {}, options = {}) => api.get('/procurement', { params, ...options }),
+};
+
 // ── Workflow actions ──
 export const submitProcurement = (uuid, remarks) => api.post(`/procurement/${uuid}/submit`, { remarks });
 export const approveProcurement = (uuid, remarks) => api.post(`/procurement/${uuid}/approve`, { remarks });
