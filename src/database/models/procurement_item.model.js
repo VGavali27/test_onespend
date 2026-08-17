@@ -28,7 +28,7 @@ export default (sequelize, DataTypes) => {
       item_name: { type: DataTypes.STRING(255), allowNull: false },
       description: DataTypes.TEXT,
       category: DataTypes.STRING(100),
-      quantity: { type: DataTypes.DECIMAL(18, 2), defaultValue: 1 },
+      quantity: { type: DataTypes.INTEGER, defaultValue: 1 },
       unit_price: DataTypes.TEXT,
       // tax rate (%) stored plain — only sensitive amounts are encrypted
       tax_rate: DataTypes.DECIMAL(10, 2),

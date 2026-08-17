@@ -119,7 +119,7 @@ export async function up(queryInterface, Sequelize) {
     item_name: { type: Sequelize.STRING(255), allowNull: false },
     description: { type: Sequelize.TEXT, allowNull: true },
     category: { type: Sequelize.STRING(100), allowNull: true },
-    quantity: { type: Sequelize.DECIMAL(18, 2), allowNull: true, defaultValue: 1 },
+    quantity: { type: Sequelize.INTEGER, allowNull: true, defaultValue: 1 },
     unit_price: { type: Sequelize.TEXT, allowNull: true },
     // tax rate (%) stored plain — only sensitive amounts are encrypted
     tax_rate: { type: Sequelize.DECIMAL(10, 2), allowNull: true },

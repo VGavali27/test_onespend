@@ -214,20 +214,38 @@ const copyItems = (sourceItems = []) =>
 
 export const getVisible = async (user, params = {}) => {
   const employmentIds = await getEmploymentIdsByUser(user.userId);
+  const companyIds = await getActiveCompanyIdsByUser(user.userId);
+  const scope = params.scope || 'all'; // 'all', 'mine', 'submitted'
+
   let result;
 
-  // Build the visibility scope (which documents this user can see at all)
+  // Build the base visibility scope
   let scopeWhere = {};
   if (GLOBAL_ROLES.includes(user.roleCode)) {
     scopeWhere = {};
   } else if (MANAGER_ROLES.includes(user.roleCode)) {
-    const companyIds = await getActiveCompanyIdsByUser(user.userId);
     if (companyIds.length === 0) return { rows: [], total: 0 };
     scopeWhere = { company_id: { [Op.in]: companyIds } };
   } else {
     if (employmentIds.length === 0) return { rows: [], total: 0 };
     scopeWhere = { requested_by_employment_id: { [Op.in]: employmentIds } };
   }
+
+  // Apply scope filter
+  let scopeFilter = {};
+  if (scope === 'mine') {
+    // Only the logged-in user's own requests
+    scopeFilter = { requested_by_employment_id: { [Op.in]: employmentIds } };
+  } else if (scope === 'submitted') {
+    // All requests from user's employments, but only non-DRAFT (submitted onwards)
+    scopeFilter = {
+      [Op.and]: [
+        { requested_by_employment_id: { [Op.in]: employmentIds } },
+        { status: { [Op.ne]: 'DRAFT' } },
+      ],
+    };
+  }
+  // 'all' = no additional filter beyond base scopeWhere
 
   // DRAFT PIs are hidden from everyone EXCEPT their creator (the requester).
   // This applies to ALL role types (global, manager, requester).
@@ -241,7 +259,7 @@ export const getVisible = async (user, params = {}) => {
       }
     : { status: { [Op.ne]: 'DRAFT' } }; // users with no employments see no drafts
 
-  const combinedWhere = { [Op.and]: [scopeWhere, draftPiFilter] };
+  const combinedWhere = { [Op.and]: [scopeWhere, scopeFilter, draftPiFilter] };
 
   result = await procurementRepository.findAll(combinedWhere, params);
 
@@ -608,7 +626,7 @@ export const selectQuotation = async (uuid, user, quotationUuid) => {
     await pr.update(
       {
         status: 'QUOTATION_APPROVED',
-        current_role_id: ROLE_IDS.CFO,
+        current_role_id: ROLE_IDS.ADMIN_MGR, // After selection, admin creates PO from it
         current_employment_id: null,
         vendor_id: quotation.vendor_id, // vendor revealed to approvers from here on
       },
@@ -616,7 +634,7 @@ export const selectQuotation = async (uuid, user, quotationUuid) => {
     );
     await logHandover({
       type: 'PR', docId: pr.id, actionType: 'SELECT_QUOTATION',
-      fromRoleId: null, toRoleId: ROLE_IDS.CFO,
+      fromRoleId: null, toRoleId: ROLE_IDS.ADMIN_MGR,
       employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
     });
     return procurementRepository.findByUuid(uuid, t);
@@ -767,7 +785,8 @@ export const createPo = async (uuid, user) => {
   const resolved = await resolveDoc(uuid);
   if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('A purchase order can only be created from a PR');
   const pr = resolved.doc;
-  if (pr.status !== 'APPROVED') throw ApiError.badRequest('The PR must be approved before creating a PO');
+  console.log('DEBUG createPo - PR status:', pr.status, '| vendor_id:', pr.vendor_id, '| uuid:', uuid);
+  if (pr.status !== 'QUOTATION_APPROVED') throw ApiError.badRequest('The PR must have an approved quotation before creating a PO');
   if (!pr.vendor_id) throw ApiError.badRequest('The PR has no selected vendor yet');
 
   // Duplicate guard: only one PO per PR
@@ -778,6 +797,14 @@ export const createPo = async (uuid, user) => {
   const documentNumber = await generateDocumentNumber('PO');
 
   return sequelize.transaction(async (t) => {
+    // Find the SELECTED quotation on this PR — its line items (qty, price, tax) are
+    // the source of truth for the PO.
+    const selectedQuotation = await ProcurementQuotation.findOne({
+      where: { pr_id: pr.id, status: 'SELECTED' },
+      include: [{ model: ProcurementItem, as: 'items' }],
+      transaction: t,
+    });
+
     const po = await ProcurementOrder.create(
       {
         document_number: documentNumber,
@@ -797,7 +824,10 @@ export const createPo = async (uuid, user) => {
       },
       { transaction: t },
     );
-    const copiedItems = copyItems(pr.items);
+
+    // Copy items from the SELECTED quotation (if any), else fall back to PR items
+    const sourceItems = selectedQuotation?.items?.length ? selectedQuotation.items : pr.items;
+    const copiedItems = copyItems(sourceItems);
     if (copiedItems.length) {
       await db.ProcurementItem.bulkCreate(
         copiedItems.map((it, i) => ({ ...it, po_id: po.id, sort_order: i })),
