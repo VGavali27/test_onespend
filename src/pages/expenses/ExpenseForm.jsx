@@ -135,7 +135,9 @@ export default function ExpenseForm({
     const load = async () => {
       try {
         const [cats, prof] = await Promise.all([categoryApi.list(), getMyProfile()]);
-        setCategories(cats.data?.data ?? []);
+        // Filter out procurement module categories from the dropdown
+        const allCategories = cats.data?.data ?? [];
+        setCategories(allCategories.filter((c) => c.module !== 'procurement'));
         // Company dropdown is scoped to the companies the logged-in user is employed in
         const seen = new Set();
         const companies = [];

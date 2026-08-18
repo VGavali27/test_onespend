@@ -38,7 +38,9 @@ const PROCUREMENT_STATUS_STYLES = {
 // Statuses where the current handler can approve/reject.
 // NOTE: PR_CREATED is NOT here — after PR creation the admin fills quotations
 // and runs submit-quotations (there is no plain "approve" step at PR_CREATED).
-const APPROVABLE_STATUSES = ['SUBMITTED', 'QUOTATION_APPROVED', 'RECEIVED', 'FINANCE_APPROVED'];
+// QUOTATION_APPROVED is also NOT approvable — at this stage the PR has a
+// selected quotation and the next action is "Create PO" (not approve).
+const APPROVABLE_STATUSES = ['SUBMITTED', 'RECEIVED', 'FINANCE_APPROVED'];
 
 export default function ProcurementDetail() {
   const { uuid } = useParams();

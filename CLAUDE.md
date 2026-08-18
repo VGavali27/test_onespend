@@ -199,6 +199,10 @@ VITE_APP_ENV=development
 - [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
 - [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
 
+### Today's Updates (2026-08-18)
+- **Expense category filter**: In `ExpenseForm.jsx`, procurement module categories are now filtered out of the category dropdown (`c.module !== 'procurement'`). Procurement expenses are created automatically from PO/PR, not manually.
+- **QUOTATION_APPROVED no longer approvable**: In `ProcurementDetail.jsx`, removed `QUOTATION_APPROVED` from `APPROVABLE_STATUSES`. At this stage the PR has a selected quotation and the next action is "Create PO" (not approve). Only `SUBMITTED`, `RECEIVED`, and `FINANCE_APPROVED` remain approvable.
+
 ### Today's Updates (2026-08-17)
 - **Procurement tabs**: Added three tabs to Procurement list — "All Requests", "My Requests", and reserved "Role-based" (commented out for future).
 - **Sidebar highlighting fixed**: "My Requests" tab now properly highlights when URL contains `?scope=mine`.
