@@ -229,6 +229,13 @@ npm run seed              # run seeders
 
 Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Quotation → PO (Purchase Order) → Received → Finance → CFO (re-approval) → Payment`.
 
+### Today's Updates (2026-08-18)
+- **Health check debug logging**: Added `console.log('Health check endpoint hit')` to `GET /health` in `src/app.js` for monitoring.
+- **SQL logging disabled**: Changed `logging: env.isDev ? console.log : false` to `logging: false` in `src/config/database.js` — no more SQL queries logged in development.
+- **`markReceived` workflow removed**: Deleted the `markReceived` controller function and its route (`POST /:uuid/received`) from procurement module. The "Received" step is no longer a separate action in the PO flow.
+- **Test route commented out**: Added a commented test route for `/create-po` in `procurement.routes.js` (for debugging).
+- **PO handover log `toRoleId` set to `null`**: In `procurement.service.js`, the `createPo` handover log now uses `toRoleId: null` instead of `ROLE_IDS.ADMIN_MGR` — the PO creation doesn't hand off to a next role; the auto-created expense handles its own approval chain.
+
 ### Today's Updates (2026-08-17)
 - **PR Quotation Selection flow fixed**: After requester selects a quotation (`SELECT_QUOTATION`), the PR status becomes `QUOTATION_APPROVED` and the handler is now `ADMIN_MGR` (not CFO) — so admin can create the PO from the selected quotation.
 - **Create PO uses selected quotation items**: `createPo` copies line items (qty, unit_price, tax_rate) from the `SELECTED` quotation on the PR, not from the original PR items. Falls back to PR items if no quotation selected.

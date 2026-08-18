@@ -836,7 +836,7 @@ export const createPo = async (uuid, user) => {
     }
     await logHandover({
       type: 'PO', docId: po.id, actionType: 'CREATE_PO',
-      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: ROLE_IDS.ADMIN_MGR,
+      fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: null,
       employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
     });
     // Create the expense linked to this PO — same transaction, atomic.

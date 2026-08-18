@@ -20,6 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // ---------- Health Check ----------
 app.get('/health', (_req, res) => {
+  console.log('Health check endpoint hit');
   res.status(HTTP_STATUS.OK).json({
     success: true,
     message: 'API is running',

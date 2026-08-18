@@ -106,15 +106,6 @@ export const createPo = async (req, res, next) => {
 };
 
 
-export const markReceived = async (req, res, next) => {
-  try {
-    const doc = await procurementService.received(req.params.uuid, req.user);
-    return ApiResponse.success(res, doc, 'Purchase order marked as received');
-  } catch (error) {
-    next(error);
-  }
-};
-
 export const markPaid = async (req, res, next) => {
   try {
     const doc = await procurementService.pay(req.params.uuid, req.user, req.body?.remarks);
