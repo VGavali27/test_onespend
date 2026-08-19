@@ -166,7 +166,7 @@ npm run seed              # run seeders
 - [x] Permission API — CRUD by UUID
 - [x] UserEmployment API — CRUD by UUID
 - [x] Expense API — CRUD by UUID. **Combined create supports Travel AND Reimbursement** in one transaction; `estimated_amount` is computed server-side from the line items (not trusted from the client). **Scoped lists** — `GET /expenses/my` (own expenses), `GET /expenses` (role+company scoped: SUPER_ADMIN/CFO/**ADMIN_MGR** see all — ADMIN_MGR is global so it can see the procurement-converted expenses it creates — other expense-manager roles see only companies they're employed in), both server-side paginated (`page/limit/search/status/category/sort`); DRAFT expenses are editable by the creator only
-- [x] **Expense approval flow** — `POST /expenses/:uuid/{submit,approve,reject}` (`actionSchema` = optional remarks). Handover hops validated against `role_handover_rules` with `module='expense'` (seeded: ADMIN_MGR→CFO, SUPER_ADMIN→CFO). `submit` moves a DRAFT to SUBMITTED with the category's first receiver as handler; `approve` forwards the current handler to the category's final approver (rule-checked) and closes the expense as **APPROVED** when the **final approver** approves; `reject` closes it as REJECTED. Each action logs an `expense_handovers` row (SUBMIT/APPROVE/REJECT) and returns the post-update state read inside the same transaction
+- [x] **Expense approval flow** — `POST /expenses/:uuid/{submit,approve,reject}` (`actionSchema` = optional remarks + `to_role_id` for approve). **Scoped lists**: `GET /expenses/my` (own), `GET /expenses` (all, role+company scoped), `GET /expenses/assigned` (pending user's role approval, company-scoped). Handover hops validated against `role_handover_rules` with `module=category.module` (travel/reimbursement/procurement — seeded: FINANCE_MGR→CFO for travel/reimbursement, ADMIN_MGR→CFO for procurement, SUPER_ADMIN→CFO). `submit` moves a DRAFT to SUBMITTED with the category's first receiver as handler; `approve` forwards to a selected handover role (validated against rules) or defaults to the category's final approver; closes as **APPROVED** when the final approver approves; `reject` closes as REJECTED. Each action logs an `expense_handovers` row (SUBMIT/APPROVE/REJECT) and returns the post-update state read inside the same transaction
 - [x] ExpenseCategory API — CRUD by UUID
 - [x] **Reimbursement API** — header (`reimbursement_expenses`: advance amount/date, payment method, remarks) + line items (`reimbursement_expense_items`: date, description, bill no., exps. type, total). `GET /reimbursements/by-expense/:expenseUuid`, `PUT /reimbursements/:uuid`. Amounts AES-encrypted (created via bulkCreate with `individualHooks`)
 - [x] TravelExpense API — combined create with-travel endpoint
@@ -257,3 +257,16 @@ Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Q
 - **Expense payment step** — expenses currently stop at APPROVED (final approver = CFO). A payment stage (PAID) would mirror the PO's Received → Finance → Payment leg.
 - **Vendor masked on the expense** — the PO-created expense currently shows the PO amount; a vendor breakdown could be added if expenses need vendor-level detail.
 - Frontend lives in the frontend repo (Procurement section — list, create PI, detail with action bar + handover timeline + documents).
+
+### Today's Updates (2026-08-18) — Expense Approval Handover Flow
+- **New endpoint**: `GET /expenses/assigned` — returns expenses pending the logged-in user's role approval (company-scoped; SUPER_ADMIN/CFO see all, other manager roles see only their employed companies).
+- **Enhanced approve action**: `POST /expenses/:uuid/approve` now accepts optional `to_role_id` for flexible handover to a specific role.
+- **Role handover rules per category module**: The approval chain now uses `category.module` (travel/reimbursement/procurement) instead of hardcoded `'expense'`. Existing seeded rules work:
+  - Travel: FINANCE_MGR (104) → CFO (101)
+  - Reimbursement: FINANCE_MGR (104) → CFO (101)
+  - Procurement: ADMIN_MGR (106) → CFO (101)
+  - SUPER_ADMIN → CFO (all modules)
+- **New service method**: `getValidHandoverRoles(uuid)` — returns valid handover target roles from `role_handover_rules` for the current handler.
+- **New route**: `GET /expenses/:uuid/handover-roles` — exposes valid handover roles for the frontend dropdown.
+- **Updated validation**: `actionSchema` now accepts optional `to_role_id` for approve action.
+- **Removed redundant seeder**: `20260811000001-seed-expense-handover-rules.js` (uses existing travel/reimbursement/procurement module rules).

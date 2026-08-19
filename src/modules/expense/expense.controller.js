@@ -14,6 +14,19 @@ export const getAllExpenses = async (req, res, next) => {
   }
 };
 
+// Expenses assigned to the logged-in user's role (pending their approval) —
+// paginated and company-scoped (SUPER_ADMIN/CFO see all). Query: page, limit, search, category, sortBy, sortOrder, decrypt
+export const getAssignedExpenses = async (req, res, next) => {
+  try {
+    const { rows, total } = await expenseService.getAssigned(req.user, req.query);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+    return ApiResponse.paginated(res, rows, { page, limit, total });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Expenses created by the logged-in user — paginated (same query params as above)
 export const getMyExpenses = async (req, res, next) => {
   try {
@@ -90,8 +103,19 @@ export const submitExpense = async (req, res, next) => {
 
 export const approveExpense = async (req, res, next) => {
   try {
-    const expense = await expenseService.approve(req.params.uuid, req.user, req.body?.remarks);
+    const toRoleId = req.body?.to_role_id ? Number(req.body.to_role_id) : null;
+    const expense = await expenseService.approve(req.params.uuid, req.user, req.body?.remarks, toRoleId);
     return ApiResponse.success(res, expense, 'Expense approved successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get valid handover target roles for the current handler of an expense
+export const getHandoverRoles = async (req, res, next) => {
+  try {
+    const roles = await expenseService.getValidHandoverRoles(req.params.uuid);
+    return ApiResponse.success(res, roles, 'Valid handover roles fetched');
   } catch (error) {
     next(error);
   }

@@ -140,8 +140,10 @@ export const createExpenseSchema = Joi.object({
 });
 
 // Workflow actions (submit / approve / reject) carry an optional remark
+// approve also accepts optional to_role_id for handover
 export const actionSchema = Joi.object({
   remarks: Joi.string().allow(null, ''),
+  to_role_id: Joi.number().integer().allow(null, ''),
 });
 
 // Schema for updating an expense — basic fields + module children, all optional.

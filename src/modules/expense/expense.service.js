@@ -24,6 +24,7 @@ const {
 const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR'];
 
 // Roles allowed to view the "all expenses" list (everyone else uses /expenses/my)
+// Also used for /expenses/assigned (expenses pending approval for the user's role)
 export const EXPENSE_MANAGER_ROLES = [
   'SUPER_ADMIN',
   'CFO',
@@ -34,6 +35,7 @@ export const EXPENSE_MANAGER_ROLES = [
   'FINANCE_JR',
   'TRAVEL_MGR',
   'HOD',
+  'EMP_MGR',
 ];
 
 // Persist uploaded attachments as expense_documents, each linked to its own sub-part record
@@ -108,6 +110,29 @@ export const getVisible = async (user, params = {}) => {
         ? await expenseRepository.findByCompanyIds(companyIds, params)
         : { rows: [], total: 0 };
   }
+  if (params.decrypt) decryptResults(result.rows);
+  const employmentIds = await getEmploymentIdsByUser(user.userId);
+  markCanEdit(result.rows, employmentIds);
+  return result;
+};
+
+// Expenses assigned to the logged-in user's role (current_role_id = their role) and
+// scoped to the companies they're actively employed in — so a FINANCE_MGR only sees the
+// expenses pending their approval in the companies they belong to. SUPER_ADMIN/CFO are
+// global and see every assigned expense regardless of company. Paginated.
+export const getAssigned = async (user, params = {}) => {
+  const role = await roleRepository.findByCode(user.roleCode);
+  if (!role) return { rows: [], total: 0 };
+
+  let companyIds = [];
+  if (!EXPENSE_GLOBAL_ROLES.includes(user.roleCode)) {
+    companyIds = await getActiveCompanyIdsByUser(user.userId);
+  }
+
+  const where = { current_role_id: role.id, status: 'SUBMITTED' };
+  if (companyIds.length > 0) where.company_id = { [db.Sequelize.Op.in]: companyIds };
+
+  const result = await expenseRepository.findAll(where, params);
   if (params.decrypt) decryptResults(result.rows);
   const employmentIds = await getEmploymentIdsByUser(user.userId);
   markCanEdit(result.rows, employmentIds);
@@ -570,10 +595,10 @@ export const deleteRecord = async (uuid) => {
 const findRoleByCode = async (code) => roleRepository.findByCode(code);
 
 // Every role→role hop must be authorized by an ACTIVE role_handover_rules row for
-// module='expense' — editing those rules reconfigures who can forward to whom.
-const requireHandoverRule = async (fromRoleId, toRoleId) => {
+// the expense's category module (travel/reimbursement/procurement) — editing those rules reconfigures who can forward to whom.
+const requireHandoverRule = async (fromRoleId, toRoleId, module) => {
   const rule = await RoleHandoverRule.findOne({
-    where: { module: 'expense', from_role_id: fromRoleId, to_role_id: toRoleId, status: 'ACTIVE' },
+    where: { module, from_role_id: fromRoleId, to_role_id: toRoleId, status: 'ACTIVE' },
   });
   if (!rule) throw ApiError.forbidden('This expense handover is not configured');
 };
@@ -691,9 +716,11 @@ export const submit = async (uuid, user, remarks) => {
   });
 };
 
-// Approve a SUBMITTED expense. The current handler forwards to the category's final
-// approver (CFO); the final approver's approve closes the expense as APPROVED.
-export const approve = async (uuid, user, remarks) => {
+// Approve a SUBMITTED expense with optional handover to a specific role.
+// If toRoleId is provided, validates against role_handover_rules (module='expense').
+// If toRoleId is not provided, defaults to the category's final_approver_role_id.
+// If the current handler IS the final approver, the expense is closed as APPROVED.
+export const approve = async (uuid, user, remarks, toRoleId = null) => {
   const expense = await expenseRepository.findByUuid(uuid);
   if (!expense) throw ApiError.notFound('Expense not found');
   if (expense.status !== 'SUBMITTED') throw ApiError.badRequest('This expense is not pending approval');
@@ -708,9 +735,12 @@ export const approve = async (uuid, user, remarks) => {
   const fromRole = expense.current_role_id;
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
 
+  // Determine the target role for handover
+  const targetRoleId = toRoleId ?? finalApprover;
+
   return sequelize.transaction(async (t) => {
-    if (fromRole != null && fromRole === finalApprover) {
-      // final approver (CFO) approves → expense is fully approved
+    if (fromRole != null && fromRole === finalApprover && !toRoleId) {
+      // Current handler is the final approver and no explicit handover requested → close as APPROVED
       await expense.update(
         { status: 'APPROVED', current_role_id: null, current_employment_id: null, closed_at: new Date() },
         { transaction: t },
@@ -720,18 +750,48 @@ export const approve = async (uuid, user, remarks) => {
         employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
       });
     } else {
-      await requireHandoverRule(fromRole, finalApprover);
+      // Validate the handover against role_handover_rules for the category's module
+      if (targetRoleId) {
+        await requireHandoverRule(fromRole, targetRoleId, category?.module);
+      }
       await expense.update(
-        { current_role_id: finalApprover, current_employment_id: null },
+        { current_role_id: targetRoleId, current_employment_id: null },
         { transaction: t },
       );
       await logExpenseHandover({
-        expenseId: expense.id, fromRoleId: fromRole, toRoleId: finalApprover,
+        expenseId: expense.id, fromRoleId: fromRole, toRoleId: targetRoleId,
         employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
       });
     }
     return expenseRepository.findByUuid(uuid, t);
   });
+};
+
+// Get valid handover target roles for the current handler of an expense
+// Returns roles from role_handover_rules where from_role_id = expense.current_role_id, module=category.module, status='ACTIVE'
+export const getValidHandoverRoles = async (uuid) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+  if (expense.status !== 'SUBMITTED') throw ApiError.badRequest('This expense is not pending approval');
+
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+  if (!category) return [];
+
+  const fromRoleId = expense.current_role_id;
+  if (!fromRoleId) return [];
+
+  const rules = await RoleHandoverRule.findAll({
+    where: { module: category.module, from_role_id: fromRoleId, status: 'ACTIVE' },
+    include: [{ model: db.Role, as: 'toRole', attributes: ['id', 'uuid', 'name', 'code'] }],
+    order: [['created_at', 'ASC']],
+  });
+
+  return rules.map((r) => ({
+    roleId: r.toRole?.id,
+    roleUuid: r.toRole?.uuid,
+    roleName: r.toRole?.name,
+    roleCode: r.toRole?.code,
+  }));
 };
 
 // Reject a SUBMITTED expense — closes it as REJECTED and clears the handler.
