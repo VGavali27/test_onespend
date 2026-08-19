@@ -1,27 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Wallet, Plus, Eye, Pencil, Send, CheckCircle2, XCircle, ArrowRightLeft, Banknote } from 'lucide-react';
+import { Wallet, Plus, Eye, Pencil, Send, CheckCircle2, XCircle, ArrowRightLeft, Banknote, Loader2 } from 'lucide-react';
 import DataTablePage from '@/components/ui/DataTablePage';
 import StatusBadge from '@/components/ui/StatusBadge';
 import UserDetailsModal from '@/components/ui/UserDetailsModal';
 import { useToast } from '@/components/ui/Toast';
 import { getMyExpenses } from '@/services/expenseService';
 import { categoryApi } from '@/services/financeService';
+import { approveExpense, rejectExpense, getHandoverRoles } from '@/services/expenseService';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
+import { useAuth } from '@/context/AuthContext';
 
 const STATUS_OPTIONS = ['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID'];
 const columnHelper = createColumnHelper();
 
 // Shared expense list built on the standard DataTablePage (server-side pagination,
 // sorting, debounced search, filters). Rendered by both /expenses/my (own expenses)
-// and /expenses/all (the role+company-scoped list) via the fetchList prop.
+// and /expenses/all (the role+company-scoped list) and /expenses/assigned (pending approval)
+// via the fetchList prop and actionMode.
 export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExpenses, actionMode = 'mine' }) {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [categories, setCategories] = useState([]);
   const [viewUser, setViewUser] = useState(null);
+  const [acting, setActing] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // 'approve' | 'reject'
+  const [remarks, setRemarks] = useState('');
+  const [selectedExpense, setSelectedExpense] = useState(null);
+  const [handoverRoles, setHandoverRoles] = useState([]);
+  const [selectedHandoverRoleId, setSelectedHandoverRoleId] = useState(null);
+  const [loadingHandoverRoles, setLoadingHandoverRoles] = useState(false);
   const toast = useToast();
+  const { user } = useAuth();
 
   // Approve/handover/payment endpoints aren't built yet — show a notice until they are.
   const placeholderAction = () => toast.error('This action is not implemented yet.');
@@ -55,6 +66,44 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     return { data: data?.data ?? [], total: data?.meta?.total ?? 0 };
   };
 
+  const loadHandoverRoles = useCallback(async (expenseId) => {
+    setLoadingHandoverRoles(true);
+    try {
+      const { data } = await getHandoverRoles(expenseId);
+      setHandoverRoles(data?.data ?? []);
+    } catch (e) {
+      console.error('Failed to load handover roles:', e);
+      setHandoverRoles([]);
+    } finally {
+      setLoadingHandoverRoles(false);
+    }
+  }, []);
+
+  const handleApproveClick = useCallback(async (expense) => {
+    setSelectedExpense(expense);
+    await loadHandoverRoles(expense.uuid);
+    setConfirmAction('approve');
+  }, [loadHandoverRoles]);
+
+  const runAction = useCallback(async (key, actionRemarks) => {
+    if (!selectedExpense) return;
+    setActing(true);
+    try {
+      if (key === 'approve') await approveExpense(selectedExpense.uuid, actionRemarks, selectedHandoverRoleId);
+      else if (key === 'reject') await rejectExpense(selectedExpense.uuid, actionRemarks);
+      toast.success(key === 'approve' ? 'Expense approved' : 'Expense rejected');
+      setConfirmAction(null);
+      setRemarks('');
+      setSelectedExpense(null);
+      setSelectedHandoverRoleId(null);
+      setHandoverRoles([]);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Action failed.');
+    } finally {
+      setActing(false);
+    }
+  }, [selectedExpense, selectedHandoverRoleId, toast]);
+
   const columns = [
     columnHelper.accessor('title', {
       header: 'Expense',
@@ -77,13 +126,14 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     }),
     // All Expenses: one column with the submitter's name (clickable → user modal) on top
     // and the company below. My Expenses just shows the company.
+    // Assigned: show submitter name + company
     columnHelper.accessor('company', {
-      header: actionMode === 'all' ? 'Submitted by' : 'Company',
+      header: actionMode === 'all' || actionMode === 'assigned' ? 'Submitted by' : 'Company',
       enableSorting: false,
       cell: ({ row }) => {
         const r = row.original;
         const companyName = r.company?.name || '—';
-        if (actionMode !== 'all') return companyName;
+        if (actionMode !== 'all' && actionMode !== 'assigned') return companyName;
         const emp = r.requestedByEmployment;
         const u = emp?.user;
         const name = u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : null;
@@ -159,6 +209,40 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
             </button>,
             viewLink,
           ];
+        } else if (actionMode === 'assigned') {
+          // Assigned view — approve/reject for SUBMITTED expenses where user is the handler
+          // Check if the current user's role matches the current handler role
+          const isCurrentHandler = r.currentRole?.code && user?.role === r.currentRole.code;
+          const isSubmitted = r.status === 'SUBMITTED';
+          const canAct = isCurrentHandler || user?.role === 'SUPER_ADMIN';
+
+          actions = [
+            canAct && isSubmitted && (
+              <button
+                key="approve"
+                type="button"
+                title="Approve expense"
+                disabled={acting}
+                onClick={() => handleApproveClick(r)}
+                className={`${iconClass} hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20`}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+              </button>
+            ),
+            canAct && isSubmitted && (
+              <button
+                key="reject"
+                type="button"
+                title="Reject expense"
+                disabled={acting}
+                onClick={() => { setSelectedExpense(r); setConfirmAction('reject'); }}
+                className={`${iconClass} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20`}
+              >
+                <XCircle className="h-4 w-4" />
+              </button>
+            ),
+            viewLink,
+          ];
         } else {
           // Creator's own view — edit + submit while DRAFT
           actions = [
@@ -180,17 +264,24 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     }),
   ];
 
+  // Subtitle based on actionMode
+  const getSubtitle = () => {
+    if (actionMode === 'assigned') return 'Expenses pending your approval';
+    if (title === 'All Expenses') return 'Expenses across your companies';
+    return 'Expenses you have created';
+  };
+
   return (
     <>
       <DataTablePage
         title={title}
-        subtitle={title === 'All Expenses' ? 'Expenses across your companies' : 'Expenses you have created'}
+        subtitle={getSubtitle()}
         icon={Wallet}
         columns={columns}
         fetchFn={fetchExpenses}
         filterDeps={[statusFilter, categoryFilter]}
         countLabel="expense"
-        emptyMessage="No expenses yet"
+        emptyMessage={actionMode === 'assigned' ? 'No expenses pending your approval' : 'No expenses yet'}
         searchPlaceholder="Search by title, number or company..."
         hasFilters={hasFilters}
         onClearFilters={clearFilters}
@@ -233,6 +324,75 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
       />
 
       <UserDetailsModal employment={viewUser} onClose={() => setViewUser(null)} />
+
+      {/* Confirm approve/reject with optional remark and handover role selection */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => { setConfirmAction(null); setSelectedExpense(null); setSelectedHandoverRoleId(null); }}>
+          <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              {confirmAction === 'approve' ? 'Approve expense' : 'Reject expense'}
+            </h3>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400">
+              {confirmAction === 'approve'
+                ? 'Forward to the next approver (or close as approved at the final approver).'
+                : 'Mark this expense as rejected and clear the current handler.'}
+            </p>
+            {confirmAction === 'approve' && handoverRoles.length > 0 && (
+              <div className="space-y-1">
+                <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">Handover to role <span className="text-red-500">*</span></label>
+                <select
+                  value={selectedHandoverRoleId || ''}
+                  onChange={(e) => setSelectedHandoverRoleId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 cursor-pointer transition-colors"
+                  required
+                >
+                  <option value="">Select handover role</option>
+                  {handoverRoles.map((role) => (
+                    <option key={role.roleId} value={role.roleId}>
+                      {role.roleName} ({role.roleCode})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400">Choose who to forward this expense to. Valid handovers are configured in Role Handover Rules.</p>
+              </div>
+            )}
+            {confirmAction === 'approve' && handoverRoles.length === 0 && !loadingHandoverRoles && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">No valid handover roles configured. Expense will be sent to the final approver.</p>
+            )}
+            {confirmAction === 'approve' && loadingHandoverRoles && (
+              <div className="flex items-center justify-center py-2">
+                <Loader2 className="h-4 w-4 text-indigo-500 animate-spin" />
+                <span className="ml-2 text-[12px] text-slate-400">Loading handover roles...</span>
+              </div>
+            )}
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Remarks (optional)"
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => { setConfirmAction(null); setSelectedExpense(null); setSelectedHandoverRoleId(null); }}
+                className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={acting || (confirmAction === 'approve' && handoverRoles.length > 0 && !selectedHandoverRoleId)}
+                onClick={() => runAction(confirmAction, remarks)}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 transition-colors ${confirmAction === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+              >
+                {acting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {acting ? 'Working...' : confirmAction === 'approve' ? 'Approve' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

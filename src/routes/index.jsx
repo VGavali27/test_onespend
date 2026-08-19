@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import('@/pages/dashboard/Dashboard'));
 
 const MyExpenses = lazy(() => import('@/pages/expenses/MyExpenses'));
 const AllExpenses = lazy(() => import('@/pages/expenses/AllExpenses'));
+const AssignedExpenses = lazy(() => import('@/pages/expenses/AssignedExpenses'));
 const CreateExpense = lazy(() => import('@/pages/expenses/CreateExpense'));
 const EditExpense = lazy(() => import('@/pages/expenses/EditExpense'));
 const ExpenseDetail = lazy(() => import('@/pages/expenses/ExpenseDetail'));
@@ -93,6 +94,7 @@ export default function AppRoutes() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="expenses/my" element={<MyExpenses />} />
           <Route path="expenses/all" element={<AllExpenses />} />
+          <Route path="expenses/assigned" element={<AssignedExpenses />} />
           <Route path="expenses/new" element={<CreateExpense />} />
           <Route path="expenses/:uuid/edit" element={<EditExpense />} />
           <Route path="expenses/:id" element={<ExpenseDetail />} />

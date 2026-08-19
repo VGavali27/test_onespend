@@ -4,7 +4,7 @@ import {
   Wallet, Plane, BedDouble, Coins, Bus, MoreHorizontal, FileText,
   ReceiptText, Paperclip, CheckCircle2, XCircle, Send, Banknote, ArrowRightLeft, Inbox, Loader2, ShoppingCart, History, Eye, ChevronDown,
 } from 'lucide-react';
-import { getExpenseById, normalizeExpense, approveExpense, rejectExpense, getExpenseProcurementChain } from '@/services/expenseService';
+import { getExpenseById, normalizeExpense, approveExpense, rejectExpense, getExpenseProcurementChain, submitExpense, getHandoverRoles } from '@/services/expenseService';
 import ErrorState from '@/components/ui/ErrorState';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
@@ -22,8 +22,11 @@ export default function ExpenseDetail() {
   const [error, setError] = useState(null);
   const [viewUser, setViewUser] = useState(null);
   const [acting, setActing] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null); // 'approve' | 'reject'
+  const [confirmAction, setConfirmAction] = useState(null); // 'approve' | 'reject' | 'submit'
   const [remarks, setRemarks] = useState('');
+  const [handoverRoles, setHandoverRoles] = useState([]);
+  const [selectedHandoverRoleId, setSelectedHandoverRoleId] = useState(null);
+  const [loadingHandoverRoles, setLoadingHandoverRoles] = useState(false);
   const toast = useToast();
 
   const loadExpense = useCallback(async () => {
@@ -48,14 +51,35 @@ export default function ExpenseDetail() {
     loadExpense();
   }, [loadExpense]);
 
+  const loadHandoverRoles = useCallback(async () => {
+    setLoadingHandoverRoles(true);
+    try {
+      const { data } = await getHandoverRoles(id);
+      setHandoverRoles(data?.data ?? []);
+    } catch (e) {
+      console.error('Failed to load handover roles:', e);
+      setHandoverRoles([]);
+    } finally {
+      setLoadingHandoverRoles(false);
+    }
+  }, [id]);
+
+  const handleApproveClick = useCallback(async () => {
+    await loadHandoverRoles();
+    setConfirmAction('approve');
+  }, [loadHandoverRoles]);
+
   const runAction = async (key, actionRemarks) => {
     setActing(true);
     try {
-      if (key === 'approve') await approveExpense(id, actionRemarks);
+      if (key === 'submit') await submitExpense(id, actionRemarks);
+      else if (key === 'approve') await approveExpense(id, actionRemarks, selectedHandoverRoleId);
       else if (key === 'reject') await rejectExpense(id, actionRemarks);
-      toast.success(key === 'approve' ? 'Expense approved' : 'Expense rejected');
+      toast.success(key === 'submit' ? 'Expense submitted' : key === 'approve' ? 'Expense approved' : 'Expense rejected');
       setConfirmAction(null);
       setRemarks('');
+      setSelectedHandoverRoleId(null);
+      setHandoverRoles([]);
       loadExpense();
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Action failed.');
@@ -124,16 +148,28 @@ export default function ExpenseDetail() {
         </div>
       </div>
 
-      {/* Role-aware actions — the current handler (or SUPER_ADMIN) approves/rejects a SUBMITTED expense.
-          The backend enforces the handler check regardless; this just hides the buttons for onlookers. */}
-      {expense.status === 'SUBMITTED' && (user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === expense.currentRole?.code) && (
+      {/* Role-aware actions — Submit for DRAFT (creator only), or Approve/Reject for SUBMITTED (current handler or SUPER_ADMIN). */}
+      {expense.status === 'DRAFT' && expense.canEdit && (
+        <div className="flex flex-wrap items-center gap-2">
+          <ActionButton
+            icon={Send}
+            label="Submit expense"
+            tone="primary"
+            disabled={acting}
+            onClick={() => setConfirmAction('submit')}
+          />
+          <span className="text-[12px] text-slate-400">This expense is still a draft — submit it to send it to the first approver.</span>
+        </div>
+      )}
+
+      {expense.status === 'SUBMITTED' && (user?.role === 'SUPER_ADMIN' || user?.role === expense.currentRole?.code) && (
         <div className="flex flex-wrap items-center gap-2">
           <ActionButton
             icon={CheckCircle2}
             label="Approve"
             tone="success"
             disabled={acting}
-            onClick={() => setConfirmAction('approve')}
+            onClick={handleApproveClick}
           />
           <ActionButton
             icon={XCircle}
@@ -510,18 +546,48 @@ export default function ExpenseDetail() {
 
       <UserDetailsModal employment={viewUser} onClose={() => setViewUser(null)} />
 
-      {/* Confirm approve/reject with optional remark */}
+      {/* Confirm submit/approve/reject with optional remark and handover role selection */}
       {confirmAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmAction(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => { setConfirmAction(null); setSelectedHandoverRoleId(null); }}>
           <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-xl p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-              {confirmAction === 'approve' ? 'Approve expense' : 'Reject expense'}
+              {confirmAction === 'submit' ? 'Submit expense' : confirmAction === 'approve' ? 'Approve expense' : 'Reject expense'}
             </h3>
             <p className="text-[12px] text-slate-500 dark:text-slate-400">
-              {confirmAction === 'approve'
+              {confirmAction === 'submit'
+                ? "Send this expense to the category's first approver for review."
+                : confirmAction === 'approve'
                 ? 'Forward to the next approver (or close as approved at the final approver).'
                 : 'Mark this expense as rejected and clear the current handler.'}
             </p>
+            {confirmAction === 'approve' && handoverRoles.length > 0 && (
+              <div className="space-y-1">
+                <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">Handover to role <span className="text-red-500">*</span></label>
+                <select
+                  value={selectedHandoverRoleId || ''}
+                  onChange={(e) => setSelectedHandoverRoleId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 cursor-pointer transition-colors"
+                  required
+                >
+                  <option value="">Select handover role</option>
+                  {handoverRoles.map((role) => (
+                    <option key={role.roleId} value={role.roleId}>
+                      {role.roleName} ({role.roleCode})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400">Choose who to forward this expense to. Valid handovers are configured in Role Handover Rules.</p>
+              </div>
+            )}
+            {confirmAction === 'approve' && handoverRoles.length === 0 && !loadingHandoverRoles && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">No valid handover roles configured. Expense will be sent to the final approver.</p>
+            )}
+            {confirmAction === 'approve' && loadingHandoverRoles && (
+              <div className="flex items-center justify-center py-2">
+                <Loader2 className="h-4 w-4 text-indigo-500 animate-spin" />
+                <span className="ml-2 text-[12px] text-slate-400">Loading handover roles...</span>
+              </div>
+            )}
             <textarea
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
@@ -532,19 +598,31 @@ export default function ExpenseDetail() {
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setConfirmAction(null)}
+                onClick={() => { setConfirmAction(null); setSelectedHandoverRoleId(null); }}
                 className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={acting}
+                disabled={acting || (confirmAction === 'approve' && handoverRoles.length > 0 && !selectedHandoverRoleId)}
                 onClick={() => runAction(confirmAction, remarks)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 transition-colors ${confirmAction === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 transition-colors ${
+                  confirmAction === 'submit'
+                    ? 'bg-indigo-600 hover:bg-indigo-700'
+                    : confirmAction === 'reject'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
               >
                 {acting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {acting ? 'Working...' : confirmAction === 'approve' ? 'Approve' : 'Reject'}
+                {acting
+                  ? 'Working...'
+                  : confirmAction === 'submit'
+                  ? 'Submit'
+                  : confirmAction === 'approve'
+                  ? 'Approve'
+                  : 'Reject'}
               </button>
             </div>
           </div>

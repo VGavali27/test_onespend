@@ -5,6 +5,9 @@ import api from '@/services/api';
 // `config` (e.g. { signal }) is forwarded so the paginated DataTable can cancel stale requests
 export const getExpenses = (params, config) =>
   api.get('/expenses', { ...config, params: { decrypt: 'true', ...params } });
+// Expenses assigned to the logged-in user's role (pending their approval)
+export const getAssignedExpenses = (params, config) =>
+  api.get('/expenses/assigned', { ...config, params: { decrypt: 'true', ...params } });
 // Expenses created by the logged-in user
 export const getMyExpenses = (params, config) =>
   api.get('/expenses/my', { ...config, params: { decrypt: 'true', ...params } });
@@ -17,8 +20,9 @@ export const updateExpense = (uuid, payload) => api.put(`/expenses/${uuid}`, pay
 export const deleteExpense = (uuid) => api.delete(`/expenses/${uuid}`);
 // Expense approval workflow (PO-created expenses follow the expense role-handover chain)
 export const submitExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/submit`, { remarks });
-export const approveExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/approve`, { remarks });
+export const approveExpense = (uuid, remarks, toRoleId) => api.post(`/expenses/${uuid}/approve`, { remarks, to_role_id: toRoleId });
 export const rejectExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/reject`, { remarks });
+export const getHandoverRoles = (uuid) => api.get(`/expenses/${uuid}/handover-roles`);
 
 // Expense documents & handovers — add here when the backend endpoints exist.
 
