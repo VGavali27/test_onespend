@@ -200,6 +200,15 @@ VITE_APP_ENV=development
 - [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
 - [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
 
+### Today's Updates (2026-08-20) — Selected Quotation Display & Procurement Chain
+- **ExpenseDetail.jsx**: Updated `normalizeExpense` usage and procurement history rendering. The expense detail now receives the selected quotation (with line items) from the backend's procurement chain response and displays it in the procurement history section.
+- **ProcurementDetail.jsx**: Major refactor of quotation display:
+  - **Selected quotation now prominently displayed above procurement history** — always visible in an emerald-bordered card with vendor, validity, totals, line items (table on desktop, cards on mobile), and attached documents.
+  - **Quotations section now shows only OTHER quotations** — the selected quotation is removed from the list here (was previously highlighted first then others collapsed).
+  - **Price history card** now filters out the selected quotation from the comparison table (since it's displayed separately above).
+  - **Submit quotations button** now only enables when there are OTHER quotations (non-selected) to submit for requester selection.
+- **expenseService.js**: Updated `normalizeExpense` to check for `procurementOrder` (the new include from backend) instead of the old `procurement_pr_id`/`procurement_po_id` fields to determine if an expense is procurement-linked.
+
 ### Today's Updates (2026-08-18)
 - **Expense approval handover flow**: New **Approvals** page (`/expenses/assigned`) listing expenses pending the logged-in user's role approval (company-scoped; reuses `MyExpenses` component with `actionMode='assigned'`). Added to sidebar menu under **Expenses**.
 - **Expense Detail approval actions**: On SUBMITTED expenses, current handler (or SUPER_ADMIN) sees **Approve / Reject** buttons. **Approve opens a handover role dropdown** (fetches valid targets from `GET /expenses/:uuid/handover-roles` — based on `role_handover_rules` for the expense's category module: travel/reimbursement/procurement). Selected role is sent as `to_role_id` on approve.

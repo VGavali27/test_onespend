@@ -165,7 +165,8 @@ export const normalizeExpense = (e) => {
     })),
     // Is this expense tied to a procurement chain? (PO-created or converted) — gates the
     // "Procurement history" toggle on the detail; the chain itself is lazy-loaded on expand.
-    isProcurement: Boolean(e.procurement_pr_id || e.procurement_po_id),
+    // The expense is the parent; the linked PO has expense_id FK. Check for procurementOrder.
+    isProcurement: Boolean(e.procurementOrder),
     documents: (e.documents || []).map((d) => ({ name: d.original_file_name })),
   };
 };

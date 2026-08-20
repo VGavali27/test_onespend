@@ -383,6 +383,105 @@ export default function ProcurementDetail() {
             )}
           </div>
 
+          {/* Selected quotation — always prominently displayed above procurement history */}
+          {(() => {
+            const selectedQuotation = (doc.quotations || []).find((q) => q.status === 'SELECTED');
+            if (!selectedQuotation) return null;
+            return (
+              <div key="selected-quotation" className="bg-white dark:bg-gray-900 rounded-xl border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/10 ring-1 ring-emerald-200 dark:ring-emerald-800 shadow-sm overflow-hidden">
+                <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-4 border-b border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/20">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Selected Quotation</h3>
+                  <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Selected
+                  </span>
+                </div>
+                <div className="px-4 sm:px-6 py-4 space-y-3">
+                  {/* Vendor + meta */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className="text-base font-semibold text-slate-800 dark:text-slate-200 break-words">{selectedQuotation.vendor?.name || '—'}</p>
+                      {selectedQuotation.valid_until && (
+                        <span className="text-[12px] text-slate-500 dark:text-slate-400">Valid until {formatDate(selectedQuotation.valid_until)}</span>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(selectedQuotation.grand_total)}</p>
+                      {selectedQuotation.total_amount != null && selectedQuotation.tax_amount != null && (
+                        <p className="text-[11px] text-slate-400">
+                          {formatCurrency(selectedQuotation.total_amount)} + {formatCurrency(selectedQuotation.tax_amount)} tax
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedQuotation.notes && (
+                    <p className="text-[12px] text-slate-500 dark:text-slate-400 break-words">Comments: {selectedQuotation.notes}</p>
+                  )}
+                  {/* Quotation line items (read-only) — table on desktop, cards on mobile */}
+                  {(selectedQuotation.items || []).length > 0 && (
+                    <>
+                      <div className="hidden md:block mt-3 w-full rounded-lg border border-slate-200 dark:border-gray-700">
+                        <table className="w-full text-[13px] table-fixed">
+                          <thead>
+                            <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
+                              <th className="px-3 py-2 font-semibold w-[38%]">Item</th>
+                              <th className="px-3 py-2 font-semibold text-right w-[13%]">Qty</th>
+                              <th className="px-3 py-2 font-semibold text-right w-[16%]">Unit price</th>
+                              <th className="px-3 py-2 font-semibold text-right w-[13%]">Tax %</th>
+                              <th className="px-3 py-2 font-semibold text-right w-[16%]">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(selectedQuotation.items || []).map((it, idx) => (
+                              <tr key={it.uuid ?? idx} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
+                                <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</td>
+                                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{it.quantity}</td>
+                                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{formatCurrency(it.unit_price)}</td>
+                                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{it.tax_rate != null ? `${it.tax_rate}%` : '—'}</td>
+                                <td className="px-3 py-2 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(it.total_with_tax)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="md:hidden mt-3 space-y-1.5">
+                        {(selectedQuotation.items || []).map((it, idx) => (
+                          <div key={it.uuid ?? idx} className="rounded-lg border border-slate-200 dark:border-gray-700 px-3 py-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</p>
+                              <p className="text-[13px] font-semibold text-slate-900 dark:text-white flex-shrink-0">{formatCurrency(it.total_with_tax)}</p>
+                            </div>
+                            <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                              Qty {it.quantity} · Unit {formatCurrency(it.unit_price)}
+                              {it.tax_rate != null ? ` · Tax ${it.tax_rate}%` : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {/* Quotation documents — shown read-only */}
+                  {(selectedQuotation.documents || []).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-gray-800 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Attached documents</p>
+                      {selectedQuotation.documents.map((d) => (
+                        <div key={d.uuid} className="flex items-center justify-between gap-2">
+                          <a href={d.file_path} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline min-w-0">
+                            <Paperclip className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                            <span className="truncate">{d.original_file_name || d.file_path}</span>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Price history — stage-by-stage comparison across PI → PR → Quotations → PO */}
           {doc.price_history && (
             <PriceHistoryCard history={doc.price_history} />
@@ -689,12 +788,14 @@ function QuotationsSection({
   const quotations = doc.quotations || [];
   // The "Add a quotation" form stays hidden until the admin clicks the button.
   const [showBuilder, setShowBuilder] = useState(false);
-  // When a quotation is SELECTED, the others are collapsed behind a "Show" toggle.
-  const [showOtherQuotations, setShowOtherQuotations] = useState(false);
+  // The selected quotation is now displayed prominently above the procurement history
+  // (in the parent component). This section only shows the OTHER quotations.
   const builderRef = useRef(null); // scroll target when editing a quotation
   const editingQuotation = quotations.find((q) => q.uuid === qEditingId) || null;
   const selectedQuotation = quotations.find((q) => q.status === 'SELECTED') || null;
-  const otherQuotations = quotations.filter((q) => q !== selectedQuotation);
+  const otherQuotations = quotations.filter((q) => q.status !== 'SELECTED');
+  // Only show other quotations here (selected is shown above)
+  const [showOtherQuotations, setShowOtherQuotations] = useState(false);
 
   // When editing starts, bring the builder form into view.
   useEffect(() => {
@@ -1085,31 +1186,30 @@ function QuotationsSection({
             </div>
           )}
 
-          {/* Quotation list — selected is highlighted and shown first; the rest are
-              collapsed behind a "Show" toggle once one is selected */}
+          {/* Quotation list — shows only OTHER quotations (not the selected one).
+              The selected quotation is displayed prominently above the procurement history. */}
           {(() => {
-            const list = selectedQuotation
-              ? [selectedQuotation, ...(showOtherQuotations ? otherQuotations : [])]
-              : quotations;
+            const list = showOtherQuotations ? otherQuotations : [];
+            if (list.length === 0 && otherQuotations.length > 0) {
+              return (
+                <button
+                  type="button"
+                  onClick={() => setShowOtherQuotations(true)}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                  Show {otherQuotations.length} other quotation{otherQuotations.length > 1 ? 's' : ''}
+                </button>
+              );
+            }
             return list.map((q) => {
               const idx = quotations.indexOf(q);
-              const isSelected = q.status === 'SELECTED';
               return (
-            <div key={q.uuid} className={`rounded-xl border p-4 transition-colors ${
-              isSelected
-                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/10 ring-1 ring-emerald-200 dark:ring-emerald-800'
-                : 'border-slate-200 dark:border-gray-700'
-            }`}>
+            <div key={q.uuid} className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 transition-colors">
               {/* Header: title + actions */}
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 flex items-center gap-2">
                   <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">Quotation {idx + 1}</p>
-                  {isSelected && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Selected
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {/* Admin: edit/delete */}
@@ -1156,9 +1256,6 @@ function QuotationsSection({
                     </p>
                   )}
                 </div>
-                {q.status === 'SELECTED' && (
-                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Selected</span>
-                )}
               </div>
 
               {/* Quotation line items (read-only) — table on desktop, cards on mobile */}
@@ -1251,21 +1348,9 @@ function QuotationsSection({
           })()}
 
           {/* Toggle to reveal the remaining quotations after one is selected */}
-          {selectedQuotation && otherQuotations.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowOtherQuotations((v) => !v)}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
-            >
-              <ChevronDown className={`h-4 w-4 transition-transform ${showOtherQuotations ? 'rotate-180' : ''}`} />
-              {showOtherQuotations
-                ? 'Hide other quotations'
-                : `Show ${otherQuotations.length} other quotation${otherQuotations.length > 1 ? 's' : ''}`}
-            </button>
-          )}
-
+          
           {/* Admin: submit quotations for requester selection */}
-          {fillMode && quotations.length > 0 && (
+          {fillMode && otherQuotations.length > 0 && (
             <div className="flex justify-end pt-1 border-t border-slate-100 dark:border-gray-800">
               <button
                 type="button"
@@ -1294,12 +1379,14 @@ function PriceHistoryCard({ history }) {
   const stages = [
     { label: 'Purchase Intention', num: pi?.document_number, total: pi?.grand_total, uuid: pi?.uuid },
     { label: 'Purchase Request', num: pr?.document_number, total: pr?.grand_total, uuid: pr?.uuid },
-    ...quotations.map((q, i) => ({
-      label: `Quotation ${i + 1}`,
-      num: q.vendor?.name || '—', // quotations no longer carry a title — show vendor
-      total: q.grand_total,
-      uuid: null, // quotations live on the PR's detail page, no standalone route
-    })),
+    ...quotations
+      .filter((q) => q.status !== 'SELECTED') // Selected quotation shown separately above
+      .map((q, i) => ({
+        label: `Quotation ${i + 1}`,
+        num: q.vendor?.name || '—', // quotations no longer carry a title — show vendor
+        total: q.grand_total,
+        uuid: null, // quotations live on the PR's detail page, no standalone route
+      })),
     { label: 'Purchase Order', num: po?.document_number, total: po?.grand_total, uuid: po?.uuid },
   ].filter((s) => s.total != null);
 
