@@ -179,6 +179,9 @@ const buildProcurementChain = async (expense, requesterIsOwner) => {
   const vendorOf = (doc) => (requesterIsOwner ? null : doc?.vendor?.name || null);
   const handovers = await procurementRepository.findChainHandovers({ piId: pi?.id, prId: pr.id, poId: chainPo?.id });
 
+  // Find the selected quotation (status = 'SELECTED')
+  const selectedQuotation = (quotations || []).find(q => q.status === 'SELECTED');
+
   return {
     pi: pi ? { uuid: pi.uuid, document_number: pi.document_number, title: pi.title, status: pi.status, grand_total: fin(pi.grand_total) } : null,
     pr: { uuid: pr.uuid, document_number: pr.document_number, title: pr.title, status: pr.status, vendor: vendorOf(pr), grand_total: fin(pr.grand_total) },
@@ -191,6 +194,25 @@ const buildProcurementChain = async (expense, requesterIsOwner) => {
       tax_amount: fin(q.tax_amount),
       grand_total: fin(q.grand_total),
     })),
+    // Include selected quotation with its items for display on expense detail
+    selectedQuotation: selectedQuotation ? {
+      uuid: selectedQuotation.uuid,
+      vendor: vendorOf(selectedQuotation),
+      status: selectedQuotation.status,
+      valid_until: selectedQuotation.valid_until,
+      total_amount: fin(selectedQuotation.total_amount),
+      tax_amount: fin(selectedQuotation.tax_amount),
+      grand_total: fin(selectedQuotation.grand_total),
+      items: (selectedQuotation.items || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: fin(item.unit_price),
+        tax_rate: item.tax_rate,
+        total_with_tax: fin(item.total_with_tax),
+      })),
+    } : null,
     po: chainPo ? { uuid: chainPo.uuid, document_number: chainPo.document_number, status: chainPo.status, vendor: vendorOf(chainPo), grand_total: fin(chainPo.grand_total) } : null,
     handovers: (handovers || []).map((h) => {
       const p = h.get ? h.get({ plain: true }) : h;

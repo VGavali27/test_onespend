@@ -17,6 +17,7 @@ const {
   Role,
   UserEmployment,
   User,
+  ProcurementOrder,
 } = db;
 
 // Names shown in list views (category/company + who submitted it)
@@ -52,6 +53,17 @@ const detailInclude = [
     model: ReimbursementExpense,
     as: 'reimbursementExpense',
     include: [{ model: ReimbursementItem, as: 'items' }],
+  },
+  {
+    model: ProcurementOrder,
+    as: 'procurementOrder',
+    include: [
+      { model: db.ProcurementRequest, as: 'pr', include: [
+        { model: db.ProcurementIntention, as: 'pi' }
+      ]},
+      { model: db.Vendor, as: 'vendor' },
+      { model: db.ProcurementItem, as: 'items' },
+    ],
   },
   { model: ExpenseDocument, as: 'documents' },
   {
