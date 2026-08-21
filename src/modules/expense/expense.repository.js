@@ -22,7 +22,10 @@ const {
 
 // Names shown in list views (category/company + who submitted it)
 const listInclude = [
-  { model: ExpenseCategory, as: 'category' },
+  { model: ExpenseCategory, as: 'category', include: [
+    { model: Role, as: 'firstReceiverRole' },
+    { model: Role, as: 'finalApproverRole' },
+  ]},
   { model: Company, as: 'company' },
   { model: Role, as: 'currentRole' },
   {

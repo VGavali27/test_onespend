@@ -741,7 +741,8 @@ export const submit = async (uuid, user, remarks) => {
 // Approve a SUBMITTED expense with optional handover to a specific role.
 // If toRoleId is provided, validates against role_handover_rules (module='expense').
 // If toRoleId is not provided, defaults to the category's final_approver_role_id.
-// If the current handler IS the final approver, the expense is closed as APPROVED.
+// If the current handler IS the category's final_approver_role_id, the expense is
+// closed as APPROVED — any to_role_id is ignored (nothing hands over past the final approver).
 export const approve = async (uuid, user, remarks, toRoleId = null) => {
   const expense = await expenseRepository.findByUuid(uuid);
   if (!expense) throw ApiError.notFound('Expense not found');
@@ -761,8 +762,9 @@ export const approve = async (uuid, user, remarks, toRoleId = null) => {
   const targetRoleId = toRoleId ?? finalApprover;
 
   return sequelize.transaction(async (t) => {
-    if (fromRole != null && fromRole === finalApprover && !toRoleId) {
-      // Current handler is the final approver and no explicit handover requested → close as APPROVED
+    // If current handler IS the final approver → close as APPROVED.
+    // Ignore any to_role_id: nothing hands over past the final approver.
+    if (fromRole != null && fromRole === finalApprover) {
       await expense.update(
         { status: 'APPROVED', current_role_id: null, current_employment_id: null, closed_at: new Date() },
         { transaction: t },
@@ -772,7 +774,7 @@ export const approve = async (uuid, user, remarks, toRoleId = null) => {
         employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
       });
     } else {
-      // Validate the handover against role_handover_rules for the category's module
+      // Not the final approver: validate handover and forward
       if (targetRoleId) {
         await requireHandoverRule(fromRole, targetRoleId, category?.module);
       }
