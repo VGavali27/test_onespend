@@ -200,6 +200,10 @@ VITE_APP_ENV=development
 - [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
 - [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
 
+### Today's Updates (2026-08-21) — Final Approver Closes Expense as APPROVED
+- **ExpenseDetail.jsx**: Added detection of whether the current user is the category's final approver (`expense.category.finalApproverRole.code === expense.currentRole.code`). If so, the approve modal shows an info banner ("You are the final approver — this expense will be closed as APPROVED") instead of the handover role dropdown. The expense is always closed as APPROVED regardless of any handover selection (backend enforces this).
+- **expenseService.js**: Updated `normalizeExpense` to include `category.finalApproverRole` (id, name, code) in the normalized payload so the frontend can determine if the current handler is the final approver.
+
 ### Today's Updates (2026-08-20) — Selected Quotation Display & Procurement Chain
 - **ExpenseDetail.jsx**: Updated `normalizeExpense` usage and procurement history rendering. The expense detail now receives the selected quotation (with line items) from the backend's procurement chain response and displays it in the procurement history section.
 - **ProcurementDetail.jsx**: Major refactor of quotation display:
