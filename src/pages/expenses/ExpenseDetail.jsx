@@ -252,6 +252,21 @@ export default function ExpenseDetail() {
         </div>
       )}
 
+      {expense.status === "REJECTED" && expense.canEdit && (
+        <div className="flex flex-wrap items-center gap-2">
+          <ActionButton
+            icon={Loader2}
+            label="Resubmit expense"
+            tone="primary"
+            disabled={acting}
+            onClick={() => setConfirmAction("resubmit")}
+          />
+          <span className="text-[12px] text-slate-400">
+            Expense was rejected — resubmit to send it through the approval flow again.
+          </span>
+        </div>
+      )}
+
       {expense.status === "SUBMITTED" &&
         (user?.role === "SUPER_ADMIN" ||
           user?.role === expense.currentRole?.code) && (
@@ -866,14 +881,18 @@ export default function ExpenseDetail() {
                 ? "Submit expense"
                 : confirmAction === "approve"
                   ? "Approve expense"
-                  : "Reject expense"}
+                  : confirmAction === "reject"
+                    ? "Reject expense"
+                    : "Resubmit expense"}
             </h3>
             <p className="text-[12px] text-slate-500 dark:text-slate-400">
               {confirmAction === "submit"
                 ? "Send this expense to the category's first approver for review."
                 : confirmAction === "approve"
                   ? "Forward to the next approver (or close as approved at the final approver)."
-                  : "Mark this expense as rejected and clear the current handler."}
+                  : confirmAction === "reject"
+                    ? "Mark this expense as rejected and clear the current handler."
+                    : "Resubmit this expense to restart the approval flow."}
             </p>
             {confirmAction === "approve" && isFinalApprover && (
               <div className="space-y-1">
@@ -956,7 +975,10 @@ export default function ExpenseDetail() {
                   acting ||
                   (confirmAction === "approve" &&
                     handoverRoles.length > 0 &&
-                    !selectedHandoverRoleId)
+                    !selectedHandoverRoleId) ||
+                  (confirmAction === "submit" && expense.status !== "DRAFT") ||
+                  (confirmAction === "reject" && expense.status !== "SUBMITTED") ||
+                  (confirmAction === "resubmit" && expense.status !== "REJECTED")
                 }
                 onClick={() => runAction(confirmAction, remarks)}
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white disabled:opacity-60 transition-colors ${
@@ -964,7 +986,9 @@ export default function ExpenseDetail() {
                     ? "bg-indigo-600 hover:bg-indigo-700"
                     : confirmAction === "reject"
                       ? "bg-red-600 hover:bg-red-700"
-                      : "bg-emerald-600 hover:bg-emerald-700"
+                      : confirmAction === "approve"
+                        ? "bg-emerald-600 hover:bg-emerald-700"
+                        : "bg-indigo-600 hover:bg-indigo-700"
                 }`}
               >
                 {acting && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -974,7 +998,9 @@ export default function ExpenseDetail() {
                     ? "Submit"
                     : confirmAction === "approve"
                       ? "Approve"
-                      : "Reject"}
+                      : confirmAction === "reject"
+                        ? "Reject"
+                        : "Resubmit"}
               </button>
             </div>
           </div>

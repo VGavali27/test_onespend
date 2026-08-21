@@ -8,7 +8,7 @@ import UserDetailsModal from '@/components/ui/UserDetailsModal';
 import { useToast } from '@/components/ui/Toast';
 import { getMyExpenses } from '@/services/expenseService';
 import { categoryApi } from '@/services/financeService';
-import { approveExpense, rejectExpense, getHandoverRoles } from '@/services/expenseService';
+import { approveExpense, rejectExpense, submitExpense, getHandoverRoles } from '@/services/expenseService';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
 import { useAuth } from '@/context/AuthContext';
 
@@ -25,7 +25,7 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
   const [categories, setCategories] = useState([]);
   const [viewUser, setViewUser] = useState(null);
   const [acting, setActing] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null); // 'approve' | 'reject'
+  const [confirmAction, setConfirmAction] = useState(null); // 'approve' | 'reject' | 'resubmit'
   const [remarks, setRemarks] = useState('');
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [handoverRoles, setHandoverRoles] = useState([]);
@@ -85,13 +85,14 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     setConfirmAction('approve');
   }, [loadHandoverRoles]);
 
-  const runAction = useCallback(async (key, actionRemarks) => {
+const runAction = useCallback(async (key, actionRemarks) => {
     if (!selectedExpense) return;
     setActing(true);
     try {
       if (key === 'approve') await approveExpense(selectedExpense.uuid, actionRemarks, selectedHandoverRoleId);
       else if (key === 'reject') await rejectExpense(selectedExpense.uuid, actionRemarks);
-      toast.success(key === 'approve' ? 'Expense approved' : 'Expense rejected');
+      else if (key === 'resubmit') await submitExpense(selectedExpense.uuid, actionRemarks);
+      toast.success(key === 'approve' ? 'Expense approved' : key === 'reject' ? 'Expense rejected' : 'Expense resubmitted');
       setConfirmAction(null);
       setRemarks('');
       setSelectedExpense(null);
@@ -244,18 +245,8 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
             viewLink,
           ];
         } else {
-          // Creator's own view — edit + submit while DRAFT
+          // Creator's own view — view only
           actions = [
-            r.canEdit && (
-              <Link key="edit" to={`/expenses/${r.uuid}/edit`} title="Edit expense" className={iconClass}>
-                <Pencil className="h-4 w-4" />
-              </Link>
-            ),
-            r.canEdit && (
-              <button key="submit" type="button" title="Submit expense" onClick={placeholderAction} className={`${iconClass} hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20`}>
-                <Send className="h-4 w-4" />
-              </button>
-            ),
             viewLink,
           ];
         }

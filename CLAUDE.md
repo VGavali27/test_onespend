@@ -236,3 +236,4 @@ VITE_APP_ENV=development
 - [ ] Travel pages
 - [ ] Finance pages (Categories, Payments, Reports)
 - [ ] Company switcher (fetch employments on demand)
+- [ ] **Resubmit rejected expenses** — frontend resubmit flow for REJECTED expenses (allows creator to edit and resubmit through approval flow)

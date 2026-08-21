@@ -1,0 +1,18 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://github.com/VGavali27/test_onespend.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "dev_frontend"]
+	remote = origin
+	merge = refs/heads/dev_frontend
+	vscode-merge-base = origin/main_backend
+[branch "procurement_frontend"]
+	vscode-merge-base = origin/dev_frontend
+	remote = origin
+	merge = refs/heads/procurement_frontend
