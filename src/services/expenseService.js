@@ -150,7 +150,14 @@ export const normalizeExpense = (e) => {
     estimated_amount: num(e.estimated_amount),
     final_amount: num(e.final_amount),
     paid_amount: num(e.paid_amount),
-    category: e.category ? { name: e.category.name } : null,
+    category: e.category
+      ? {
+          name: e.category.name,
+          finalApproverRole: e.category.finalApproverRole
+            ? { id: e.category.finalApproverRole.id, name: e.category.finalApproverRole.name, code: e.category.finalApproverRole.code }
+            : null,
+        }
+      : null,
     company: e.company ? { name: e.company.name } : null,
     currentRole: e.currentRole ? { name: e.currentRole.name, code: e.currentRole.code } : null,
     travel,

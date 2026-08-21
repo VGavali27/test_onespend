@@ -113,10 +113,19 @@ export default function ExpenseDetail() {
     }
   }, [id]);
 
+  const isFinalApprover = expense?.category?.finalApproverRole?.id &&
+    expense?.currentRole?.code === expense.category.finalApproverRole.code;
+
   const handleApproveClick = useCallback(async () => {
-    await loadHandoverRoles();
+    // If current handler is the final approver, don't load handover roles —
+    // the expense will be closed as APPROVED regardless of any selection
+    if (!isFinalApprover) {
+      await loadHandoverRoles();
+    } else {
+      setHandoverRoles([]);
+    }
     setConfirmAction("approve");
-  }, [loadHandoverRoles]);
+  }, [loadHandoverRoles, isFinalApprover]);
 
   const runAction = async (key, actionRemarks) => {
     setActing(true);
@@ -866,7 +875,20 @@ export default function ExpenseDetail() {
                   ? "Forward to the next approver (or close as approved at the final approver)."
                   : "Mark this expense as rejected and clear the current handler."}
             </p>
-            {confirmAction === "approve" && handoverRoles.length > 0 && (
+            {confirmAction === "approve" && isFinalApprover && (
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                    You are the final approver — this expense will be closed as <strong>APPROVED</strong>
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  No handover selection needed. Your approval finalizes this expense.
+                </p>
+              </div>
+            )}
+            {confirmAction === "approve" && !isFinalApprover && handoverRoles.length > 0 && (
               <div className="space-y-1">
                 <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
                   Handover to role <span className="text-red-500">*</span>
@@ -894,7 +916,7 @@ export default function ExpenseDetail() {
                 </p>
               </div>
             )}
-            {confirmAction === "approve" &&
+            {confirmAction === "approve" && !isFinalApprover &&
               handoverRoles.length === 0 &&
               !loadingHandoverRoles && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">
