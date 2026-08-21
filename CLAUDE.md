@@ -262,6 +262,11 @@ Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Q
 - **Expense repository** (`expense.repository.js`): Added `ProcurementOrder` to the detail include chain — now includes the full procurement chain: PO → PR → PI, plus Vendor and PO Items. This enables fetching the selected quotation with its line items when building the procurement chain for an expense.
 - **Expense service** (`expense.service.js`): In `buildProcurementChain`, added logic to find the `SELECTED` quotation from the PR's quotations and include it in the response with its full line items (name, description, quantity, unit_price, tax_rate, total_with_tax). The selected quotation is now exposed on the expense detail's procurement history card for visibility.
 
+### Today's Updates (2026-08-21) — Final Approver Closes Expense as APPROVED
+- **Expense service** (`expense.service.js`): Fixed the approve logic — if the current handler IS the category's `final_approver_role_id`, the expense is now **always closed as APPROVED** regardless of any `to_role_id` provided. Nothing hands over past the final approver. Previously, if the final approver selected a handover role in the dropdown, the expense would forward instead of closing.
+- **Expense repository** (`expense.repository.js`): Added `firstReceiverRole` and `finalApproverRole` includes to the category in `detailInclude` so the frontend knows the final approver.
+- **Expense controller** (`expense.controller.js`): The `approveExpense` endpoint passes `to_role_id` through to the service.
+
 ### Today's Updates (2026-08-18) — Expense Approval Handover Flow
 - **New endpoint**: `GET /expenses/assigned` — returns expenses pending the logged-in user's role approval (company-scoped; SUPER_ADMIN/CFO see all, other manager roles see only their employed companies).
 - **Enhanced approve action**: `POST /expenses/:uuid/approve` now accepts optional `to_role_id` for flexible handover to a specific role.
