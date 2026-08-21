@@ -81,9 +81,13 @@ const generateExpenseNumber = async () => {
 // Attach a `canEdit` flag to each row — a user may edit an expense only while it's
 // DRAFT and they are the one who created it (the backend also enforces this on PUT).
 const markCanEdit = (rows, employmentIds) => {
-  (rows || []).forEach((r) =>
-    r.setDataValue('canEdit', r.status === 'DRAFT' && employmentIds.includes(r.requested_by_employment_id))
-  );
+  (rows || []).forEach((r) => {
+    const isRequester = employmentIds.includes(r.requested_by_employment_id);
+    r.setDataValue(
+      'canEdit',
+      r.status === 'DRAFT' || (r.status === 'REJECTED' && isRequester),
+    );
+  });
   return rows;
 };
 
@@ -427,18 +431,21 @@ export const create = async (data) => {
   });
 };
 
-// Update an expense by UUID — only the creator may edit their own expense while it's DRAFT.
+// Update an expense by UUID — only the creator may edit their own expense while it's
+// DRAFT or REJECTED (rejected expenses can be edited by the original requester to resubmit).
 // Supports editing the module children (travel / reimbursement) and recomputes the
 // estimated amount from the submitted line items.
 export const update = async (uuid, user, data) => {
   const expense = await expenseRepository.findByUuid(uuid);
   if (!expense) throw ApiError.notFound('Expense not found');
-  if (expense.status !== 'DRAFT') throw ApiError.badRequest('Cannot update a non-draft expense');
+  if (expense.status !== 'DRAFT' && expense.status !== 'REJECTED') {
+    throw ApiError.badRequest('Cannot update a non-draft expense');
+  }
 
-  // Only the requesting employee can edit their own draft
+  // Only the requesting employee can edit their own draft/rejected expenses
   const employmentIds = await getEmploymentIdsByUser(user.userId);
   if (!employmentIds.includes(expense.requested_by_employment_id)) {
-    throw ApiError.forbidden('You can only edit your own draft expenses');
+    throw ApiError.forbidden('You can only edit your own expenses');
   }
 
   const {
@@ -703,12 +710,15 @@ export const createProcurementExpense = async ({ po, t }) =>
     t,
   });
 
-// Submit a DRAFT expense — creator-only, moves to SUBMITTED with the category's
-// first receiver as handler (used by manual expenses; PO-created ones start SUBMITTED).
+// Submit a DRAFT or REJECTED expense — creator-only, moves to SUBMITTED
+// with the category's first receiver as handler. REJECTED expenses can be
+// resubmitted after the creator fixes the issues.
 export const submit = async (uuid, user, remarks) => {
   const expense = await expenseRepository.findByUuid(uuid);
   if (!expense) throw ApiError.notFound('Expense not found');
-  if (expense.status !== 'DRAFT') throw ApiError.badRequest('Only a draft expense can be submitted');
+  if (expense.status !== 'DRAFT' && expense.status !== 'REJECTED') {
+    throw ApiError.badRequest('Only a draft or rejected expense can be submitted');
+  }
 
   const employmentIds = await getEmploymentIdsByUser(user.userId);
   if (!employmentIds.includes(expense.requested_by_employment_id)) {
