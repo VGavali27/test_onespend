@@ -150,6 +150,7 @@ npm run dev               # nodemon (port from .env PORT — dev runs on 3015)
 npm start                 # production
 npm run migrate           # run migrations
 npm run migrate:rollback  # rollback last batch
+npm run migrate:rollback:all  # rollback all migrations
 npm run seed              # run seeders
 ```
 
@@ -207,7 +208,7 @@ npm run seed              # run seeders
 - [x] Reusable ApiError + ApiResponse + errorHandler
 - [x] Validation middleware (Joi) with field-level errors
 - [x] AES-256-CBC encryption utility with model hooks
-- [x] Umzug v3 migration/seed scripts (migrate, rollback, seed)
+- [x] Umzug v3 migration/seed scripts (migrate, rollback, rollback-all, seed)
 
 ### Key Implementation Details
 - **UUID-based lookups** — all APIs use UUID, not auto-increment ID

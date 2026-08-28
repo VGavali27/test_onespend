@@ -26,7 +26,7 @@ const umzug = new Umzug({
     }),
   },
   context: sequelize.getQueryInterface(),
-  storage: new SequelizeStorage({ sequelize }),
+  storage: new SequelizeStorage({ sequelize, tableName: 'sequelize_meta' }),
   logger: console,
 });
 

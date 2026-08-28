@@ -4,7 +4,7 @@ import db from '../../database/models/index.js';
 import env from '../../config/env.js';
 import ApiError from '../../utils/ApiError.js';
 
-const { User, Role } = db;
+const { User, Role, Permission } = db;
 
 // Login — verify credentials, generate JWT
 export const login = async (email, password) => {
@@ -14,9 +14,14 @@ export const login = async (email, password) => {
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) throw ApiError.unauthorized('Invalid email or password');
 
-  // Get role info
-  const role = await Role.findByPk(user.role_id);
+  // Get role info with permissions
+  const role = await Role.findByPk(user.role_id, {
+    include: [{ model: Permission, as: 'permissions', through: { attributes: [] } }],
+  });
   if (!role) throw ApiError.unauthorized('User role not found');
+
+  // Extract permission keys
+  const permissionKeys = role.permissions?.map(p => p.permission_key) || [];
 
   // JWT contains only identity — employment/company context is resolved per-request
   const payload = {
@@ -37,6 +42,7 @@ export const login = async (email, password) => {
       email: user.email,
       department_id: user.department_id,
       role: role.code,
+      permissions: permissionKeys,
     },
   };
 };

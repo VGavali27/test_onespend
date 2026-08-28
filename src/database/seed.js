@@ -12,7 +12,7 @@ const seedersGlob = path.join(__dirname, 'seeders', '*.js').replace(/\\/g, '/');
 const umzug = new Umzug({
   migrations: { glob: seedersGlob },
   context: sequelize.getQueryInterface(),
-  storage: new SequelizeStorage({ sequelize, modelName: 'SequelizeData' }),
+  storage: new SequelizeStorage({ sequelize, tableName: 'sequelize_data' }),
   logger: console,
 });
 

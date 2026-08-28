@@ -143,6 +143,24 @@ export async function up(queryInterface, Sequelize) {
 }
 
 export async function down(queryInterface, _Sequelize) {
+  // Remove ALL FKs from any table referencing vendors before dropping vendor tables
+  const [constraints] = await queryInterface.sequelize.query(`
+    SELECT DISTINCT kcu.CONSTRAINT_NAME, kcu.TABLE_NAME
+    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+    JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+      ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+      AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+    WHERE rc.REFERENCED_TABLE_NAME = 'vendors'
+  `);
+  for (const c of constraints) {
+    try {
+      await queryInterface.removeConstraint(c.TABLE_NAME, c.CONSTRAINT_NAME);
+    } catch (err) {
+      // Constraint might have been already removed or doesn't exist
+      console.log(`  Skipping constraint ${c.CONSTRAINT_NAME} on ${c.TABLE_NAME}: ${err.message}`);
+    }
+  }
+
   await queryInterface.dropTable('vendor_documents');
   await queryInterface.dropTable('vendor_bank_accounts');
   await queryInterface.dropTable('vendor_addresses');

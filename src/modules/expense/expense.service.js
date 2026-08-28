@@ -21,7 +21,7 @@ const {
 // Roles that see every company's expenses (global visibility). ADMIN_MGR is included
 // because the procurement admin converts quotes into expenses (Convert to Expense) and
 // must be able to see the result in All Expenses.
-const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR'];
+export const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR'];
 
 // Roles allowed to view the "all expenses" list (everyone else uses /expenses/my)
 // Also used for /expenses/assigned (expenses pending approval for the user's role)
@@ -250,7 +250,7 @@ export const getByUuid = async (uuid, user, decrypt = false) => {
 
   if (!visible) throw ApiError.notFound('Expense not found');
 
-  expense.setDataValue('canEdit', expense.status === 'DRAFT' && employmentIds.includes(expense.requested_by_employment_id));
+  expense.setDataValue('canEdit', (expense.status === 'DRAFT' || expense.status === 'REJECTED') && employmentIds.includes(expense.requested_by_employment_id));
 
   return decrypt ? decryptExpenseDeep(expense) : expense;
 };

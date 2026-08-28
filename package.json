@@ -9,6 +9,7 @@
     "dev": "nodemon server.js",
     "migrate": "node src/database/migrate.js",
     "migrate:rollback": "node src/database/rollback.js",
+    "migrate:rollback:all": "node src/database/rollback-all.js",
     "seed": "node src/database/seed.js",
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },

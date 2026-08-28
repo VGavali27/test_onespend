@@ -312,11 +312,22 @@ export async function up(queryInterface, Sequelize) {
 export async function down(queryInterface, _Sequelize) {
   // Remove the expense FKs from `procurement_orders` before dropping procurement tables.
   // (defensive: only remove if they exist — the schema may predate this addition)
-  const [expenseFk] = await queryInterface.sequelize.query(
-    "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_NAME = 'procurement_orders' AND CONSTRAINT_NAME = 'fk_pc_po_expense_id' AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
+  const [constraints] = await queryInterface.sequelize.query(`
+    SELECT DISTINCT kcu.CONSTRAINT_NAME
+    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+    JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+      ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+      AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+    WHERE kcu.TABLE_NAME = 'procurement_orders'
+      AND rc.REFERENCED_TABLE_NAME = 'expenses'
+  `);
+  for (const c of constraints) {
+    await queryInterface.removeConstraint('procurement_orders', c.CONSTRAINT_NAME);
+  }
+  const [indexes] = await queryInterface.sequelize.query(
+    "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_NAME = 'procurement_orders' AND INDEX_NAME = 'idx_pc_po_expense_id'"
   );
-  if (expenseFk.length > 0) {
-    await queryInterface.removeConstraint('procurement_orders', 'fk_pc_po_expense_id');
+  if (indexes.length > 0) {
     await queryInterface.removeIndex('procurement_orders', 'idx_pc_po_expense_id');
   }
 

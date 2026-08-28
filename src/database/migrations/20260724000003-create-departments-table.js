@@ -34,5 +34,22 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.addIndex('departments', ['uuid'], { unique: true, name: 'idx_departments_uuid' });
 }
 export async function down(queryInterface, _Sequelize) {
+  // Remove ALL FKs from any table referencing departments before dropping
+  const [constraints] = await queryInterface.sequelize.query(`
+    SELECT DISTINCT kcu.CONSTRAINT_NAME, kcu.TABLE_NAME
+    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+    JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+      ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+      AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+    WHERE rc.REFERENCED_TABLE_NAME = 'departments'
+  `);
+  for (const c of constraints) {
+    try {
+      await queryInterface.removeConstraint(c.TABLE_NAME, c.CONSTRAINT_NAME);
+    } catch (err) {
+      console.log(`  Skipping constraint ${c.CONSTRAINT_NAME} on ${c.TABLE_NAME}: ${err.message}`);
+    }
+  }
+
   await queryInterface.dropTable('departments');
 }

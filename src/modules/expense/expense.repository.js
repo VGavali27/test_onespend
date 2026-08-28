@@ -28,6 +28,7 @@ const listInclude = [
   ]},
   { model: Company, as: 'company' },
   { model: Role, as: 'currentRole' },
+  { model: TravelExpense, as: 'travelExpense', required: false }, // for date filtering on travel dates
   {
     model: UserEmployment,
     as: 'requestedByEmployment',
@@ -87,12 +88,14 @@ const { Op } = db.Sequelize;
 const ALLOWED_SORT_FIELDS = ['createdAt', 'title', 'submitted_at'];
 const DEFAULT_SORT = [['createdAt', 'DESC']];
 
-// Merge the scoping `where` with server-side filters (search, status, category)
+// Merge the scoping `where` with server-side filters (search, status, category, date ranges)
 const buildWhere = (where, params = {}) => {
   const w = { ...where };
   const status = params.status || '';
   const category = params.category || '';
   const search = (params.search || '').trim();
+  const dateFrom = params.dateFrom || '';
+  const dateTo = params.dateTo || '';
 
   if (status) w.status = status;
   if (category) w['$category.name$'] = category; // company & category are in listInclude
@@ -103,6 +106,16 @@ const buildWhere = (where, params = {}) => {
       { '$company.name$': { [Op.like]: `%${search}%` } },
     ];
   }
+
+  // Date range filtering — only apply if BOTH from and to are provided
+  // Filter by submitted_at date on the expense model
+  if (dateFrom && dateTo) {
+    w.submitted_at = {
+      [Op.gte]: dateFrom,
+      [Op.lte]: dateTo,
+    };
+  }
+
   return w;
 };
 
