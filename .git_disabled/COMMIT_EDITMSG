@@ -1,0 +1,6 @@
+fix: final approver closes expense as APPROVED + CLAUDE.md update
+
+- ExpenseDetail.jsx: Hide handover dropdown for final approver, show info banner
+- expenseService.js: Include category.finalApproverRole in normalized expense
+- MyExpenses.jsx: Updated (likely related change)
+- CLAUDE.md: Document 2026-08-21 fix
