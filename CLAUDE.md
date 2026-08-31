@@ -26,7 +26,7 @@ src/
 ├── components/
 │   ├── layout/
 │   │   ├── AppLayout.jsx          # Layout wrapper (sidebar + navbar + outlet)
-│   │   ├── Sidebar.jsx            # Collapsible role-based nav (accordion + preview-open, submenu icons, guide line)
+│   │   ├── Sidebar.jsx            # Collapsible permission-based nav (accordion, submenu icons, guide line, query-aware active leaf)
 │   │   └── Navbar.jsx             # Top bar — search, theme, notifications, profile menu
 │   ├── ui/                        # Reusable UI components
 │   │   ├── DataTable.jsx          # Generic TanStack table (self-managed fetchFn mode)
@@ -39,13 +39,15 @@ src/
 │   │   ├── ErrorState.jsx         # Full-card load-error state with retry
 │   │   ├── Toast.jsx              # ToastProvider + useToast — success/error toasts (mounted in App.jsx)
 │   │   ├── detail.jsx             # Read-only view primitives: InfoCard, InfoRow, Detail, DetailHeader (back + edit)
-│   │   └── form.jsx               # Form primitives: inputClass/For, FormSection, FormField
-│   └── ProtectedRoute.jsx         # Auth guard — redirects to /login if unauthenticated
+│   │   ├── form.jsx               # Form primitives: inputClass/For, FormSection, FormField
+│   │   ├── SearchableSelect.jsx   # Searchable combobox (Select2-style) for picking from lists
+│   │   └── PermissionGuard.jsx    # Route-level permission guard (checks user.permissions array)
+│   └── ProtectedRoute.jsx         # Auth guard — redirects to /login if unauthenticated; optional permission check
 ├── context/
-│   ├── AuthContext.jsx            # Auth state, login/logout, JWT management
+│   ├── AuthContext.jsx            # Auth state, login/logout, JWT management, hasPermission(perm) helper
 │   └── ThemeContext.jsx           # Dark/light theme + font family/size preferences
 ├── data/
-│   └── menuConfig.js              # Role-based menu config; submenu items carry their own icon
+│   └── menuConfig.js              # Permission-based menu config; items have `permission` key; '*' = all authenticated
 ├── pages/
 │   ├── auth/
 │   │   └── Login.jsx              # Split-panel login (real API)
@@ -65,12 +67,12 @@ src/
 │   ├── access/                    # Access Control
 │   │   ├── roles/                 # Roles: list / add / edit / view
 │   │   ├── permissions/           # Permissions: list / add / edit / view
-│   │   ├── rolePermissions/       # RolePermissions: assign permissions to a role
-│   │   └── roleHandoverRules/     # RoleHandoverRules: list + Role-Permissions-style editor (add/remove via sync)
+│   │   ├── rolePermissions/       # RolePermissions: assign permissions to a role (sync)
+│   │   └── roleHandoverRules/     # RoleHandoverRules: list + Role-Permissions-style editor (sync)
 │   ├── profile/
 │   │   └── Profile.jsx            # My Profile page (navbar menu → GET /users/me)
 │   ├── expenses/                  # MyExpenses (own), AllExpenses (scoped list), CreateExpense (real API create), ExpenseDetail (real API view)
-│   ├── travel/                    # (future) TravelRequests...
+│   ├── procurement/               # Procurement: list (tabs: All/My), Create PI, Edit PI, Detail (actions, quotations, timeline, docs)
 │   ├── finance/
 │   │   └── categories/            # Expense Categories: list / add / edit / view (routed + menu under Master Data → /master/categories)
 │   └── settings/
@@ -84,6 +86,8 @@ src/
 │   ├── accessService.js           # /roles, /permissions, /role-permissions, /role-handover-rules (+sync), /roles/options
 │   ├── financeService.js          # /expense-categories
 │   ├── vendorService.js           # /vendors, /vendors/options, /vendor-documents, /vendor-categories (+/options)
+│   ├── procurementService.js      # /procurement (CRUD + workflow actions + quotations + documents)
+│   ├── dashboardService.js        # /dashboard
 │   └── uploadService.js           # POST /uploads (image upload)
 ├── validations/                   # Shared Zod schemas — one file per form/domain
 │   ├── userFormSchema.js          # User create/edit form schema + EMPLOYMENT_TYPES
@@ -95,9 +99,10 @@ src/
 │   ├── roleSchema.js              # Role create/edit form schema
 │   ├── permissionSchema.js        # Permission create/edit form schema
 │   └── expenseSchema.js           # Expense create form — category/company + Travel (segments, accommodations, forex, transports, misc) + Reimbursement line items; amounts as strings (backend encrypts)
+│   └── procurementSchema.js       # Procurement create/edit form schema (qty + unit price only)
 └── utils/
     ├── assets.js                  # resolveAssetUrl(path) — backend asset path → absolute URL
-    ├── format.js                  # formatDate, nullIfEmpty, formatType
+    ├── format.js                  # formatDate, nullIfEmpty, formatType, formatCurrency
     ├── user.js                    # getFullName, getInitials
     ├── table.js                   # sortRows (client-side sort for DataTable)
     └── formErrors.js              # applyServerErrors — map 422 errors onto RHF fields
@@ -107,12 +112,13 @@ src/
 - **Path alias:** Always use `@/` for imports (maps to `src/`), never relative `../../`
 - **Functional components only** — no classes
 - **Feature-based pages** — add new pages inside the relevant folder (`pages/{feature}/`)
-- **Role-based menu:** sidebar renders from `data/menuConfig.js`, filtered by `user.role`
+- **Permission-based menu & routes:** sidebar renders from `data/menuConfig.js`, filtered by `user.permissions`; routes wrapped in `<PermissionGuard permission="...">` (keys match backend `permission_key` like `companies:read_all`, `expenses:approvals`, `procurement:po`)
 - **All buttons/links** show pointer cursor (global CSS rule)
 - **All API calls go through `src/services/`** — one file per domain; components never call axios directly
 - **Reusable listings:** use `DataTable` (self-managed `fetchFn` mode) or `DataTablePage` for any listing page
-- **Dropdown option fetches** use the lightweight `/options` endpoints (`getRoleOptions`, `getCompanyOptions`, `getDepartmentOptions`), not the full list APIs
+- **Dropdown option fetches** use the lightweight `/options` endpoints (`getRoleOptions`, `getCompanyOptions`, `getDepartmentOptions`, `getVendorOptions`, `getVendorCategoryOptions`), not the full list APIs
 - **Forms:** all forms use React Hook Form + Zod — schemas live in `src/validations/`, components use `useForm` + `zodResolver`, dynamic rows use `useFieldArray`, and server-side 422 errors are mapped back onto fields via `setError`. Don't hand-roll form state or validation.
+- **Permission checks:** `AuthContext` provides `hasPermission(perm)` checking `user.permissions` array (populated from backend `/auth/login` response). `PermissionGuard` and `ProtectedRoute` both support permission prop.
 
 ## Design System (Indigo/Slate)
 - **Primary:** `#6366f1` (indigo-500)
@@ -125,35 +131,34 @@ src/
 - **Dark mode:** toggle via Navbar or Settings, persists in localStorage
 
 ## Routing
-All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazily code-split** via `React.lazy`; the route tree is wrapped in one `Suspense` with a spinner fallback.
+All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazily code-split** via `React.lazy`; the route tree is wrapped in one `Suspense` with a spinner fallback. Routes are protected by `PermissionGuard` (checks `user.permissions`) and `ProtectedRoute` (auth + optional permission).
 ```
 /login                    → Public
 /                         → Protected (redirects to /login if unauthenticated)
-/dashboard                → Dashboard
-/master/companies         → Companies list / new / :uuid (view) / :uuid/edit
-/master/departments       → Departments list / new / :uuid (view) / :uuid/edit
-/master/users             → Users list / new / :uuid (view) / :uuid/edit
-/master/vendors           → Vendors list / new / :uuid (view) / :uuid/edit
-/master/vendor-categories → Vendor Categories list / new / :uuid (view) / :uuid/edit
-/master/categories        → Expense Categories list / new / :uuid (view) / :uuid/edit
-/access/roles             → Roles list / new / :uuid (view) / :uuid/edit
-/access/permissions       → Permissions list / new / :uuid (view) / :uuid/edit
-/access/role-permissions  → Role Permissions (assignment)
-/access/role-handover-rules          → Role Handover Rules list
-/access/role-handover-rules/edit     → Configure a from role's handover rules
-/expenses/my              → My Expenses (own — GET /expenses/my)
-/expenses/all             → All Expenses (scoped — GET /expenses; SUPER_ADMIN/CFO see all, other manager roles only their employed companies)
-/expenses/assigned        → Approvals (pending user's role approval — GET /expenses/assigned; company-scoped)
-/expenses/new             → Create Expense (real API)
-/expenses/:uuid/edit      → Edit a DRAFT expense (creator only; PUT replaces line items)
-/expenses/:id             → Expense Detail (real API view)
-/procurement              → All Procurement Requests (PI/PR/PO, type+status filters)
-/procurement/new          → Create PI (only roles with procurement:create)
-/procurement/:uuid        → Procurement Detail (actions, quotations, timeline, docs)
-/procurement/:uuid/edit   → Edit a draft PI (admin "Edit Line Items" for a PR in quote-gathering is a modal on the detail page, not this route)
+/dashboard                → Dashboard (permission: '*')
+/expenses/my              → My Expenses (own — GET /expenses/my) — permission: expenses:read
+/expenses/all             → All Expenses (scoped — GET /expenses; SUPER_ADMIN/CFO see all, other manager roles only their employed companies) — permission: expenses:read_all
+/expenses/assigned        → Approvals (pending user's role approval — GET /expenses/assigned; company-scoped) — permission: expenses:approvals
+/expenses/new             → Create Expense (real API) — permission: expenses:create
+/expenses/:uuid/edit      → Edit a DRAFT expense (creator only; PUT replaces line items) — permission: expenses:update
+/expenses/:id             → Expense Detail (real API view) — permission: expenses:read
+/master/companies         → Companies list / new / :uuid (view) / :uuid/edit — permissions: companies:read_all / companies:create / companies:read / companies:update
+/master/vendors           → Vendors list / new / :uuid (view) / :uuid/edit — permissions: vendors:read_all / vendors:create / vendors:read / vendors:update
+/master/vendor-categories → Vendor Categories list / new / :uuid (view) / :uuid/edit — permissions: vendor_categories:read_all / vendor_categories:create / vendor_categories:read / vendor_categories:update
+/master/departments       → Departments list / new / :uuid (view) / :uuid/edit — permissions: departments:read_all / departments:create / departments:read / departments:update
+/master/users             → Users list / new / :uuid (view) / :uuid/edit — permissions: users:read_all / users:create / users:read / users:update
+/master/categories        → Expense Categories list / new / :uuid (view) / :uuid/edit — permissions: expense_categories:read_all / expense_categories:create / expense_categories:read / expense_categories:update
+/access/roles             → Roles list / new / :uuid (view) / :uuid/edit — permissions: roles:read_all / roles:create / roles:read / roles:update
+/access/permissions       → Permissions list / new / :uuid (view) / :uuid/edit — permissions: permissions:read_all / permissions:create / permissions:read / permissions:update
+/access/role-permissions  → Role Permissions (assignment) — permission: role_permissions:read_all
+/access/role-handover-rules          → Role Handover Rules list — permission: role_handover_rules:read_all
+/access/role-handover-rules/edit     → Configure a from-role's handover rules — permission: role_handover_rules:update
+/procurement              → All Procurement Requests (PI/PR/PO, type+status filters) — permission: procurement:read_all
+/procurement/new          → Create PI (only roles with procurement:create) — permission: procurement:create
+/procurement/:uuid        → Procurement Detail (actions, quotations, timeline, docs) — permission: procurement:read
+/procurement/:uuid/edit   → Edit a draft PI (admin "Edit Line Items" for a PR in quote-gathering is a modal on the detail page, not this route) — permission: procurement:update
 /profile                  → My Profile
 /settings                 → Settings
-/travel, /finance, ...    → Mapped to pages (to be built)
 ```
 
 ## Scripts
@@ -176,10 +181,10 @@ VITE_APP_ENV=development
 - [x] **Real login API** — `POST /auth/login` via `authService`, JWT stored, AuthContext wiring (fixed a recursion bug)
 - [x] **Demo credentials on login** — the login page shows all 13 seeded demo users (Super Admin, CFO, Payment/Finance/Admin/Travel managers + juniors, HOD, Employee Mgr, Employee) in a **3-column grid spanning the full right partition**, each button auto-fills the email + password (`Admin@123`). **All users use password "Admin@123"** (seeded via bcrypt hash).
 - [x] Dashboard (stats cards, spending charts, activity feed)
-- [x] Collapsible role-based sidebar with submenus — active section stays open, other sections collapse once you navigate to a page; submenu items have their own icons + a guide line
+- [x] Collapsible **permission-based** sidebar with submenus — active section stays open, other sections collapse once you navigate to a page; submenu items have their own icons + a guide line; active leaf matches query params (e.g., `/procurement?scope=mine` highlights "My Requests" tab)
 - [x] Navbar with search, notifications, profile dropdown
 - [x] Settings page (font family, font size, theme)
-- [x] Protected routes + auth guard
+- [x] Protected routes + auth guard (`ProtectedRoute` + `PermissionGuard` with permission keys matching backend `permission_key`)
 - [x] Feature-based page structure + `@/` alias
 - [x] **Services layer** — shared axios client (JWT + 401 redirect) + per-module service files + `crud()` helper
 - [x] **Users module** (`src/pages/master/users/`)
@@ -197,8 +202,9 @@ VITE_APP_ENV=development
 - [x] **Expenses UI** (`src/pages/expenses/`) — **Create Expense** wired to the real API (`POST /expenses`; category + company dropdowns — company scoped to the logged-in user's employments via `GET /users/me`); per-item **attachments** (files uploaded via `POST /uploads` on submit, kept per sub-part on edit, shown in the detail view); amounts not sent (backend computes); **validation is module-aware** (Travel XOR Reimbursement required fields, dates required, end ≥ start) and submit shows a **success/error toast** via `useToast()`. **My Expenses** (`GET /expenses/my` — only expenses the user created), **All Expenses** (`GET /expenses` — role+company scoped: SUPER_ADMIN/CFO see everything, other expense-manager roles see only companies they're actively employed in), and **Approvals** (`GET /expenses/assigned` — expenses pending the logged-in user's role approval, company-scoped) are **server-side paginated** via the shared `DataTablePage` (`page/limit/search/status/category/sort` on the backend, `ApiResponse.paginated`); All Expenses shows a clickable **Submitted by** (→ user-details modal) and approver-style actions. **Detail** (`GET /expenses/:uuid`, visibility-checked, payload normalized via `normalizeExpense`) renders all travel sections **tables on desktop / cards on mobile**, each showing its own **attachments**. **DRAFT expenses can be edited** (`/expenses/:uuid/edit` → `EditExpense` reuses `ExpenseForm`; creator-only, `PUT /expenses/:uuid` replaces line items + attachments and recomputes the amount; Edit shown only for the owner's DRAFT). `MyExpenses` is a parameterized list component reused by `AllExpenses` and `Approvals`. Themed `DatePicker` (react-datepicker) used for date/datetime fields. **Expense approval actions** — the **Expense Detail** page shows **Approve / Reject** buttons (with a confirm modal + optional remark) for a `SUBMITTED` expense **when the logged-in role is the current handler (or SUPER_ADMIN)**; **Approve opens a handover role dropdown** (fetched from `GET /expenses/:uuid/handover-roles` — valid targets from `role_handover_rules` for the category's module) to select who to forward to; defaults to final approver if no selection. They call `expenseService.submit/approve/rejectExpense`, then reload. The current handler role is surfaced from `currentRole` (normalized in `normalizeExpense`). **PO-created expenses** (auto-created when a procurement PO is created) appear in the expenses list as SUBMITTED and flow through the expense approval chain — the expense detail's handover trail shows the SUBMIT → APPROVE(→CFO) → APPROVE(→APPROVED) journey. For **procurement-linked expenses** (PO-created or converted) the Expense Detail shows a **collapsed "Procurement history"** card (`ProcurementHistorySection`, gated by `normalizeExpense.isProcurement`) with a **Show/Hide** button and a **smooth height animation** (`grid-template-rows` transition — the payload can be large, so it opens gently). On first expand it **lazy-loads** the chain via `getExpenseProcurementChain` (`GET /expenses/:uuid/procurement-chain`) and renders `ProcurementHistory` — a **responsive stage table** (desktop table / mobile cards, like the PR price-history card) with columns **Stage | Document | Grand total | View** for PI → PR → each quotation → PO, plus the **chain's approval logs** below it (e.g. SUBMIT → APPROVE → CREATE_PR → ADD_QUOTATION → SUBMIT_QUOTATIONS → SELECT_QUOTATION → CONVERT_TO_EXPENSE). Each row's **View** links to that document's procurement detail page (`/procurement/:uuid`; quotations have no standalone route).
 - [x] **Procurement module** (`src/pages/procurement/`) — full PI → PR → PO flow wired to the real API (`/procurement*`). **Procurements list** — server-side `DataTablePage` (`page/limit/search/type/status/sort`), type/status filter dropdowns, draft-PI edit/delete, per-status color pills (the backend now projects the all-types view to the **latest document per chain**). **DRAFT PI visibility fixed** — DRAFT PIs are visible **only to their creator** in "All Requests" list (backend `procurement.repository.js:buildWhere()` combines draft exclusion filter with status filters using `Op.and`). **Create/Edit PI** — `ProcurementForm` (RHF+Zod, `procurementSchema`), company dropdown scoped to the user's employments (`GET /users/me`), dynamic line items (qty + unit price only — no vendor at PI stage). **ProcurementDetail** — status pill + **workflow action bar** (submit / approve / reject / create-PR / create-PO / mark-received / process-payment, shown by role+status; **creating a PR redirects to the all-requests list** `/procurement`; **no convert-to-expense action** — expense is now created only when PO is created), **Edit Line Items** (admin modal to adjust PI/PR qty & unit price → `PUT /:uuid/items`; hidden once quotations are **submitted to the requester** — status `QUOTATION_SELECTION`), **quotation builder** (hidden behind an **"Add quotation"** button — admin fills vendor, **valid-until via the themed `DatePicker`** (same picker as the other forms), **comments**, and an editable **line-items table** pre-filled from the PR's items with per-item name/qty/unit price/`tax_rate` and a live grand total; totals are server-computed on save), **blind selection** for the requester (vendor masked but **line items + prices visible**; `submit-quotations` opens selection, `select-quotation` picks one), **selected-quotation highlight** (emerald card + ✓ badge, with the other quotations collapsed behind a **"Show N other quotations"** toggle), **price-history card** (PI → PR → quotations → PO totals with a **View link** per stage), line-items table, handover **timeline**, and **quotation documents** (per-quotation upload/delete, shown only in **edit mode** — the existing "QUOTATION" type label was removed). The whole detail page is **responsive: tables on desktop / stacked cards on mobile** (`hidden md:block` + `md:hidden`), with `table-fixed` percentage columns and `break-words` so no horizontal scrollbars. Follows the intended flow: anyone who can **create a PI can submit it** (permission-based, not handover-gated); the PR goes straight to quotation-gathering with **no separate PR approval**; admin edits PR items before sending to the requester to choose a quotation blindly. On a **PO** (or a PR that was **converted to an expense**) the detail page shows a **"Linked Expense" link** (Wallet icon, from `doc.expenses[0]`) → `/expenses/:uuid`, so the expense that the PO auto-created or the admin converted is reachable directly from the procurement record.
 - [x] **My Profile page** (navbar) — avatar, personal info, role/department, all employments
-- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
+- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`, `SearchableSelect`, `PermissionGuard`
 - [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
+- [x] **Permission-based routing** — all routes wrapped in `<PermissionGuard permission="...">` using backend permission keys (e.g., `expenses:read_all`, `companies:create`, `procurement:po`); sidebar menu items filtered by same permissions from `menuConfig.js`
 
 ### Today's Updates (2026-08-21) — Final Approver Closes Expense as APPROVED
 - **ExpenseDetail.jsx**: Added detection of whether the current user is the category's final approver (`expense.category.finalApproverRole.code === expense.currentRole.code`). If so, the approve modal shows an info banner ("You are the final approver — this expense will be closed as APPROVED") instead of the handover role dropdown. The expense is always closed as APPROVED regardless of any handover selection (backend enforces this).
@@ -233,7 +239,7 @@ VITE_APP_ENV=development
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
 - [ ] Employments list/create pages (`/master/employments`)
 - [ ] Expense attachments → real upload (`POST /uploads`) + `expense_documents` per line item
-- [ ] Travel pages
-- [ ] Finance pages (Categories, Payments, Reports)
+- [ ] Travel pages (folder exists but no implementation)
+- [ ] Finance pages (Payments, Reports — only Categories built)
 - [ ] Company switcher (fetch employments on demand)
 - [ ] **Resubmit rejected expenses** — frontend resubmit flow for REJECTED expenses (allows creator to edit and resubmit through approval flow)
