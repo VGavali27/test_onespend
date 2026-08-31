@@ -104,8 +104,11 @@ function Submenu({ open, children }) {
 }
 
 // Parent item with collapsible submenu. Accordion: only one submenu is open at a time.
-function ParentItem({ item, onNavigate, open, toggleMenu, activeId }) {
+function ParentItem({ item, onNavigate, open, toggleMenu, activeId, userPermissions }) {
   const Icon = item.icon;
+  // Filter children by permission
+  const visibleChildren = item.children.filter((child) => hasPermission(child.permission, userPermissions));
+
   return (
     <div>
       <button
@@ -122,7 +125,7 @@ function ParentItem({ item, onNavigate, open, toggleMenu, activeId }) {
       </button>
 
       <Submenu open={open}>
-        {item.children.map((child) => (
+        {visibleChildren.map((child) => (
           <LeafItem key={child.id} item={child} nested onNavigate={onNavigate} active={activeId === child.id} />
         ))}
       </Submenu>
@@ -203,6 +206,7 @@ export default function Sidebar() {
                 open={openSection === item.id}
                 toggleMenu={toggleMenu}
                 activeId={leafActive}
+                userPermissions={user?.permissions}
               />
             ) : (
               <LeafItem key={item.id} item={item} onNavigate={() => setMobileOpen(false)} active={leafActive === item.id} />
