@@ -1,20 +1,20 @@
 import { Router } from 'express';
 import * as departmentController from './department.controller.js';
 import validate from '../../middleware/validate.js';
-import { authMiddleware, requireRole } from '../../middleware/auth.js';
+import { authMiddleware, requirePermission } from '../../middleware/auth.js';
 import { createDepartmentSchema, updateDepartmentSchema } from './department.validation.js';
 const router = Router();
 router.use(authMiddleware);
 // List all departments
-router.get('/', departmentController.getAllDepartments);
+router.get('/', requirePermission('departments:read_all'), departmentController.getAllDepartments);
 // Lightweight department options for dropdowns (must precede /:uuid)
-router.get('/options', departmentController.getDepartmentOptions);
+router.get('/options', requirePermission('departments:read'), departmentController.getDepartmentOptions);
 // Get a single department by UUID
-router.get('/:uuid', departmentController.getDepartmentByUuid);
+router.get('/:uuid', requirePermission('departments:read'), departmentController.getDepartmentByUuid);
 // Create a new department (validate body first)
-router.post('/', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), validate(createDepartmentSchema), departmentController.createDepartment);
+router.post('/', requirePermission('departments:create'), validate(createDepartmentSchema), departmentController.createDepartment);
 // Update an existing department by UUID (validate body first)
-router.put('/:uuid', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), validate(updateDepartmentSchema), departmentController.updateDepartment);
+router.put('/:uuid', requirePermission('departments:update'), validate(updateDepartmentSchema), departmentController.updateDepartment);
 // Soft delete a department by UUID
-router.delete('/:uuid', requireRole('SUPER_ADMIN'), departmentController.deleteDepartment);
+router.delete('/:uuid', requirePermission('departments:delete'), departmentController.deleteDepartment);
 export default router;

@@ -1,21 +1,21 @@
 import { Router } from 'express';
 import * as userController from './user.controller.js';
 import validate from '../../middleware/validate.js';
-import { authMiddleware, requireRole } from '../../middleware/auth.js';
+import { authMiddleware, requirePermission } from '../../middleware/auth.js';
 import { createUserSchema, updateUserSchema } from './user.validation.js';
 
 const router = Router();
 router.use(authMiddleware);
 // List all users
-router.get('/', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), userController.getAllUsers);
+router.get('/', requirePermission('users:read_all'), userController.getAllUsers);
 // Get the authenticated user's profile (must precede /:uuid)
 router.get('/me', userController.getMyProfile);
 // Get a single user by UUID
-router.get('/:uuid', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), userController.getUserByUuid);
+router.get('/:uuid', requirePermission('users:read'), userController.getUserByUuid);
 // Create a new user (validate body first)
-router.post('/', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), validate(createUserSchema), userController.createUser);
+router.post('/', requirePermission('users:create'), validate(createUserSchema), userController.createUser);
 // Update an existing user by UUID (validate body first)
-router.put('/:uuid', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), validate(updateUserSchema), userController.updateUser);
+router.put('/:uuid', requirePermission('users:update'), validate(updateUserSchema), userController.updateUser);
 // Soft delete a user by UUID
-router.delete('/:uuid', requireRole('SUPER_ADMIN'), userController.deleteUser);
+router.delete('/:uuid', requirePermission('users:delete'), userController.deleteUser);
 export default router;
