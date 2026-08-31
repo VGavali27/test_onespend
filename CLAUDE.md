@@ -54,7 +54,7 @@ src/
 │   ├── seed.js                   # Run: node src/database/seed.js
 │   └── rollback.js               # Run: node src/database/rollback.js
 ├── modules/
-│   ├── auth/                     # Login (JWT), authMiddleware, requireRole, optionalAuth
+│   ├── auth/                     # Login (JWT), authMiddleware, optionalAuth, **requirePermission** (permission-based auth, replaces requireRole)
 │   ├── upload/                   # Image upload (multer) → serves /uploads
 │   ├── group/                    # Read-only groups (GET /groups, /groups/options) — for company group dropdown
 │   ├── user/                     # CRUD + paginated list + GET /users/me
@@ -159,7 +159,7 @@ npm run seed              # run seeders
 ## What's Built / What's Pending
 
 ### API Modules
-- [x] Authentication / Authorization — JWT login, authMiddleware, requireRole, **requirePermission** (async: checks the user's role has a given `permission_key` from `role_permissions`; used to gate `POST /procurement` and `POST /procurement/:uuid/submit` on `procurement:create`)
+- [x] Authentication / Authorization — JWT login, authMiddleware, **requirePermission** (async: checks the user's role has a given `permission_key` from `role_permissions`; used to gate all routes via permission keys like `users:read_all`, `companies:create`, `expenses:approve`, `procurement:po`, etc. — `requireRole` has been fully removed from route files)
 - [x] User API — CRUD by UUID, **paginated list** (page/limit/search/status/sort), create/update with employments, **GET /users/me** (full profile), GET /users/:uuid returns profile
 - [x] Company API — CRUD by UUID + **GET /companies/options**
 - [x] Department API — CRUD by UUID + **GET /departments/options**
@@ -217,6 +217,7 @@ npm run seed              # run seeders
 - **Combined endpoints** — `POST /api/expenses` creates expense + travel + child items in one transaction
 - **Per-item attachments** — `expense_documents` link each uploaded file to its own sub-part record (`module_name` = travel_segment / travel_accommodation / travel_forex / travel_local_transport / travel_misc_expense / reimbursement_item)
 - **Approval chain** — `expense_categories` define first/final approver roles, `role_handover_rules` define handover paths
+- **Permission-based authorization** — all routes use `requirePermission(permission_key)` middleware that checks `role_permissions` table (replaced hardcoded `requireRole('SUPER_ADMIN', 'ADMIN_MGR')` checks). Permission keys follow pattern `{resource}:{action}` (e.g., `roles:read_all`, `companies:create`, `expenses:approve`, `procurement:po`).
 - **Password hashing** — passwords bcrypt-hashed on create and update (fixed plaintext bug). **All seeded users use password "Admin@123"**
 - **UUID auto-generation** — every model's `uuid` has `defaultValue: UUIDV4` (fixed "uuid cannot be null" on create)
 - **Per-employment email** — `user_employments.email` column (a user can have a different email per company)
