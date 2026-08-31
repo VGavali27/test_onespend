@@ -855,3 +855,258 @@ export const reject = async (uuid, user, remarks) => {
     return expenseRepository.findByUuid(uuid, t);
   });
 };
+
+// ── Payment flow (unified for all expense types) ──
+
+// Compute payment status based on paid_amount, final_amount, advance_amount
+const computePaymentStatus = (paid, final, advance) => {
+  const p = Number(paid) || 0;
+  const f = Number(final) || 0;
+  const a = Number(advance) || 0;
+
+  if (p === 0) return 'UNPAID';
+  if (p < f && a === 0) return 'PARTIAL_PAID';
+  if (p >= f && a === 0) return 'PAID';
+  if (a > f && p < a) return 'ADVANCE_REFUND_DUE';
+  if (a > f && p >= a) return 'SETTLED';
+  if (f > a && p < f) return 'ADDITIONAL_PAYMENT_DUE';
+  if (f > a && p >= f) return 'SETTLED';
+  if (a === f && p >= f) return 'SETTLED';
+  return 'UNPAID';
+};
+
+// Record a payment installment for an expense
+export const recordPayment = async (uuid, user, paymentData) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+
+  // Check permissions - only users with expenses:pay can record payments
+  const actorRole = await findRoleByCode(user.roleCode);
+  const hasPayPermission = await db.RolePermission.findOne({
+    where: { role_id: actorRole?.id },
+    include: [{ model: db.Permission, as: 'permission', where: { permission_key: 'expenses:pay' } }],
+  });
+  if (!hasPayPermission && user.roleCode !== 'SUPER_ADMIN') {
+    throw ApiError.forbidden('You do not have permission to record payments');
+  }
+
+  // Only allow payments on APPROVED or payment-pending statuses
+  const allowedPaymentStatuses = ['APPROVED', 'PARTIAL_PAID', 'ADVANCE_REFUND_DUE', 'ADDITIONAL_PAYMENT_DUE', 'UNPAID', 'SETTLED'];
+  if (!allowedPaymentStatuses.includes(expense.status) && expense.status !== 'APPROVED') {
+    throw ApiError.badRequest(`Cannot record payment for expense in ${expense.status} status`);
+  }
+
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
+  const { amount, payment_method, payment_date, payment_type, reference_number, remarks, proofs } = paymentData;
+
+  return sequelize.transaction(async (t) => {
+    // Create the payment record
+    const payment = await db.ExpensePayment.create(
+      {
+        expense_id: expense.id,
+        amount,
+        payment_method,
+        payment_date: new Date(payment_date),
+        payment_type: payment_type || 'PARTIAL',
+        reference_number: reference_number || null,
+        remarks: remarks || null,
+        processed_by_employment_id: actorEmployment?.id,
+      },
+      { transaction: t },
+    );
+
+    // Handle proof uploads
+    if (proofs?.length) {
+      await db.ExpensePaymentProof.bulkCreate(
+        proofs.map((p) => ({
+          expense_payment_id: payment.id,
+          file_path: p.file_path,
+          file_name: p.file_name,
+          file_type: p.file_type || null,
+          uploaded_by_employment_id: actorEmployment?.id,
+        })),
+        { transaction: t },
+      );
+    }
+
+    // Update expense paid_amount and payment_status
+    const currentPaid = Number(decrypt(String(expense.paid_amount || '0')));
+    const newPaid = currentPaid + Number(amount);
+    const finalAmount = Number(decrypt(String(expense.final_amount || '0')));
+    const advanceAmount = Number(decrypt(String(expense.advance_amount || '0')));
+    const newPaymentStatus = computePaymentStatus(newPaid, finalAmount, advanceAmount);
+
+    await expense.update(
+      {
+        paid_amount: String(newPaid),
+        payment_status: newPaymentStatus,
+        // If expense was APPROVED and now fully paid, update status to PAID (if no advance)
+        ...(expense.status === 'APPROVED' && newPaymentStatus === 'PAID' && advanceAmount === 0
+          ? { status: 'PAID' }
+          : {}),
+      },
+      { transaction: t },
+    );
+
+    // Log payment handover
+    await logExpenseHandover({
+      expenseId: expense.id,
+      fromRoleId: actorRole?.id,
+      toRoleId: actorRole?.id,
+      employmentId: actorEmployment?.id,
+      actionType: 'PAY',
+      remarks: `Payment: ${amount} (${payment_method})`,
+      t,
+    });
+
+    return { payment, expense: await expenseRepository.findByUuid(uuid, t) };
+  });
+};
+
+// Get payment summary for an expense (computed values)
+export const getPaymentSummary = async (uuid, user) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+
+  const [employmentIds, companyIds] = await Promise.all([
+    getEmploymentIdsByUser(user.userId),
+    getActiveCompanyIdsByUser(user.userId),
+  ]);
+  const visible =
+    EXPENSE_GLOBAL_ROLES.includes(user.roleCode) ||
+    employmentIds.includes(expense.requested_by_employment_id) ||
+    companyIds.includes(expense.company_id);
+
+  if (!visible) throw ApiError.notFound('Expense not found');
+
+  // Decrypt amounts for computation
+  const finalAmount = Number(decrypt(String(expense.final_amount || '0')));
+  const advanceAmount = Number(decrypt(String(expense.advance_amount || '0')));
+  const paidAmount = Number(decrypt(String(expense.paid_amount || '0')));
+
+  // Fetch all payments with proofs
+  const payments = await db.ExpensePayment.findAll({
+    where: { expense_id: expense.id },
+    include: [{ model: db.ExpensePaymentProof, as: 'proofs' }],
+    order: [['payment_date', 'ASC']],
+  });
+  decryptResults(payments);
+  payments.forEach(p => {
+    if (p.proofs) decryptResults(p.proofs);
+  });
+
+  // Determine payment status
+  const paymentStatus = computePaymentStatus(paidAmount, finalAmount, advanceAmount);
+
+  // Compute what's due
+  let amountDue = 0;
+  let isOverAdvance = false;
+  let isUnderAdvance = false;
+
+  if (advanceAmount > finalAmount) {
+    // User was over-advanced, owes refund
+    isOverAdvance = true;
+    amountDue = advanceAmount - paidAmount; // positive = user owes refund
+  } else if (finalAmount > advanceAmount) {
+    // Company owes additional payment
+    isUnderAdvance = true;
+    amountDue = finalAmount - paidAmount; // positive = company owes
+  }
+
+  return {
+    final_amount: finalAmount.toFixed(2),
+    advance_amount: advanceAmount.toFixed(2),
+    paid_amount: paidAmount.toFixed(2),
+    payment_status: paymentStatus,
+    amount_due: amountDue.toFixed(2),
+    is_over_advance: isOverAdvance,
+    is_under_advance: isUnderAdvance,
+    payments: payments.map(p => ({
+      uuid: p.uuid,
+      amount: Number(p.amount).toFixed(2),
+      payment_method: p.payment_method,
+      payment_date: p.payment_date,
+      payment_type: p.payment_type,
+      reference_number: p.reference_number,
+      remarks: p.remarks,
+      proofs: (p.proofs || []).map(pr => ({
+        uuid: pr.uuid,
+        file_path: pr.file_path,
+        file_name: pr.file_name,
+        file_type: pr.file_type,
+      })),
+    })),
+    can_pay: true, // TODO: check if user has expenses:pay permission
+  };
+};
+
+// Update submit to initialize payment fields
+const originalSubmit = async (uuid, user, remarks) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+  if (expense.status !== 'DRAFT' && expense.status !== 'REJECTED') {
+    throw ApiError.badRequest('Only a draft or rejected expense can be submitted');
+  }
+
+  const employmentIds = await getEmploymentIdsByUser(user.userId);
+  if (!employmentIds.includes(expense.requested_by_employment_id)) {
+    throw ApiError.forbidden('You can only submit your own expenses');
+  }
+
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+  const actorRole = await findRoleByCode(user.roleCode);
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
+  const firstReceiver = category?.first_receiver_role_id ?? null;
+
+  // Compute final_amount from line items
+  let finalAmount = 0;
+  let advanceAmount = 0;
+
+  if (category.module === 'travel') {
+    const travel = expense.travelExpense;
+    if (travel) {
+      finalAmount = (travel.segments || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0) +
+        (travel.accommodations || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0) +
+        (travel.localTransports || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0) +
+        (travel.forex || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0) +
+        (travel.miscExpenses || []).reduce((s, x) => s + (Number(x.estimated_amount) || 0), 0);
+    }
+  } else if (category.module === 'reimbursement') {
+    const reim = expense.reimbursementExpense;
+    if (reim) {
+      advanceAmount = Number(decrypt(String(reim.advance_amount || '0')));
+      finalAmount = (reim.items || []).reduce((s, x) => s + (Number(x.total_amount) || 0), 0);
+    }
+  } else if (category.module === 'procurement') {
+    // For procurement-linked expenses, final_amount is already set from PO
+    finalAmount = Number(decrypt(String(expense.final_amount || expense.estimated_amount || '0')));
+  }
+
+  const initialPaymentStatus = computePaymentStatus(0, finalAmount, advanceAmount);
+
+  return sequelize.transaction(async (t) => {
+    await expense.update(
+      {
+        status: 'SUBMITTED',
+        current_role_id: firstReceiver,
+        current_employment_id: null,
+        submitted_at: new Date(),
+        final_amount: String(finalAmount),
+        advance_amount: String(advanceAmount),
+        paid_amount: '0',
+        payment_status: initialPaymentStatus,
+      },
+      { transaction: t },
+    );
+    await logExpenseHandover({
+      expenseId: expense.id,
+      fromRoleId: actorRole?.id,
+      toRoleId: firstReceiver,
+      employmentId: actorEmployment?.id,
+      actionType: 'SUBMIT',
+      remarks,
+      t,
+    });
+    return expenseRepository.findByUuid(uuid, t);
+  });
+};

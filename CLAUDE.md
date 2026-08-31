@@ -281,3 +281,18 @@ Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Q
 - **New route**: `GET /expenses/:uuid/handover-roles` — exposes valid handover roles for the frontend dropdown.
 - **Updated validation**: `actionSchema` now accepts optional `to_role_id` for approve action.
 - **Removed redundant seeder**: `20260811000001-seed-expense-handover-rules.js` (uses existing travel/reimbursement/procurement module rules).
+
+### Today's Updates (2026-08-31) — Unified Expense Payment System
+- **New payment workflow** for ALL expense types (Travel, Reimbursement, Procurement-linked, General) — unified logic replacing the previous reimbursement-only approach.
+- **New fields on `expenses` table**: `advance_amount` (default '0'), `final_amount` (computed on SUBMIT), `paid_amount` (running total, default '0'), `payment_status` (ENUM: UNPAID, PARTIAL_PAID, PAID, ADVANCE_REFUND_DUE, ADDITIONAL_PAYMENT_DUE, SETTLED).
+- **New tables**: `expense_payments` (each installment: amount, payment_method, payment_date, payment_type, reference_number, remarks) and `expense_payment_proofs` (screenshots/receipts per payment).
+- **Unified payment status logic**: Single formula for all expense types based on `paid_amount` vs `final_amount` vs `advance_amount`:
+  - `advance_amount = 0` for non-reimbursement; `reimbursement.advance_amount` for reimbursement.
+  - On SUBMIT: `final_amount` computed from line items, `advance_amount` set, `payment_status` initialized.
+  - `PARTIAL_PAID` for partial payments, `PAID` when paid ≥ final (no advance), `ADVANCE_REFUND_DUE` when advance > final (user owes refund), `ADDITIONAL_PAYMENT_DUE` when final > advance (company owes more), `SETTLED` when fully reconciled.
+- **New endpoints** (permission `expenses:pay`):
+  - `POST /expenses/:uuid/payments` — record payment installment + upload proofs
+  - `GET /expenses/:uuid/payments` — list all payments
+  - `GET /expenses/:uuid/payment-summary` — computed summary (paid, due, status)
+- **Permission grants**: `expenses:pay` (id 158) granted to SUPER_ADMIN (100), CFO (101), PAYMENT_MGR (102), PAYMENT_JR (103), FINANCE_MGR (104).
+- **Proof of payment**: Each payment installment can have multiple uploaded proofs (screenshots, bank statements) via `/uploads`.

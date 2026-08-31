@@ -22,6 +22,16 @@ export const getMyProfile = async (req, res, next) => {
   }
 };
 
+// Get the authenticated user's permissions with all permissions grouped by resource
+export const getMyPermissions = async (req, res, next) => {
+  try {
+    const data = await userService.getMyPermissions(req.user.userUuid);
+    return ApiResponse.success(res, data, 'Permissions fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Fetch a single user by UUID (full profile: role, department, employments)
 export const getUserByUuid = async (req, res, next) => {
   try {

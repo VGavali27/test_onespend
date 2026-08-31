@@ -10,6 +10,8 @@ router.use(authMiddleware);
 router.get('/', requirePermission('users:read_all'), userController.getAllUsers);
 // Get the authenticated user's profile (must precede /:uuid)
 router.get('/me', userController.getMyProfile);
+// Get the authenticated user's permissions (with all permissions grouped by resource)
+router.get('/me/permissions', userController.getMyPermissions);
 // Get a single user by UUID
 router.get('/:uuid', requirePermission('users:read'), userController.getUserByUuid);
 // Create a new user (validate body first)

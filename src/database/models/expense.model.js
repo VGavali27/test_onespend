@@ -34,8 +34,14 @@ export default (sequelize, DataTypes) => {
       current_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       estimated_amount: { type: DataTypes.TEXT, allowNull: true },
       final_amount: { type: DataTypes.TEXT, allowNull: true },
-      paid_amount: { type: DataTypes.TEXT, allowNull: true },
+      advance_amount: { type: DataTypes.TEXT, allowNull: true, defaultValue: '0' },
+      paid_amount: { type: DataTypes.TEXT, allowNull: true, defaultValue: '0' },
       status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'DRAFT' },
+      payment_status: {
+        type: DataTypes.ENUM('UNPAID', 'PARTIAL_PAID', 'PAID', 'ADVANCE_REFUND_DUE', 'ADDITIONAL_PAYMENT_DUE', 'SETTLED'),
+        allowNull: false,
+        defaultValue: 'UNPAID',
+      },
       submitted_at: { type: DataTypes.DATE, allowNull: true },
       closed_at: { type: DataTypes.DATE, allowNull: true },
       created_by: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
@@ -65,6 +71,7 @@ export default (sequelize, DataTypes) => {
     Expense.hasOne(models.ProcurementOrder, { foreignKey: 'expense_id', as: 'procurementOrder' });
     Expense.hasMany(models.ExpenseDocument, { foreignKey: 'expense_id', as: 'documents' });
     Expense.hasMany(models.ExpenseHandover, { foreignKey: 'expense_id', as: 'handovers' });
+    Expense.hasMany(models.ExpensePayment, { foreignKey: 'expense_id', as: 'payments' });
   };
 
   return Expense;

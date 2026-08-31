@@ -129,3 +129,32 @@ export const rejectExpense = async (req, res, next) => {
     next(error);
   }
 };
+
+// ── Payment endpoints (require expenses:pay permission) ──
+
+export const recordPayment = async (req, res, next) => {
+  try {
+    const payment = await expenseService.recordPayment(req.params.uuid, req.user, req.body);
+    return ApiResponse.created(res, payment, 'Payment recorded successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPayments = async (req, res, next) => {
+  try {
+    const payments = await expenseService.getPayments(req.params.uuid, req.user);
+    return ApiResponse.success(res, payments, 'Payments fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPaymentSummary = async (req, res, next) => {
+  try {
+    const summary = await expenseService.getPaymentSummary(req.params.uuid, req.user);
+    return ApiResponse.success(res, summary, 'Payment summary fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
