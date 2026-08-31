@@ -327,6 +327,7 @@ export default function ProcurementDetail() {
         title={doc?.document_number || 'Procurement'}
         onBack={() => navigate('/procurement')}
         editTo={canEdit ? `/procurement/${uuid}/edit` : null}
+        editPermission="procurement:update"
       />
 
       {loading ? (

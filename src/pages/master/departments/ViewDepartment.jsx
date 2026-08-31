@@ -39,6 +39,7 @@ export default function ViewDepartment() {
         title={dept?.name || 'Department'}
         onBack={() => navigate('/master/departments')}
         editTo={`/master/departments/${uuid}/edit`}
+        editPermission="departments:update"
       />
 
       {loading ? (

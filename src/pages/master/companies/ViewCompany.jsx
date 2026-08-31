@@ -42,6 +42,7 @@ export default function ViewCompany() {
         title={company?.name || 'Company'}
         onBack={() => navigate('/master/companies')}
         editTo={`/master/companies/${uuid}/edit`}
+        editPermission="companies:update"
       />
 
       {loading ? (

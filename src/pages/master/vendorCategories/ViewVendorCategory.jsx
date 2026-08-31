@@ -33,7 +33,7 @@ export default function ViewVendorCategory() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <DetailHeader icon={Tag} title={category?.name || 'Category'} onBack={() => navigate('/master/vendor-categories')} editTo={`/master/vendor-categories/${uuid}/edit`} />
+      <DetailHeader icon={Tag} title={category?.name || 'Category'} onBack={() => navigate('/master/vendor-categories')} editTo={`/master/vendor-categories/${uuid}/edit`} editPermission="vendor_categories:update" />
 
       {loading ? (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6 space-y-3">

@@ -34,7 +34,7 @@ export default function ViewRole() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <DetailHeader icon={Shield} title={role?.name || 'Role'} onBack={() => navigate('/access/roles')} editTo={`/access/roles/${uuid}/edit`} />
+      <DetailHeader icon={Shield} title={role?.name || 'Role'} onBack={() => navigate('/access/roles')} editTo={`/access/roles/${uuid}/edit`} editPermission="roles:update" />
 
       {loading ? (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6 space-y-3">

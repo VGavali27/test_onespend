@@ -33,7 +33,7 @@ export default function ViewCategory() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <DetailHeader icon={Tags} title={category?.name || 'Category'} onBack={() => navigate('/master/categories')} editTo={`/master/categories/${uuid}/edit`} />
+      <DetailHeader icon={Tags} title={category?.name || 'Category'} onBack={() => navigate('/master/categories')} editTo={`/master/categories/${uuid}/edit`} editPermission="expense_categories:update" />
 
       {loading ? (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6 space-y-3">

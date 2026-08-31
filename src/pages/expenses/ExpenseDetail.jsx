@@ -211,6 +211,7 @@ export default function ExpenseDetail() {
         title={expense.title}
         onBack={() => navigate("/expenses/my")}
         editTo={expense.canEdit || expense.status === "REJECTED" ? `/expenses/${expense.uuid}/edit` : undefined}
+        editPermission="expenses:update"
       />
 
       {/* Amount summary */}

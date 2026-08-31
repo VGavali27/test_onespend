@@ -34,7 +34,7 @@ export default function ViewPermission() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <DetailHeader icon={KeyRound} title={perm?.permission_key || 'Permission'} onBack={() => navigate('/access/permissions')} editTo={`/access/permissions/${uuid}/edit`} />
+      <DetailHeader icon={KeyRound} title={perm?.permission_key || 'Permission'} onBack={() => navigate('/access/permissions')} editTo={`/access/permissions/${uuid}/edit`} editPermission="permissions:update" />
 
       {loading ? (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6 space-y-3">

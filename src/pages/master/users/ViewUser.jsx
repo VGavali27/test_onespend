@@ -39,7 +39,7 @@ export default function ViewUser() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <DetailHeader icon={UserRound} title="User Details" onBack={() => navigate('/master/users')} editTo={`/master/users/${uuid}/edit`} />
+      <DetailHeader icon={UserRound} title="User Details" onBack={() => navigate('/master/users')} editTo={`/master/users/${uuid}/edit`} editPermission="users:update" />
 
       {loading ? (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6">

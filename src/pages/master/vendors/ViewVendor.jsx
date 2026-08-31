@@ -92,6 +92,7 @@ export default function ViewVendor() {
         title={vendor?.name || 'Vendor'}
         onBack={() => navigate('/master/vendors')}
         editTo={`/master/vendors/${uuid}/edit`}
+        editPermission="vendors:update"
       />
 
       {loading ? (
