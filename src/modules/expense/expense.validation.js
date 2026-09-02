@@ -1,5 +1,28 @@
 import Joi from 'joi';
 
+// Schema for recording a payment installment
+export const recordPaymentSchema = Joi.object({
+  amount: Joi.string().required().messages({ 'string.empty': 'Amount is required' }),
+  payment_method: Joi.string().max(30).required().messages({
+    'string.empty': 'Payment method is required',
+    'string.max': 'Payment method must be at most 30 characters',
+  }),
+  payment_date: Joi.date().iso().required().messages({ 'date.base': 'Payment date is required', 'date.format': 'Payment date must be a valid ISO date' }),
+  payment_type: Joi.string().valid('PARTIAL', 'FULL', 'ADVANCE_REFUND', 'ADDITIONAL', 'REFUND_RECEIVED').required().messages({
+    'any.only': 'Payment type must be one of: PARTIAL, FULL, ADVANCE_REFUND, ADDITIONAL, REFUND_RECEIVED',
+    'any.required': 'Payment type is required',
+  }),
+  reference_number: Joi.string().max(100).allow(null, ''),
+  remarks: Joi.string().allow(null, ''),
+  proofs: Joi.array().items(
+    Joi.object({
+      file_path: Joi.string().required(),
+      file_name: Joi.string().required(),
+      file_type: Joi.string().max(100).allow(null, ''),
+    })
+  ).allow(null),
+});
+
 // One uploaded attachment (metadata returned by POST /uploads)
 const attachmentSchema = Joi.object({
   url: Joi.string().required(),

@@ -14,6 +14,7 @@
 const MODULES = [
   { module: 'travel', prefix: 'd2e3f4a5-b6c7-8901-cdef-12345678' },
   { module: 'reimbursement', prefix: 'd3e4f5a6-b7c8-9012-cdef-12345678' },
+  { module: 'payment', prefix: 'd4e5f6a7-b8c9-0123-cdef-12345678' },
 ];
 
 function buildRules(module, prefix) {

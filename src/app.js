@@ -11,8 +11,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // ---------- Global Middleware ----------
-app.use(cors({ origin: env.corsOrigin }));
-app.use(express.json({ limit: '10kb' }));
+app.use(
+  cors({
+    // Dev: echo the request origin (handles any LAN IP like http://192.168.x.x:5173).
+    // Set CORS_ORIGIN to a specific origin / comma-separated list for production.
+    origin: env.corsOrigin === '*' ? true : env.corsOrigin,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '100kb' }));
 
 // ---------- Uploaded files (static) ----------
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

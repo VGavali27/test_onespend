@@ -1,7 +1,7 @@
 export async function up(queryInterface, Sequelize) {
   await queryInterface.createTable('expense_payment_proofs', {
     id: { type: Sequelize.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
-    uuid: { type: Sequelize.UUID, allowNull: false, unique: true, defaultValue: Sequelize.literal('UUID()') },
+    uuid: { type: Sequelize.UUID, allowNull: false, unique: true },
     expense_payment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
     file_path: { type: Sequelize.STRING(500), allowNull: false },
     file_name: { type: Sequelize.STRING(255), allowNull: false },

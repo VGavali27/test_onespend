@@ -1,7 +1,7 @@
 export async function up(queryInterface, Sequelize) {
   await queryInterface.createTable('expense_payments', {
     id: { type: Sequelize.BIGINT.UNSIGNED, autoIncrement: true, primaryKey: true },
-    uuid: { type: Sequelize.UUID, allowNull: false, unique: true, defaultValue: Sequelize.literal('UUID()') },
+    uuid: { type: Sequelize.UUID, allowNull: false, unique: true },
     expense_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
     amount: { type: Sequelize.TEXT, allowNull: false },
     payment_method: { type: Sequelize.STRING(30), allowNull: false },

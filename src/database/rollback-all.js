@@ -42,6 +42,15 @@ const run = async () => {
       rolled.forEach((m) => console.log(`  ✗ Rolled back: ${m.name}`));
       rolledBack += rolled.length;
     }
+
+    // Clear seeder tracking table so seeders can run fresh
+    const qi = sequelize.getQueryInterface();
+    const tables = await qi.showAllTables();
+    if (tables.includes('sequelize_data')) {
+      await qi.bulkDelete('sequelize_data', null);
+      console.log('✓ Cleared seeder tracking (sequelize_data)');
+    }
+
     console.log(`\n✓ Rollback completed successfully (${rolledBack} migration(s) rolled back)`);
   } catch (err) {
     console.error('✗ Rollback failed:', err.message);

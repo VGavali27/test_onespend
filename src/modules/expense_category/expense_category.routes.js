@@ -7,6 +7,8 @@ const router = Router();
 router.use(authMiddleware);
 // List all expense categories
 router.get('/', requirePermission('expense_categories:read_all'), expenseCategoryController.getAllCategories);
+// Lightweight expense category options for dropdowns (must precede /:uuid)
+router.get('/options', requirePermission('expense_categories:read'), expenseCategoryController.getCategoryOptions);
 // Get a single category by UUID
 router.get('/:uuid', requirePermission('expense_categories:read'), expenseCategoryController.getCategoryByUuid);
 // Create a new category (validate body first)

@@ -5,6 +5,9 @@ import ApiError from '../../utils/ApiError.js';
 // Fetch all expense categories
 export const getAll = async () => expenseCategoryRepository.findAll();
 
+// Lightweight dropdown options for expense category dropdowns
+export const getOptions = async () => expenseCategoryRepository.findOptions();
+
 // Fetch a single category by UUID — throws 404 if missing
 export const getByUuid = async (uuid) => {
   const category = await expenseCategoryRepository.findByUuid(uuid);

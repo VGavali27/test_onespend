@@ -158,3 +158,35 @@ export const getPaymentSummary = async (req, res, next) => {
     next(error);
   }
 };
+
+// ── Payment handover endpoints ──
+
+export const handoverForPayment = async (req, res, next) => {
+  try {
+    const toRoleId = req.body?.to_role_id ? Number(req.body.to_role_id) : null;
+    const expense = await expenseService.handoverForPayment(req.params.uuid, req.user, toRoleId, req.body?.remarks);
+    return ApiResponse.success(res, expense, 'Payment handover successful');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPaymentHandoverRoles = async (req, res, next) => {
+  try {
+    const roles = await expenseService.getPaymentHandoverRoles(req.params.uuid);
+    return ApiResponse.success(res, roles, 'Payment handover roles fetched');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyPaymentRequests = async (req, res, next) => {
+  try {
+    const { rows, total } = await expenseService.getMyPaymentRequests(req.user, req.query);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+    return ApiResponse.paginated(res, rows, { page, limit, total });
+  } catch (error) {
+    next(error);
+  }
+};

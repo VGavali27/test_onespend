@@ -18,6 +18,14 @@ export const findByUuid = async (uuid) =>
 // Find a category by its code
 export const findByCode = async (code) => ExpenseCategory.findOne({ where: { code } });
 
+// Lightweight dropdown options — uuid, name, module (module drives travel vs reimbursement forms)
+export const findOptions = async () =>
+  ExpenseCategory.findAll({
+    attributes: ['uuid', 'name', 'module'],
+    where: { status: 'ACTIVE' },
+    order: [['name', 'ASC']],
+  });
+
 // Create a new category record
 export const create = async (data) => ExpenseCategory.create(data);
 

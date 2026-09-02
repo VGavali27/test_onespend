@@ -10,6 +10,16 @@ export const getAllCategories = async (_req, res, next) => {
   }
 };
 
+// Lightweight expense category options for dropdowns
+export const getCategoryOptions = async (_req, res, next) => {
+  try {
+    const options = await expenseCategoryService.getOptions();
+    return ApiResponse.success(res, options, 'Category options fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Fetch a single category by UUID
 export const getCategoryByUuid = async (req, res, next) => {
   try {
