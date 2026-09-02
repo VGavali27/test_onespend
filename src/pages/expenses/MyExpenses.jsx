@@ -8,7 +8,7 @@ import UserDetailsModal from '@/components/ui/UserDetailsModal';
 import DatePicker from '@/components/ui/DatePicker';
 import { useToast } from '@/components/ui/Toast';
 import { getMyExpenses } from '@/services/expenseService';
-import { categoryApi } from '@/services/financeService';
+import { getCategoryOptions } from '@/services/financeService';
 import { approveExpense, rejectExpense, submitExpense, getHandoverRoles } from '@/services/expenseService';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
 import { useAuth } from '@/context/AuthContext';
@@ -33,8 +33,7 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
   const isDateFilterActive = dateFrom && dateTo;
 
   useEffect(() => {
-    categoryApi
-      .list({ limit: 100 })
+    getCategoryOptions()
       .then(({ data }) => setCategories(data?.data ?? []))
       .catch(() => setCategories([]));
   }, []);
@@ -164,6 +163,7 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
   // Subtitle based on actionMode
   const getSubtitle = () => {
     if (actionMode === 'assigned') return 'Expenses pending your approval';
+    if (actionMode === 'payments') return 'Expenses awaiting payment processing';
     if (title === 'All Expenses') return 'Expenses across your companies';
     return 'Expenses you have created';
   };
@@ -178,7 +178,7 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
         fetchFn={fetchExpenses}
         filterDeps={[statusFilter, categoryFilter, dateFrom, dateTo]}
         countLabel="expense"
-        emptyMessage={actionMode === 'assigned' ? 'No expenses pending your approval' : 'No expenses yet'}
+        emptyMessage={actionMode === 'payments' ? 'No payment requests pending' : actionMode === 'assigned' ? 'No expenses pending your approval' : 'No expenses yet'}
         searchPlaceholder="Search by title, number or company..."
         hasFilters={hasFilters}
         onClearFilters={clearFilters}

@@ -24,6 +24,16 @@ export const resubmitExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/su
 export const approveExpense = (uuid, remarks, toRoleId) => api.post(`/expenses/${uuid}/approve`, { remarks, to_role_id: toRoleId });
 export const rejectExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/reject`, { remarks });
 export const getHandoverRoles = (uuid) => api.get(`/expenses/${uuid}/handover-roles`);
+// Expense payments (unified for all expense types — only roles with expenses:pay can record)
+export const recordPayment = (uuid, payload) => api.post(`/expenses/${uuid}/payments`, payload);
+export const getPayments = (uuid) => api.get(`/expenses/${uuid}/payments`);
+export const getPaymentSummary = (uuid) => api.get(`/expenses/${uuid}/payment-summary`);
+// Payment handover
+export const handoverForPayment = (uuid, payload) => api.post(`/expenses/${uuid}/handover-payment`, payload);
+export const getPaymentHandoverRoles = (uuid) => api.get(`/expenses/${uuid}/payment-handover-roles`);
+// Payment requests list (expenses pending payment at the user's role)
+export const getMyPaymentRequests = (params, config) =>
+  api.get('/expenses/my-payments', { ...config, params: { decrypt: 'true', ...params } });
 
 // Expense documents & handovers — add here when the backend endpoints exist.
 
@@ -150,7 +160,9 @@ export const normalizeExpense = (e) => {
     submitted_at: e.submitted_at,
     estimated_amount: num(e.estimated_amount),
     final_amount: num(e.final_amount),
+    advance_amount: num(e.advance_amount),
     paid_amount: num(e.paid_amount),
+    payment_status: e.payment_status,
     category: e.category
       ? {
           name: e.category.name,

@@ -12,6 +12,7 @@ const Dashboard = lazy(() => import('@/pages/dashboard/Dashboard'));
 const MyExpenses = lazy(() => import('@/pages/expenses/MyExpenses'));
 const AllExpenses = lazy(() => import('@/pages/expenses/AllExpenses'));
 const AssignedExpenses = lazy(() => import('@/pages/expenses/AssignedExpenses'));
+const PaymentRequests = lazy(() => import('@/pages/expenses/PaymentRequests'));
 const CreateExpense = lazy(() => import('@/pages/expenses/CreateExpense'));
 const EditExpense = lazy(() => import('@/pages/expenses/EditExpense'));
 const ExpenseDetail = lazy(() => import('@/pages/expenses/ExpenseDetail'));
@@ -96,6 +97,7 @@ export default function AppRoutes() {
           <Route path="expenses/my" element={<PermissionGuard permission="expenses:read"><MyExpenses /></PermissionGuard>} />
           <Route path="expenses/all" element={<PermissionGuard permission="expenses:read_all"><AllExpenses /></PermissionGuard>} />
           <Route path="expenses/assigned" element={<PermissionGuard permission="expenses:approvals"><AssignedExpenses /></PermissionGuard>} />
+          <Route path="expenses/payments" element={<PermissionGuard permission="expenses:read"><PaymentRequests /></PermissionGuard>} />
           <Route path="expenses/new" element={<PermissionGuard permission="expenses:create"><CreateExpense /></PermissionGuard>} />
           <Route path="expenses/:uuid/edit" element={<PermissionGuard permission="expenses:update"><EditExpense /></PermissionGuard>} />
           <Route path="expenses/:id" element={<PermissionGuard permission="expenses:read"><ExpenseDetail /></PermissionGuard>} />

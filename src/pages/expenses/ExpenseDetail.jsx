@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   Wallet,
@@ -22,6 +22,8 @@ import {
   Eye,
   ChevronDown,
   Edit,
+  Upload,
+  Info,
 } from "lucide-react";
 import {
   getExpenseById,
@@ -32,9 +34,16 @@ import {
   submitExpense,
   resubmitExpense,
   getHandoverRoles,
+  getPayments,
+  getPaymentSummary,
+  recordPayment,
+  handoverForPayment,
+  getPaymentHandoverRoles,
 } from "@/services/expenseService";
+import { uploadImage } from "@/services/uploadService";
 import ErrorState from "@/components/ui/ErrorState";
 import StatusBadge from "@/components/ui/StatusBadge";
+import Modal from "@/components/ui/Modal";
 import { InfoCard, InfoRow, DetailHeader } from "@/components/ui/detail";
 import UserDetailsModal from "@/components/ui/UserDetailsModal";
 import { useToast } from "@/components/ui/Toast";
@@ -49,7 +58,8 @@ import {
 export default function ExpenseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canPay = hasPermission("expenses:pay");
   const [expense, setExpense] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -63,6 +73,17 @@ export default function ExpenseDetail() {
   // Procurement chain state (loaded eagerly for procurement expenses)
   const [procurementChain, setProcurementChain] = useState(null);
   const [loadingChain, setLoadingChain] = useState(false);
+  // Payment state (APPROVED / PAID expenses only)
+  const [payments, setPayments] = useState([]);
+  const [paymentSummary, setPaymentSummary] = useState(null);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentHandoverModal, setShowPaymentHandoverModal] = useState(false);
+  const [paymentHandoverRoles, setPaymentHandoverRoles] = useState([]);
+  const [loadingPaymentHandoverRoles, setLoadingPaymentHandoverRoles] = useState(false);
+  const [selectedPaymentHandoverRoleId, setSelectedPaymentHandoverRoleId] = useState(null);
+  const [paymentHandoverRemarks, setPaymentHandoverRemarks] = useState("");
+  const [actingPaymentHandover, setActingPaymentHandover] = useState(false);
   const toast = useToast();
 
   const loadExpense = useCallback(async () => {
@@ -85,6 +106,28 @@ export default function ExpenseDetail() {
         } finally {
           setLoadingChain(false);
         }
+      }
+
+      // Load payment history + summary when the expense is approved (or already paid)
+      if (normalized?.status === "APPROVED" || normalized?.status === "PAID") {
+        setLoadingPayments(true);
+        try {
+          const [payRes, sumRes] = await Promise.all([
+            getPayments(id),
+            getPaymentSummary(id),
+          ]);
+          setPayments(payRes?.data?.data ?? []);
+          setPaymentSummary(sumRes?.data?.data ?? null);
+        } catch (e) {
+          console.error("Failed to load payments:", e);
+          setPayments([]);
+          setPaymentSummary(null);
+        } finally {
+          setLoadingPayments(false);
+        }
+      } else {
+        setPayments([]);
+        setPaymentSummary(null);
       }
     } catch (e) {
       if (e?.response?.status === 404) {
@@ -115,8 +158,61 @@ export default function ExpenseDetail() {
     }
   }, [id]);
 
+  // Refresh payment history + summary after recording a payment
+  const refreshPayments = useCallback(async () => {
+    setLoadingPayments(true);
+    try {
+      const [payRes, sumRes] = await Promise.all([
+        getPayments(id),
+        getPaymentSummary(id),
+      ]);
+      setPayments(payRes?.data?.data ?? []);
+      setPaymentSummary(sumRes?.data?.data ?? null);
+    } catch (e) {
+      console.error("Failed to refresh payments:", e);
+    } finally {
+      setLoadingPayments(false);
+    }
+  }, [id]);
+
   const isFinalApprover = expense?.category?.finalApproverRole?.id &&
     expense?.currentRole?.code === expense.category.finalApproverRole.code;
+
+  const isCurrentHandler = user?.role === expense?.currentRole?.code;
+
+  const loadPaymentHandoverRoles = useCallback(async () => {
+    setLoadingPaymentHandoverRoles(true);
+    try {
+      const { data } = await getPaymentHandoverRoles(id);
+      setPaymentHandoverRoles(data?.data ?? []);
+    } catch (e) {
+      console.error("Failed to load payment handover roles:", e);
+      setPaymentHandoverRoles([]);
+    } finally {
+      setLoadingPaymentHandoverRoles(false);
+    }
+  }, [id]);
+
+  const handlePaymentHandover = async () => {
+    if (!selectedPaymentHandoverRoleId) return;
+    setActingPaymentHandover(true);
+    try {
+      await handoverForPayment(id, {
+        to_role_id: selectedPaymentHandoverRoleId,
+        remarks: paymentHandoverRemarks || null,
+      });
+      toast.success("Expense handed over for payment");
+      setShowPaymentHandoverModal(false);
+      setSelectedPaymentHandoverRoleId(null);
+      setPaymentHandoverRemarks("");
+      setPaymentHandoverRoles([]);
+      loadExpense();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Failed to handover for payment.");
+    } finally {
+      setActingPaymentHandover(false);
+    }
+  };
 
   const handleApproveClick = useCallback(async () => {
     // If current handler is the final approver, don't load handover roles —
@@ -307,6 +403,83 @@ export default function ExpenseDetail() {
           </div>
         )}
 
+      {/* Payments — shown once the expense is APPROVED (final approver closed it). Only
+          roles with the expenses:pay permission can record new payments. */}
+      {(expense.status === "APPROVED" || expense.status === "PAID") && (
+        <PaymentSection
+          expense={expense}
+          canPay={canPay}
+          isCurrentHandler={isCurrentHandler}
+          payments={payments}
+          summary={paymentSummary}
+          loading={loadingPayments}
+          onRecord={() => setShowPaymentModal(true)}
+        />
+      )}
+
+      {/* Payment handover — shown to the requester (current holder) when the expense is
+          APPROVED/PAID and not yet settled, regardless of expenses:pay. Both buttons show. */}
+      {(expense.status === "APPROVED" || expense.status === "PAID") &&
+        isCurrentHandler &&
+        !["SETTLED", "PAID"].includes(expense.payment_status) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {canPay && (
+              <ActionButton
+                icon={Banknote}
+                label="Record Payment"
+                tone="success"
+                disabled={acting}
+                onClick={() => setShowPaymentModal(true)}
+              />
+            )}
+            <ActionButton
+              icon={ArrowRightLeft}
+              label="Handover for Payment"
+              tone="primary"
+              disabled={acting}
+              onClick={() => {
+                setSelectedPaymentHandoverRoleId(null);
+                setPaymentHandoverRemarks("");
+                loadPaymentHandoverRoles();
+                setShowPaymentHandoverModal(true);
+              }}
+            />
+            <span className="text-[12px] text-slate-400">
+              This expense needs payment processing.
+            </span>
+          </div>
+        )}
+
+      {/* Record payment modal — amount + method + date + type + optional proofs */}
+      {showPaymentModal && (
+        <RecordPaymentModal
+          expense={expense}
+          summary={paymentSummary}
+          onClose={() => setShowPaymentModal(false)}
+          onSaved={async () => {
+            setShowPaymentModal(false);
+            await refreshPayments();
+            await loadExpense();
+          }}
+        />
+      )}
+
+      {/* Handover for payment modal — requester forwards to a payment-eligible role */}
+      {showPaymentHandoverModal && (
+        <PaymentHandoverModal
+          expense={expense}
+          roles={paymentHandoverRoles}
+          loading={loadingPaymentHandoverRoles}
+          acting={actingPaymentHandover}
+          selectedRoleId={selectedPaymentHandoverRoleId}
+          onSelectRole={setSelectedPaymentHandoverRoleId}
+          remarks={paymentHandoverRemarks}
+          onRemarksChange={setPaymentHandoverRemarks}
+          onClose={() => setShowPaymentHandoverModal(false)}
+          onSave={handlePaymentHandover}
+        />
+      )}
+
       {/* Info cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <InfoCard icon={Wallet} title="Expense">
@@ -408,6 +581,7 @@ export default function ExpenseDetail() {
       {/* Travel breakdown */}
       {travel && (
         <>
+          {travel.segments.length > 0 && (
           <TravelSection icon={Plane} title="Segments">
             {travel.segments.length === 0 ? (
               <EmptyText label="No segments" />
@@ -481,7 +655,9 @@ export default function ExpenseDetail() {
               </>
             )}
           </TravelSection>
+          )}
 
+          {travel.accommodations.length > 0 && (
           <TravelSection icon={BedDouble} title="Accommodations">
             {travel.accommodations.length === 0 ? (
               <EmptyText label="No accommodations" />
@@ -552,7 +728,9 @@ export default function ExpenseDetail() {
               </>
             )}
           </TravelSection>
+          )}
 
+          {travel.forex.length > 0 && (
           <TravelSection icon={Coins} title="Forex">
             {travel.forex.length === 0 ? (
               <EmptyText label="No forex" />
@@ -618,7 +796,9 @@ export default function ExpenseDetail() {
               </>
             )}
           </TravelSection>
+          )}
 
+          {travel.localTransports.length > 0 && (
           <TravelSection icon={Bus} title="Local Transport">
             {travel.localTransports.length === 0 ? (
               <EmptyText label="No local transport" />
@@ -686,7 +866,9 @@ export default function ExpenseDetail() {
               </>
             )}
           </TravelSection>
+          )}
 
+          {travel.miscExpenses.length > 0 && (
           <TravelSection icon={MoreHorizontal} title="Miscellaneous">
             {travel.miscExpenses.length === 0 ? (
               <EmptyText label="No miscellaneous expenses" />
@@ -749,6 +931,7 @@ export default function ExpenseDetail() {
               </>
             )}
           </TravelSection>
+          )}
         </>
       )}
 
@@ -1035,6 +1218,530 @@ function AmountCard({ label, value }) {
         {value}
       </p>
     </div>
+  );
+}
+
+// Color + label for each unified payment status (mirrors the backend ENUM)
+const PAYMENT_STATUS_META = {
+  UNPAID: { label: "Unpaid", cls: "bg-slate-100 text-slate-600 ring-slate-600/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-400/20" },
+  PARTIAL_PAID: { label: "Partially paid", cls: "bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-400/20" },
+  PAID: { label: "Paid", cls: "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-400/20" },
+  ADVANCE_REFUND_DUE: { label: "Advance refund due", cls: "bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-400/20" },
+  ADDITIONAL_PAYMENT_DUE: { label: "Additional payment due", cls: "bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-400/20" },
+  SETTLED: { label: "Settled", cls: "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-400/20" },
+};
+
+function PaymentStatusBadge({ status }) {
+  const meta = PAYMENT_STATUS_META[status];
+  if (!meta) return null;
+  return (
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset ${meta.cls}`}>
+      {meta.label}
+    </span>
+  );
+}
+
+// The unified payment block on an APPROVED (or PAID) expense: summary of final / advance /
+// paid / pending, the "Record Payment" action (expenses:pay only), and the payment trail
+// with uploaded proofs.
+function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, loading, onRecord }) {
+  const status = expense.status;
+  const receivable =
+    summary?.amount_due != null
+      ? Number(summary.amount_due)
+      : (Number(expense.final_amount) || 0) - (Number(expense.paid_amount) || 0);
+  const settlable = ["SETTLED", "PAID"].includes(expense.payment_status);
+  const showRecordPayment = status === "APPROVED" && canPay && isCurrentHandler && !settlable;
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+            <Banknote className="h-4 w-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              Payments
+            </h3>
+            <p className="text-[12px] text-slate-400 flex items-center gap-2">
+              <PaymentStatusBadge status={expense.payment_status || (status === "PAID" ? "PAID" : "UNPAID")} />
+            </p>
+          </div>
+        </div>
+        {showRecordPayment && (
+          <ActionButton
+            icon={Banknote}
+            label="Record Payment"
+            tone="success"
+            onClick={onRecord}
+          />
+        )}
+      </div>
+
+      {/* Computed summary — the pending/refund math comes straight from the backend */}
+      <div className="px-4 sm:px-6 py-5">
+        {summary ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <PaymentStat label="Final amount" value={formatCurrency(Number(summary.final_amount))} />
+            <PaymentStat label="Advance amount" value={formatCurrency(Number(summary.advance_amount))} />
+            <PaymentStat label="Paid amount" value={formatCurrency(Number(summary.paid_amount))} />
+            <PaymentStat
+              label={summary.is_over_advance ? "User owes (refund)" : "Pending payment"}
+              value={formatCurrency(receivable)}
+              emphasis={Number(receivable) > 0}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <PaymentStat label="Final amount" value={formatCurrency(expense.final_amount)} />
+            <PaymentStat label="Advance amount" value={formatCurrency(expense.advance_amount)} />
+            <PaymentStat label="Paid amount" value={formatCurrency(expense.paid_amount)} />
+            <PaymentStat label="Pending payment" value={formatCurrency(receivable)} emphasis={receivable > 0} />
+          </div>
+        )}
+
+        {/* Payment history */}
+        <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
+          Payment history
+        </p>
+        {loading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 text-indigo-500 animate-spin" />
+          </div>
+        ) : payments.length === 0 ? (
+          <p className="text-[13px] text-slate-400">
+            No payments recorded yet
+            {status === "APPROVED" && canPay ? " — use Record Payment to make an installment." : "."}
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-gray-800">
+            {payments.map((p, i) => (
+              <li key={p.uuid ?? i} className="py-3 flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+                      {formatCurrency(Number(p.amount))}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-slate-300">
+                      {String(p.payment_type || "").toLowerCase().replace(/_/g, " ")}
+                    </span>
+                    {p.reference_number && (
+                      <span className="text-[12px] text-slate-400 font-mono">
+                        Ref: {p.reference_number}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {p.payment_method} · {formatDate(p.payment_date)}
+                  </p>
+                  {p.remarks && (
+                    <p className="text-[12px] text-slate-400 mt-0.5">{p.remarks}</p>
+                  )}
+                  {(p.proofs || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {(p.proofs || []).map((pr, j) => (
+                        <a
+                          key={j}
+                          href={pr.file_path}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                          title="Open payment proof"
+                        >
+                          <Paperclip className="h-3 w-3 text-slate-400" />
+                          {pr.file_name || pr.file_path}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+                    {formatCurrency(Number(p.amount))}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PaymentStat({ label, value, emphasis }) {
+  return (
+    <div className={`rounded-lg border p-3 ${emphasis ? "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10" : "border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40"}`}>
+      <p className="text-[11px] uppercase tracking-wider text-slate-400">{label}</p>
+      <p className={`mt-0.5 text-base font-bold ${emphasis ? "text-amber-700 dark:text-amber-300" : "text-slate-900 dark:text-white"}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+// Modal to record a payment installment (expenses:pay only). Supports partial / full /
+// advance-refund / additional payment, plus uploading screenshot/document proofs via /uploads.
+function RecordPaymentModal({ expense, summary, onClose, onSaved }) {
+  // amount_due from getPaymentSummary tells us how much remains to settle,
+  // and whether the company pays the user or the user refunds the company.
+  const isUserRefund = !!summary?.is_over_advance;
+  const due = Number(summary?.amount_due) > 0 ? Number(summary.amount_due) : 0;
+  const userReceives = !isUserRefund;
+
+  const [amount, setAmount] = useState(due > 0 ? String(due) : "");
+  const [paymentMethod, setPaymentMethod] = useState("BANK_TRANSFER");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentType, setPaymentType] = useState(
+    isUserRefund ? "ADVANCE_REFUND" : "ADDITIONAL",
+  );
+  const [refNumber, setRefNumber] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [proofs, setProofs] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+  const fileInputRef = useRef(null);
+
+  const addProofFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { data } = await uploadImage(file, "expense-payment");
+      setProofs((prev) => [
+        ...prev,
+        {
+          file_path: data?.data?.url,
+          file_name: file.name,
+          file_type: file.type || "application/octet-stream",
+        },
+      ]);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Failed to upload proof.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    const amt = Number(amount);
+    if (!amount || amt <= 0) {
+      toast.error(
+        isUserRefund
+          ? "Please enter the refund amount."
+          : "Please enter a valid payment amount.",
+      );
+      return;
+    }
+    if (due > 0 && amt > due) {
+      toast.error(`Amount cannot exceed the due balance of ${due.toFixed(2)}.`);
+      return;
+    }
+    if (!paymentDate) {
+      toast.error("Payment date is required.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await recordPayment(expense.uuid, {
+        amount: String(amount),
+        payment_method: paymentMethod,
+        payment_date: paymentDate,
+        payment_type: paymentType,
+        reference_number: refNumber || null,
+        remarks: remarks || null,
+        proofs: proofs.length ? proofs : null,
+      });
+      toast.success("Payment recorded successfully");
+      onSaved?.();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Failed to record payment.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={isUserRefund ? "Record Advance Refund" : "Record Payment"}
+      subtitle={`${expense.expense_number} — ${expense.title}`}
+      icon={Banknote}
+      size="md"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || uploading || due <= 0}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving ? "Recording..." : "Record Payment"}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Due balance banner — tells the payer how much remains and in which direction */}
+        <div
+          className={`flex items-start gap-2 px-3 py-2.5 rounded-lg text-[13px] font-medium border ${
+            isUserRefund
+              ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-200"
+              : "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200"
+          }`}
+        >
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            {isUserRefund ? (
+              <>
+                User was advanced more than spent.{" "}
+                <span className="font-bold">Amount due from user: {formatCurrency(due)}</span>{" "}
+                (refund back to company).
+              </>
+            ) : (
+              <>
+                Final amount is {formatCurrency(Number(summary?.final_amount) || 0)}.{" "}
+                <span className="font-bold">Amount to pay the user: {formatCurrency(due)}</span>{" "}
+                (company to user).
+              </>
+            )}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              {isUserRefund ? "Refund amount" : "Amount"} <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              max={due > 0 ? String(due) : undefined}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+            />
+            {due > 0 && (
+              <p className="text-[11px] text-slate-400">
+                Max {formatCurrency(due)} — cannot exceed balance due.
+              </p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              Payment date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              Payment method <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 cursor-pointer"
+            >
+              {["BANK_TRANSFER", "CASH", "CHEQUE", "CARD", "OTHER"].map((m) => (
+                <option key={m} value={m}>{formatType(m)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+              Payment type <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={paymentType}
+              onChange={(e) => setPaymentType(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 cursor-pointer"
+            >
+              {(isUserRefund
+                ? ["ADVANCE_REFUND", "REFUND_RECEIVED"]
+                : ["PARTIAL", "FULL", "ADDITIONAL"]
+              ).map((t) => (
+                <option key={t} value={t}>{formatType(t).replace("_", " ")}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+            Reference number
+          </label>
+          <input
+            type="text"
+            value={refNumber}
+            onChange={(e) => setRefNumber(e.target.value)}
+            placeholder="e.g. bank transaction ref / cheque no."
+            className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+            Remarks
+          </label>
+          <textarea
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            rows={2}
+            placeholder="Optional note"
+            className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+          />
+        </div>
+        {/* Proof uploads — screenshots / documents supporting this payment */}
+        <div className="space-y-2">
+          <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+            Proof of payment
+          </label>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 border-dashed border-slate-300 dark:border-gray-600 text-[13px] font-semibold text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-500 disabled:opacity-60 transition-colors"
+          >
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+            {uploading ? "Uploading..." : "Upload screenshot or document"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              addProofFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          {proofs.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {proofs.map((p, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-[12px] text-slate-600 dark:text-slate-300"
+                >
+                  <Paperclip className="h-3 w-3 text-slate-400" />
+                  {p.file_name}
+                  <button
+                    type="button"
+                    onClick={() => setProofs((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-slate-400 hover:text-red-500"
+                    aria-label="Remove proof"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// Modal to handover an APPROVED/PAID expense for payment — requester selects the
+// target payment-eligible role (from role_handover_rules where module='payment').
+function PaymentHandoverModal({ expense, roles, loading, acting, selectedRoleId, onSelectRole, remarks, onRemarksChange, onClose, onSave }) {
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Handover for Payment"
+      subtitle={`${expense.expense_number} — ${expense.title}`}
+      icon={ArrowRightLeft}
+      size="md"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={acting || loading || !selectedRoleId}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+          >
+            {acting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {acting ? "Handing over..." : "Handover for Payment"}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg text-[13px] font-medium border bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-700 text-indigo-800 dark:text-indigo-200">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Hand this expense to a finance role to process the payment on your behalf.
+            Current handler: <span className="font-bold">{expense.currentRole?.name || expense.currentRole?.code || "—"}</span>.
+          </span>
+        </div>
+        <div className="space-y-1">
+          <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+            Handover to role <span className="text-red-500">*</span>
+          </label>
+          {loading ? (
+            <div className="flex items-center justify-center py-3">
+              <Loader2 className="h-4 w-4 text-indigo-500 animate-spin" />
+              <span className="ml-2 text-[12px] text-slate-400">Loading payment roles...</span>
+            </div>
+          ) : roles.length === 0 ? (
+            <p className="text-[12px] text-amber-600 dark:text-amber-400">
+              No payment-eligible handover roles are configured for your role.
+            </p>
+          ) : (
+            <select
+              value={selectedRoleId || ""}
+              onChange={(e) => onSelectRole(e.target.value ? Number(e.target.value) : null)}
+              className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 cursor-pointer transition-colors"
+            >
+              <option value="">Select payment role</option>
+              {roles.map((role) => (
+                <option key={role.roleId} value={role.roleId}>
+                  {role.roleName} ({role.roleCode})
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="space-y-1">
+          <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+            Remarks
+          </label>
+          <textarea
+            value={remarks}
+            onChange={(e) => onRemarksChange(e.target.value)}
+            rows={2}
+            placeholder="Optional note for the finance team"
+            className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+          />
+        </div>
+      </div>
+    </Modal>
   );
 }
 

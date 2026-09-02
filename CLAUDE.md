@@ -139,6 +139,7 @@ All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazi
 /expenses/my              → My Expenses (own — GET /expenses/my) — permission: expenses:read
 /expenses/all             → All Expenses (scoped — GET /expenses; SUPER_ADMIN/CFO see all, other manager roles only their employed companies) — permission: expenses:read_all
 /expenses/assigned        → Approvals (pending user's role approval — GET /expenses/assigned; company-scoped) — permission: expenses:approvals
+/expenses/payments        → Payment Requests (pending payment at the user's role — GET /expenses/my-payments) — permission: expenses:read
 /expenses/new             → Create Expense (real API) — permission: expenses:create
 /expenses/:uuid/edit      → Edit a DRAFT expense (creator only; PUT replaces line items) — permission: expenses:update
 /expenses/:id             → Expense Detail (real API view) — permission: expenses:read
@@ -226,6 +227,15 @@ VITE_APP_ENV=development
 - **Expense category filter**: In `ExpenseForm.jsx`, procurement module categories are now filtered out of the category dropdown (`c.module !== 'procurement'`). Procurement expenses are created automatically from PO/PR, not manually.
 - **QUOTATION_APPROVED no longer approvable**: In `ProcurementDetail.jsx`, removed `QUOTATION_APPROVED` from `APPROVABLE_STATUSES`. At this stage the PR has a selected quotation and the next action is "Create PO" (not approve). Only `SUBMITTED`, `RECEIVED`, and `FINANCE_APPROVED` remain approvable.
 
+### Today's Updates (2026-09-02) — Payment Handover Feature
+- **Payment is now a role-handover workflow**: When the final approver closes a `SUBMITTED` expense as `APPROVED` (backend), it routes to the **original requester** (`current_role_id = requester's role`). The requester sees the APPROVED expense in "My Expenses" (view only) and can **Record Payment** (if they have `expenses:pay`) and/or **Handover for Payment** — both buttons show together when the requester has `expenses:pay`, otherwise only the handover button.
+- **`PaymentSection` (ExpenseDetail)**: "Record Payment" is now shown only when the logged-in user is the **current handler** of the APPROVED/PAID expense (`user.role === expense.currentRole.code`) AND has `expenses:pay` AND the expense is not yet `SETTLED`/`PAID`. Previously the button appeared for any `expenses:pay` holder regardless of who was the handler.
+- **PaymentHandoverModal** (ExpenseDetail): a modal with a role dropdown (fetched from `GET /expenses/:uuid/payment-handover-roles` — valid `module='payment'` handover targets for the current handler) + optional remarks. Submits via `POST /expenses/:uuid/handover-payment` (`{ to_role_id, remarks }`), then reloads the expense. Only reachable while the user is the current handler of a non-settled APPROVED/PAID expense.
+- **New `PaymentRequests` page** (`/expenses/payments`, `PaymentRequests.jsx`): reuses the `MyExpenses` component with `fetchList={getMyPaymentRequests}` and `actionMode='payments'` (new subtitle "Expenses awaiting payment processing" + empty state "No payment requests pending"). Shows the expenses handed over to the logged-in role — `GET /expenses/my-payments` returns rows where `current_role_id = user's role`, `status IN ('APPROVED','PAID')`, `payment_status NOT IN ('SETTLED','PAID')`. Reserved only for payment/finance roles (the requester who holds the expense sees it via My Expenses, not here).
+- **Sidebar**: added **"Payment Requests"** under Expenses → `/expenses/payments` (icon `Banknote`, permission `expenses:read`).
+- **`expenseService.js`**: added `handoverForPayment(uuid, payload)`, `getPaymentHandoverRoles(uuid)`, and `getMyPaymentRequests(params, config)`.
+- **Pending amount fix (backend-driven, no frontend change)**: The "Pending payment" figure in **both** the detail `PaymentSection` card and the **RecordPaymentModal** comes from `getPaymentSummary.amount_due`. The modal **defaults its amount input to `amount_due`** and **clamps any entry to it** (`Amount cannot exceed the due balance`). Because the backend previously returned `amount_due` without subtracting recorded payments (partial payment on a 5000 travel expense still showed 5000 pending), this readout was stale even though the `paid_amount` card was correct. The fix landed in the backend `getPaymentSummary`; the frontend already refreshes via `refreshPayments()` (re-fetches `getPayments` + `getPaymentSummary`) in the modal's `onSaved`. After the backend fix, the due/pending figure and the modal's max default down to the true remaining balance.
+
 ### Today's Updates (2026-08-17)
 - **Procurement tabs**: Added three tabs to Procurement list — "All Requests", "My Requests", and reserved "Role-based" (commented out for future).
 - **Sidebar highlighting fixed**: "My Requests" tab now properly highlights when URL contains `?scope=mine`.
@@ -240,6 +250,6 @@ VITE_APP_ENV=development
 - [ ] Employments list/create pages (`/master/employments`)
 - [ ] Expense attachments → real upload (`POST /uploads`) + `expense_documents` per line item
 - [ ] Travel pages (folder exists but no implementation)
-- [ ] Finance pages (Payments, Reports — only Categories built)
+- [ ] Finance pages (Reports — only Categories + expense Payment UI built; a standalone Finance/Payments module list for all payments across expenses is not yet built)
 - [ ] Company switcher (fetch employments on demand)
 - [ ] **Resubmit rejected expenses** — frontend resubmit flow for REJECTED expenses (allows creator to edit and resubmit through approval flow)

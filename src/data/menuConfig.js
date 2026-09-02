@@ -3,7 +3,7 @@ import {
   Shield, Settings, BarChart3, CreditCard, ReceiptText,
   Briefcase, Landmark, Plus, CheckCircle2, BadgeCheck, Tags,
   LayoutGrid, ShieldCheck, KeyRound, KeySquare, ArrowRightLeft, Truck,
-  Tag, ShoppingCart, Inbox, FileText,
+  Tag, ShoppingCart, Inbox, FileText, Banknote,
 } from 'lucide-react';
 
 /**
@@ -29,6 +29,7 @@ export const menuConfig = [
       { id: 'my-expenses', label: 'My Expenses', icon: ReceiptText, to: '/expenses/my', permission: 'expenses:read' },
       { id: 'all-expenses', label: 'All Expenses', icon: Wallet, to: '/expenses/all', permission: 'expenses:read_all' },
       { id: 'assigned-expenses', label: 'Approvals', icon: CheckCircle2, to: '/expenses/assigned', permission: 'expenses:approvals' },
+      { id: 'payment-requests', label: 'Payment Requests', icon: Banknote, to: '/expenses/payments', permission: 'expenses:read' },
       { id: 'create-expense', label: 'Create New', icon: Plus, to: '/expenses/new', permission: 'expenses:create' },
     ],
   },
