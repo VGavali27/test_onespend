@@ -1231,6 +1231,33 @@ const PAYMENT_STATUS_META = {
   SETTLED: { label: "Settled", cls: "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-400/20" },
 };
 
+// Payment TYPE is direction-aware: tells whether money flowed company→user (a
+// disbursement toward the expense) or user→company (a refund of an over-advanced
+// amount). Labels make that direction obvious on the payment history.
+const PAYMENT_TYPE_META = {
+  PARTIAL: { label: "Company → You", cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
+  FULL: { label: "Company → You", cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
+  ADDITIONAL: { label: "Company → You", cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
+  ADVANCE_REFUND: { label: "You → Company", cls: "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-400/20" },
+  REFUND_RECEIVED: { label: "You → Company", cls: "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-400/20" },
+};
+
+function PaymentTypeBadge({ type }) {
+  const meta = PAYMENT_TYPE_META[type];
+  if (!meta) {
+    return (
+      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-slate-300">
+        {String(type || "").toLowerCase().replace(/_/g, " ")}
+      </span>
+    );
+  }
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${meta.cls}`}>
+      {meta.label}
+    </span>
+  );
+}
+
 function PaymentStatusBadge({ status }) {
   const meta = PAYMENT_STATUS_META[status];
   if (!meta) return null;
@@ -1323,9 +1350,7 @@ function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, 
                     <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
                       {formatCurrency(Number(p.amount))}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-slate-300">
-                      {String(p.payment_type || "").toLowerCase().replace(/_/g, " ")}
-                    </span>
+                    <PaymentTypeBadge type={p.payment_type} />
                     {p.reference_number && (
                       <span className="text-[12px] text-slate-400 font-mono">
                         Ref: {p.reference_number}
