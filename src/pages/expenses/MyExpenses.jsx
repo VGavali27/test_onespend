@@ -125,7 +125,16 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     columnHelper.accessor('status', {
       header: 'Status',
       enableSorting: false,
-      cell: (info) => <StatusBadge status={info.getValue()} />,
+      cell: (info) => {
+        const row = info.row.original;
+        const payment = row.payment_status;
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <StatusBadge status={row.status} />
+            {payment ? <StatusBadge status={payment} /> : null}
+          </div>
+        );
+      },
     }),
     columnHelper.accessor('submitted_at', {
       header: 'Submitted',
