@@ -129,10 +129,17 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
         const row = info.row.original;
         const approval =
           row.status === 'PAID' ? 'APPROVED' : row.status; // PAID is a payment state, never an approval status
+        const payment = row.payment_status;
+        const showPayment =
+          payment &&
+          // UNPAID is only meaningful once approved (awaiting payment); showing
+          // it on a DRAFT/SUBMITTED row would be noise. All other payment
+          // states (PAID/PARTIAL_PAID/SETTLED/...) always display.
+          (payment !== 'UNPAID' || approval === 'APPROVED');
         return (
           <div className="flex flex-col items-start gap-1">
             <StatusBadge status={approval} />
-            {row.payment_status ? <StatusBadge status={row.payment_status} /> : null}
+            {showPayment ? <StatusBadge status={payment} /> : null}
           </div>
         );
       },
