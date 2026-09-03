@@ -872,6 +872,9 @@ export const reject = async (uuid, user, remarks) => {
   if (expense.status === 'APPROVED' || expense.status === 'REJECTED' || expense.status === 'PAID') {
     throw ApiError.badRequest('This expense is already closed');
   }
+  if (expense.payment_status === 'PAID' || expense.payment_status === 'SETTLED') {
+    throw ApiError.badRequest('This expense is already paid');
+  }
 
   const actorRole = await findRoleByCode(user.roleCode);
   if (user.roleCode !== 'SUPER_ADMIN' && expense.current_role_id !== actorRole?.id) {
@@ -934,6 +937,9 @@ export const recordPayment = async (uuid, user, paymentData) => {
   if (!allowedPaymentStatuses.includes(expense.status) && expense.status !== 'APPROVED') {
     throw ApiError.badRequest(`Cannot record payment for expense in ${expense.status} status`);
   }
+  if (expense.payment_status === 'PAID' || expense.payment_status === 'SETTLED') {
+    throw ApiError.badRequest('This expense is already paid');
+  }
 
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
   const { amount, payment_method, payment_date, payment_type, reference_number, remarks, proofs } = paymentData;
@@ -981,9 +987,11 @@ export const recordPayment = async (uuid, user, paymentData) => {
       {
         paid_amount: String(newPaid),
         payment_status: newPaymentStatus,
-        // When fully settled/paid, mark status PAID and return to requester
+        // Keep the approval status (APPROVED) untouched — only the payment_status
+        // reflects payment. When fully settled/paid, return the expense to the
+        // requester so they see the final PAID payment state in "My Expenses".
         ...(isSettled
-          ? { status: 'PAID', current_role_id: requesterRole, current_employment_id: null }
+          ? { current_role_id: requesterRole, current_employment_id: null }
           : {}),
       },
       { transaction: t },
