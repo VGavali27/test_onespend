@@ -126,36 +126,32 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
       header: 'Status',
       enableSorting: false,
       cell: (info) => {
+        const approval =
+          info.row.original.status === 'PAID'
+            ? 'APPROVED'
+            : info.row.original.status; // PAID is a payment state, never an approval status
+        return <StatusBadge status={approval} />;
+      },
+    }),
+    columnHelper.accessor('payment_status', {
+      header: 'Payment Status',
+      enableSorting: false,
+      cell: (info) => {
         const row = info.row.original;
         const approval =
-          row.status === 'PAID' ? 'APPROVED' : row.status; // PAID is a payment state, never an approval status
+          row.status === 'PAID' ? 'APPROVED' : row.status;
         const payment = row.payment_status;
+        // UNPAID is only meaningful once approved (awaiting payment); on a
+        // DRAFT/SUBMITTED row it would be noise. All other payment states
+        // (PAID/PARTIAL_PAID/SETTLED/...) always display.
         const showPayment =
-          payment &&
-          // UNPAID is only meaningful once approved (awaiting payment); showing
-          // it on a DRAFT/SUBMITTED row would be noise. All other payment
-          // states (PAID/PARTIAL_PAID/SETTLED/...) always display.
-          (payment !== 'UNPAID' || approval === 'APPROVED');
-        return (
-          <div className="flex flex-col items-start gap-1">
-            <StatusBadge status={approval} />
-            {showPayment ? <StatusBadge status={payment} /> : null}
-          </div>
-        );
+          payment && (payment !== 'UNPAID' || approval === 'APPROVED');
+        return showPayment ? <StatusBadge status={payment} /> : <span className="text-slate-400">—</span>;
       },
     }),
     columnHelper.accessor('submitted_at', {
       header: 'Submitted',
       cell: (info) => (info.getValue() ? formatDateTime(info.getValue()) : '-'),
-    }),
-    columnHelper.accessor('createdAt', {
-      header: 'Created',
-      cell: (info) => formatDate(info.getValue()),
-    }),
-    columnHelper.accessor('updatedAt', {
-      header: 'Updated',
-      enableSorting: false,
-      cell: (info) => formatDate(info.getValue()),
     }),
     columnHelper.display({
       id: 'actions',
