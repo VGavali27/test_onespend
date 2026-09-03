@@ -127,11 +127,12 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
       enableSorting: false,
       cell: (info) => {
         const row = info.row.original;
-        const payment = row.payment_status;
+        const approval =
+          row.status === 'PAID' ? 'APPROVED' : row.status; // PAID is a payment state, never an approval status
         return (
           <div className="flex flex-col items-start gap-1">
-            <StatusBadge status={row.status} />
-            {payment ? <StatusBadge status={payment} /> : null}
+            <StatusBadge status={approval} />
+            {row.payment_status ? <StatusBadge status={row.payment_status} /> : null}
           </div>
         );
       },
