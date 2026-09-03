@@ -11,7 +11,10 @@
  * Role IDs: 100 SUPER_ADMIN, 101 CFO, 102 PAYMENT_MGR, 104 FINANCE_MGR,
  * 106 ADMIN_MGR, 110 HOD, 111 EMP_MGR, 112 EMPLOYEE
  */
-const PREFIX = 'd4e5f6a7-b8c9-0123-cdef-12345678';
+// Distinct prefix — the payment handover rules already use
+// 'd4e5f6a7-b8c9-0123-cdef-12345678' for their uuids (added later to the same table),
+// so using that prefix here would collide on the unique `uuid` column.
+const PREFIX = 'f6a7b8c9-d0e1-2345-abcd-ef012345';
 
 export async function up({ context }) {
   const rules = [
