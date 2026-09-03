@@ -64,6 +64,7 @@ const RoleHandoverRuleEdit = lazy(() => import('@/pages/access/roleHandoverRules
 
 const Profile = lazy(() => import('@/pages/profile/Profile'));
 const Settings = lazy(() => import('@/pages/settings/Settings'));
+const Logs = lazy(() => import('@/pages/system/Logs'));
 
 const Categories = lazy(() => import('@/pages/finance/categories/Categories'));
 const CreateCategory = lazy(() => import('@/pages/finance/categories/CreateCategory'));
@@ -149,6 +150,7 @@ export default function AppRoutes() {
 
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="system/logs" element={<PermissionGuard permission="system_logs:view"><Logs /></PermissionGuard>} />
 
           <Route path="master/categories" element={<PermissionGuard permission="expense_categories:read_all"><Categories /></PermissionGuard>} />
           <Route path="master/categories/new" element={<PermissionGuard permission="expense_categories:create"><CreateCategory /></PermissionGuard>} />

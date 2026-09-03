@@ -3,7 +3,7 @@ import {
   Shield, Settings, BarChart3, CreditCard, ReceiptText,
   Briefcase, Landmark, Plus, CheckCircle2, BadgeCheck, Tags,
   LayoutGrid, ShieldCheck, KeyRound, KeySquare, ArrowRightLeft, Truck,
-  Tag, ShoppingCart, Inbox, FileText, Banknote,
+  Tag, ShoppingCart, Inbox, FileText, Banknote, ScrollText,
 } from 'lucide-react';
 
 /**
@@ -76,5 +76,14 @@ export const menuConfig = [
     icon: Settings,
     to: '/settings',
     permission: '*',
+  },
+  {
+    id: 'system',
+    label: 'System',
+    icon: Settings,
+    permission: 'system_logs:view',
+    children: [
+      { id: 'application-logs', label: 'Application Logs', icon: ScrollText, to: '/system/logs', permission: 'system_logs:view' },
+    ],
   },
 ];

@@ -160,6 +160,7 @@ All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazi
 /procurement/:uuid/edit   → Edit a draft PI (admin "Edit Line Items" for a PR in quote-gathering is a modal on the detail page, not this route) — permission: procurement:update
 /profile                  → My Profile
 /settings                 → Settings
+/system/logs              → Application Logs (read server error + request logs for a day; date dropdown from GET /system/logs/meta, panels from GET /system/logs?date=) — permission: system_logs:view (SUPER_ADMIN only)
 ```
 
 ## Scripts
@@ -246,6 +247,14 @@ VITE_APP_ENV=development
 - **Bug fixed: quick-action role gates used `user?.roleCode`**, which the login payload never provides (the API returns `user.role`). This made `isManager`/`isGlobal`/`isProcurement` always `false`, so secondary actions never rendered for anyone. Changed all three to `user?.role` (consistent with the rest of the app). Also removed a leftover `console.log('Dashboard API response:', res)` debug line.
 - **Quick actions layout**: the quick-action buttons now render in a **responsive 4-per-row grid** (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` — 1 col mobile, 2 on tablet, 4 on desktop), matching the stat-card row layout, so "New Expense / My Approvals / All Expenses / Procurement / Payment Requests" line up like a menu.
 - **Backend is UI-free**: confirmed the API returns only data — `GET /dashboard` returns `{ charts, recentActivity, metrics, roleContext }` and no frontend presentation (labels, icons, `className`, HTML) is emitted. All presentation stays in `Dashboard.jsx`.
+
+### Today's Updates (2026-09-03) — Application Logs Viewer (SUPER_ADMIN)
+- **New page** `src/pages/system/Logs.jsx` (`/system/logs`, wrapped in `<PermissionGuard permission="system_logs:view">`): a **date picker** (themed `DatePicker`, `maxDate` = today) for choosing any day, plus a **tabbed** reader with two tabs — **API Logs** (`GET /system/logs/api?date=`) and **Error Logs** (`GET /system/logs/error?date=`). Only the **active tab** fetches its own dedicated endpoint (red panel for errors with error/warn badges; emerald panel for api traffic with http badge). Entries render as `[LEVEL] timestamp message` in monospace with `whitespace-pre-wrap` multi-line stacks; a **Refresh** button re-fetches the date + active tab.
+- **Per-tab independent counts**: each tab's header shows **its own** entry count — counts are stored separately per tab (`entriesByTab = { api: [], error: [] }`), so switching tabs never changes the other tab's badge number. Only the active tab fetches (lazy per-tab loading on tab switch).
+- **Auto-scroll to latest (end of file)**: the log scroll container (`scrollRef`) is **automatically scrolled to the bottom** whenever new entries load or the tab changes (`scrollRef.current.scrollTop = scrollRef.current.scrollHeight`), landing on the most recent record. A **"Latest"** floating button (`ArrowDownToLine`) at the bottom-right also jumps to the last entry on demand.
+- **New service** `src/services/logsService.js`: `getLogDates(config)` → `GET /system/logs/meta`; `getApiLogs({ date }, config)` → `GET /system/logs/api`; `getErrorLogs({ date }, config)` → `GET /system/logs/error`. Payload lives at **one** `.data` level (`res.data`), matching the backend `{ date, type, entries }` shape.
+- **Sidebar**: new **System** section (icon `Settings`, permission `system_logs:view`) with a single **Application Logs** child (`/system/logs`, `ScrollText` icon, permission `system_logs:view`). The existing **Settings** link is retained. Only SUPER_ADMIN sees the section (the new permission grants it to SUPER_ADMIN only).
+- Routes are backend data-only: the API returns plain objects — all presentation (tabs, level badges, panel accents, icons, scroll) lives in `Logs.jsx`.
 
 ### Today's Updates (2026-08-17)
 - **Procurement tabs**: Added three tabs to Procurement list — "All Requests", "My Requests", and reserved "Role-based" (commented out for future).
