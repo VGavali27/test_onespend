@@ -329,3 +329,26 @@ Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Q
   - `GET /api/v1/system/logs/api?date=YYYY-MM-DD` — `{ date, type: 'api', entries: [] }` from `api.log` only (request traffic).
   - `GET /api/v1/system/logs?date=YYYY-MM-DD` — combined `{ date, error: [], api: [] }`. Each entry `{ timestamp, level, message }`; stacked error trace lines are merged into the preceding entry. `400` on a malformed date or invalid log type, `404` when no folder exists for the date.
 - Configured in `src/routes/index.js` via `router.use('/system/logs', systemLogsRoutes)` — the sub-router's static `/meta`, `/error`, `/api`, and `/` routes thereby resolve to `/system/logs/meta`, `/system/logs/error`, `/system/logs/api`, and `/system/logs`. (The `/meta` static route is registered before the `/logs` root.)
+
+## Pending Improvements (future backlog)
+
+> Cross-cutting ideas for hardening, observability, and finishing the payment/logging work. Pick up in rough priority order.
+
+### Logging & observability
+- [ ] **Seed `system_logs:view` in the DB** — the permission exists in the seeder (`20260724000006`/`-0007`) but has not been run; run `npm run seed` so SUPER_ADMIN can actually open `/system/logs` in a fresh/prod DB.
+- [ ] **Log file size rotation + retention** — the date-folder buckets grow unboundedly. Add a max size per file (winston `maxsize`/`maxFiles` or a similar cap) and a scheduled cleanup that deletes `logs/**` older than N days.
+- [ ] **Request correlation IDs** — generate `req.id` and include it in both `api.log` and `error.log` entries so a single request can be traced across both files.
+- [ ] **Structured JSON log transport** (optional) — in addition to the human console format, offer a JSON-formatted transport so logs can be shipped to an aggregator (ELK/Datadog/Loki).
+- [ ] **`/health` enrichment** — add DB connectivity (and optionally a Redis/upload-dir check) to the health endpoint for monitoring.
+
+### Reliability & security
+- [ ] **API rate limiting** (`express-rate-limit`) per user/IP — especially on `/auth/login` (currently brute-forceable).
+- [ ] **Security hardening** — add `helmet`, tighten CORS, and enforce request body/size limits (the app serves file uploads + financial data).
+- [ ] **Graceful shutdown** — flush winston transports and drain in-flight requests before the process exits (custom `DailyFolderFile` transport streams should be closed cleanly).
+
+### Finance / payments
+- [ ] **Standalone Finance/Payments module list** — a global "All Payments" list across expenses (filters, totals, payment-proof viewer) to round out the unified payment system (frontend CLAUDE.md also flags this pending).
+
+### Testing / DX
+- [ ] **Automated tests** — effectively none today. Add test coverage for the highest-risk flows: the expense approval chain (submit → approve → pay / handover), the procurement chain, and the new `/system/logs` endpoints.
+- [ ] **CI pipeline** on both repos — lint + typecheck + build + tests on push.
