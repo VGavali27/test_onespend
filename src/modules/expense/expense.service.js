@@ -805,7 +805,7 @@ export const approve = async (uuid, user, remarks, toRoleId = null) => {
         finalAmount = Number(decrypt(String(expense.estimated_amount || '0')));
       }
 
-      const initialPaymentStatus = computePaymentStatus(0, finalAmount, advanceAmount);
+      const initialPaymentStatus = computePaymentStatus([], finalAmount, advanceAmount);
 
       // Route to the requester for payment — don't clear current_role_id
       const requesterRole = expense.requestedByEmployment?.user?.role_id ?? null;
@@ -905,21 +905,54 @@ export const reject = async (uuid, user, remarks) => {
 
 // ── Payment flow (unified for all expense types) ──
 
-// Compute payment status based on paid_amount, final_amount, advance_amount
-const computePaymentStatus = (paid, final, advance) => {
-  const p = Number(paid) || 0;
+// Payment TYPE is direction-aware — it tells us whether money flows from the
+// company TO the user (a disbursement toward the expense) or FROM the user TO
+// the company (a refund of an over-advanced amount).
+//   - Company → user: PARTIAL, FULL, ADDITIONAL
+//   - User → company (refund): ADVANCE_REFUND, REFUND_RECEIVED
+// A single scalar paid_amount can't tell these apart, so status is computed from
+// the individual payments, summing each bucket independently.
+const COMPANY_TO_USER_PAYMENT_TYPES = ['PARTIAL', 'FULL', 'ADDITIONAL'];
+const USER_TO_COMPANY_PAYMENT_TYPES = ['ADVANCE_REFUND', 'REFUND_RECEIVED'];
+
+// Sum company→user disbursements and user→company refunds separately.
+// `payments` is an array of `{ amount, payment_type }` (amounts already decrypted).
+const sumPaymentsByDirection = (payments = []) => {
+  let companyToUser = 0;
+  let userRefund = 0;
+  for (const p of payments || []) {
+    const amt = Number(p?.amount) || 0;
+    if (USER_TO_COMPANY_PAYMENT_TYPES.includes(p?.payment_type)) {
+      userRefund += amt;
+    } else {
+      companyToUser += amt;
+    }
+  }
+  return { companyToUser, userRefund };
+};
+
+// Compute payment status from the direction-split payments, final amount, and
+// advance amount. Reconciliation happens in the correct currency of money flow:
+//   - Over-advanced  (advance > final): user must REFUND the excess (advance - final).
+//     Settled once the user→company refunds cover that excess, else ADVANCE_REFUND_DUE.
+//   - Under-advanced / no advance (final >= advance): the advance already counts as
+//     company money toward the expense, so the company's remaining disbursement is
+//     (final - advance). Settled once advance + company→user payments >= final.
+const computePaymentStatus = (payments, final, advance) => {
   const f = Number(final) || 0;
   const a = Number(advance) || 0;
+  const { companyToUser, userRefund } = sumPaymentsByDirection(payments);
 
-  if (p === 0) return 'UNPAID';
-  if (p < f && a === 0) return 'PARTIAL_PAID';
-  if (p >= f && a === 0) return 'PAID';
-  if (a > f && p < a) return 'ADVANCE_REFUND_DUE';
-  if (a > f && p >= a) return 'SETTLED';
-  if (f > a && p < f) return 'ADDITIONAL_PAYMENT_DUE';
-  if (f > a && p >= f) return 'SETTLED';
-  if (a === f && p >= f) return 'SETTLED';
-  return 'UNPAID';
+  if (a > f) {
+    const excess = a - f; // amount the user must refund
+    return userRefund >= excess ? 'SETTLED' : 'ADVANCE_REFUND_DUE';
+  }
+
+  // final >= advance — company money toward the expense = advance + company→user payments
+  const totalCovered = a + companyToUser;
+  if (totalCovered >= f) return a > 0 ? 'SETTLED' : 'PAID';
+  if (companyToUser > 0) return 'PARTIAL_PAID';
+  return a > 0 ? 'ADDITIONAL_PAYMENT_DUE' : 'UNPAID';
 };
 
 // Record a payment installment for an expense
@@ -981,12 +1014,28 @@ export const recordPayment = async (uuid, user, paymentData) => {
       );
     }
 
-    // Update expense paid_amount and payment_status
-    const currentPaid = Number(decrypt(String(expense.paid_amount || '0')));
-    const newPaid = currentPaid + Number(amount);
+    // Update expense paid_amount and payment_status. Status must be derived from the
+    // direction-split payments (payment_type tells company→user vs user→company), so we
+    // read the expense's recorded payments and append the new one.
     const finalAmount = Number(decrypt(String(expense.final_amount || '0')));
     const advanceAmount = Number(decrypt(String(expense.advance_amount || '0')));
-    const newPaymentStatus = computePaymentStatus(newPaid, finalAmount, advanceAmount);
+
+    const [existingPayments] = await db.ExpensePayment.findAndCountAll({
+      where: { expense_id: expense.id },
+      transaction: t,
+    });
+    decryptResults(existingPayments.rows);
+    const allPayments = [
+      ...existingPayments.rows.map((p) => ({ amount: p.amount, payment_type: p.payment_type })),
+      { amount, payment_type: payment_type || 'PARTIAL' },
+    ];
+    const newPaymentStatus = computePaymentStatus(allPayments, finalAmount, advanceAmount);
+
+    // paid_amount = net company disbursement via recorded payments (company→user
+    // payments minus any user→company refunds received back), never negative.
+    const { companyToUser, userRefund } = sumPaymentsByDirection(allPayments);
+    const newPaid = Math.max(0, companyToUser - userRefund);
+
     const isSettled = newPaymentStatus === 'SETTLED' || (newPaymentStatus === 'PAID' && advanceAmount === 0);
     const requesterRole = expense.requestedByEmployment?.user?.role_id ?? null;
 
@@ -1081,7 +1130,6 @@ export const getPaymentSummary = async (uuid, user) => {
   // Decrypt amounts for computation
   const finalAmount = Number(decrypt(String(expense.final_amount || '0')));
   const advanceAmount = Number(decrypt(String(expense.advance_amount || '0')));
-  const paidAmount = Number(decrypt(String(expense.paid_amount || '0')));
 
   // Fetch all payments with proofs
   const payments = await db.ExpensePayment.findAll({
@@ -1094,25 +1142,33 @@ export const getPaymentSummary = async (uuid, user) => {
     if (p.proofs) decryptResults(p.proofs);
   });
 
-  // Determine payment status
-  const paymentStatus = computePaymentStatus(paidAmount, finalAmount, advanceAmount);
+  // Direction-split the payments — payment_type says whether money flowed company→user
+  // (a disbursement toward the expense) or user→company (a refund of an over-advance).
+  // paid_amount shown to the user = net company disbursement via recorded payments.
+  const { companyToUser, userRefund } = sumPaymentsByDirection(payments);
+  const paidAmount = Math.max(0, companyToUser - userRefund);
 
-  // Compute what's due (remaining after any payments already recorded)
+  // Determine payment status from the direction-split payments (not the conflated paid_amount)
+  const paymentStatus = computePaymentStatus(payments, finalAmount, advanceAmount);
+
+  // Compute what's due, in the correct currency of money flow:
   let amountDue = 0;
   let isOverAdvance = false;
   let isUnderAdvance = false;
 
   if (advanceAmount > finalAmount) {
-    // User was over-advanced, owes refund of the excess advance (net of any refunds received)
+    // Over-advanced: the user refunds the excess (advance - final). What they still owe
+    // is that excess minus any refunds already received back.
     isOverAdvance = true;
-    amountDue = (advanceAmount - finalAmount) - paidAmount; // user refunds the outstanding excess
+    amountDue = (advanceAmount - finalAmount) - userRefund;
   } else if (finalAmount > advanceAmount) {
-    // Company owes additional payment = final - (advance already covered) - paid so far
+    // Under-advanced: the company owes (final - advance) on top of the advance. What it
+    // still owes is that top-up minus any company→user payments already recorded.
     isUnderAdvance = true;
-    amountDue = (finalAmount - advanceAmount) - paidAmount; // company pays the remaining balance
+    amountDue = (finalAmount - advanceAmount) - companyToUser;
   } else {
-    // final === advance: everything beyond what's paid is the outstanding settlement
-    amountDue = finalAmount - paidAmount;
+    // final === advance: the advance already covers the expense; nothing further is due.
+    amountDue = 0;
   }
 
   if (amountDue < 0) amountDue = 0;

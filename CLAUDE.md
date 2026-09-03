@@ -286,10 +286,15 @@ Full chain implemented: `PI (Purchase Intention) → PR (Purchase Request) → Q
 - **New payment workflow** for ALL expense types (Travel, Reimbursement, Procurement-linked, General) — unified logic replacing the previous reimbursement-only approach.
 - **New fields on `expenses` table**: `advance_amount` (default '0'), `final_amount` (computed on SUBMIT), `paid_amount` (running total, default '0'), `payment_status` (ENUM: UNPAID, PARTIAL_PAID, PAID, ADVANCE_REFUND_DUE, ADDITIONAL_PAYMENT_DUE, SETTLED).
 - **New tables**: `expense_payments` (each installment: amount, payment_method, payment_date, payment_type, reference_number, remarks) and `expense_payment_proofs` (screenshots/receipts per payment).
-- **Unified payment status logic**: Single formula for all expense types based on `paid_amount` vs `final_amount` vs `advance_amount`:
+- **Unified payment status logic** — **direction-aware** (corrected 2026-09-03): status is computed from the **individual `expense_payments`** (their `payment_type` tells money-flow direction), NOT from the single conflated `paid_amount` scalar. A scalar can't distinguish a **company→user** disbursement from a **user→company** refund, so it misfired: e.g. advance 750 / final 1100 / paid 350 wrongly showed `ADDITIONAL_PAYMENT_DUE` (should be `SETTLED`), and advance 9500 / final 4400 / refunded 5100 wrongly showed `ADVANCE_REFUND_DUE` (should be `SETTLED`).
+  - **`payment_type` direction** — `PARTIAL`/`FULL`/`ADDITIONAL` = **company → user** (disbursement toward the expense); `ADVANCE_REFUND`/`REFUND_RECEIVED` = **user → company** (refund of an over-advanced amount).
+  - **`computePaymentStatus(payments, final, advance)`** sums each direction separately (`sumPaymentsByDirection`) and reconciles in the correct currency of flow:
+    - Over-advanced (`advance > final`): user must refund `excess = advance − final`; settled once user→company refunds `>= excess`, else `ADVANCE_REFUND_DUE`.
+    - Under-advanced / no advance (`final >= advance`): the advance already counts as company money toward the expense; settled once `advance + company→user payments >= final` (→ `SETTLED` if `advance > 0`, else `PAID`); else `PARTIAL_PAID` (some paid) or `ADDITIONAL_PAYMENT_DUE`/`UNPAID` (nothing on top of the advance yet).
+  - **`paid_amount`** on the expense = **net company disbursement** via recorded payments (`max(0, companyToUser − userRefund)`), backfilled for existing rows. `getPaymentSummary()` recomputes status + `amount_due` live from the direction-split payments (not from the stored scalar); `recordPayment()` recomputes from all the expense's payments (existing + the new one) before persisting.
   - `advance_amount = 0` for non-reimbursement; `reimbursement.advance_amount` for reimbursement.
-  - On SUBMIT: `final_amount` computed from line items, `advance_amount` set, `payment_status` initialized.
-  - `PARTIAL_PAID` for partial payments, `PAID` when paid ≥ final (no advance), `ADVANCE_REFUND_DUE` when advance > final (user owes refund), `ADDITIONAL_PAYMENT_DUE` when final > advance (company owes more), `SETTLED` when fully reconciled.
+  - On SUBMIT (approve-as-final): `final_amount` computed from line items, `advance_amount` set, `payment_status` initialized from `computePaymentStatus([], final, advance)`.
+  - Approval `status` stays `APPROVED` on payment — only `payment_status` moves to `PAID`/`SETTLED` (see 2026-09-02 section).
 - **New endpoints** (permission `expenses:pay`):
   - `POST /expenses/:uuid/payments` — record payment installment + upload proofs
   - `GET /expenses/:uuid/payments` — list all payments
