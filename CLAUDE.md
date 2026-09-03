@@ -273,3 +273,18 @@ VITE_APP_ENV=development
 - [ ] Finance pages (Reports — only Categories + expense Payment UI built; a standalone Finance/Payments module list for all payments across expenses is not yet built)
 - [ ] Company switcher (fetch employments on demand)
 - [ ] **Resubmit rejected expenses** — frontend resubmit flow for REJECTED expenses (allows creator to edit and resubmit through approval flow)
+
+### Pending Improvements (future backlog)
+> Cross-cutting hardening + finishing the Application Logs UX. Rough priority order.
+
+#### Application Logs (`/system/logs`)
+- [ ] **Fetch logs in pages/chunks** — `/system/logs/api` and `/system/logs/error` currently return the whole day's file. Add `?page`/`?limit` (or `tail=N` newest-first) so large days don't load everything at once, and so the "end of file" view stays snappy.
+- [ ] **Refresh count badges** — the tab badges show counts only for dates already fetched; consider lightweight count-only metadata from the backend so badges show even before opening a tab.
+- [ ] **Date edge-case UX** — a picked date with no log folder yields a 404 toast; surface it as a friendlier inline empty state instead.
+
+#### Finance / payments
+- [ ] **Standalone Finance/Payments module list** — a global "All Payments" list across expenses (filters, totals, payment-proof viewer) to round out the payment UI (backend Pending also tracks this).
+
+#### Reliability / DX
+- [ ] **API rate-limit error UX** — when the backend adds `express-rate-limit`, handle the 429 response gracefully (friendly toast + retry hint, especially on login) instead of a generic error.
+- [ ] **CI pipeline** — lint + typecheck + build on push for this repo.
