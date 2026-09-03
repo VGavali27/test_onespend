@@ -103,17 +103,24 @@ export const getMyExpenses = async (userId, params = {}) => {
 
 // Scoped "all expenses" list — global roles (SUPER_ADMIN/CFO) see everything, other
 // expense-manager roles see only the companies they're actively employed in. Paginated.
+// DRAFT expenses are excluded from this list — only "My Expenses" surfaces them so a
+// requester can continue their own drafts. Status filter (if any) is applied on top.
 export const getVisible = async (user, params = {}) => {
-  let result;
-  if (EXPENSE_GLOBAL_ROLES.includes(user.roleCode)) {
-    result = await expenseRepository.findAll({}, params);
-  } else {
-    const companyIds = await getActiveCompanyIdsByUser(user.userId);
-    result =
-      companyIds.length > 0
-        ? await expenseRepository.findByCompanyIds(companyIds, params)
-        : { rows: [], total: 0 };
-  }
+  const visibility = EXPENSE_GLOBAL_ROLES.includes(user.roleCode)
+    ? {}
+    : await getActiveCompanyIdsByUser(user.userId);
+
+  const scope =
+    EXPENSE_GLOBAL_ROLES.includes(user.roleCode)
+      ? {}
+      : visibility.length > 0
+        ? { company_id: { [db.Sequelize.Op.in]: visibility } }
+        : null;
+
+  if (scope === null) return { rows: [], total: 0 };
+
+  const where = { ...scope, status: { [db.Sequelize.Op.ne]: 'DRAFT' } };
+  const result = await expenseRepository.findAll(where, params);
   if (params.decrypt) decryptResults(result.rows);
   const employmentIds = await getEmploymentIdsByUser(user.userId);
   markCanEdit(result.rows, employmentIds);
