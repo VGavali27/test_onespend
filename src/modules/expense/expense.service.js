@@ -807,13 +807,22 @@ export const approve = async (uuid, user, remarks, toRoleId = null) => {
 
       const initialPaymentStatus = computePaymentStatus([], finalAmount, advanceAmount);
 
-      // Route to the requester for payment — don't clear current_role_id
+      // Route for payment after approval. Procurement-linked expenses go back to
+      // ADMIN_MGR (the role that raised the PO / owns the procurement chain) rather
+      // than the original requester; all other expense types route to the requester.
       const requesterRole = expense.requestedByEmployment?.user?.role_id ?? null;
+      let paymentHandlerRoleId;
+      if (category.module === 'procurement') {
+        const adminMgr = await findRoleByCode('ADMIN_MGR');
+        paymentHandlerRoleId = adminMgr?.id ?? requesterRole;
+      } else {
+        paymentHandlerRoleId = requesterRole;
+      }
 
       await expense.update(
         {
           status: 'APPROVED',
-          current_role_id: requesterRole,
+          current_role_id: paymentHandlerRoleId,
           current_employment_id: null,
           closed_at: new Date(),
           final_amount: String(finalAmount),
@@ -1037,17 +1046,23 @@ export const recordPayment = async (uuid, user, paymentData) => {
     const newPaid = Math.max(0, companyToUser - userRefund);
 
     const isSettled = newPaymentStatus === 'SETTLED' || (newPaymentStatus === 'PAID' && advanceAmount === 0);
+    // On settlement, route the expense back to a handler. Procurement-linked expenses go
+    // to ADMIN_MGR (consistent with where they route on approval); others go to the requester.
     const requesterRole = expense.requestedByEmployment?.user?.role_id ?? null;
+    let settledHandler = requesterRole;
+    if (expense.category?.module === 'procurement') {
+      const adminMgr = await findRoleByCode('ADMIN_MGR');
+      settledHandler = adminMgr?.id ?? requesterRole;
+    }
 
     await expense.update(
       {
         paid_amount: String(newPaid),
         payment_status: newPaymentStatus,
         // Keep the approval status (APPROVED) untouched — only the payment_status
-        // reflects payment. When fully settled/paid, return the expense to the
-        // requester so they see the final PAID payment state in "My Expenses".
+        // reflects payment. When fully settled/paid, route the expense to its handler.
         ...(isSettled
-          ? { current_role_id: requesterRole, current_employment_id: null }
+          ? { current_role_id: settledHandler, current_employment_id: null }
           : {}),
       },
       { transaction: t },
