@@ -1,7 +1,7 @@
 /**
  * Seeder: Assign permissions to roles
  *
- * Permission IDs:  100-176 (77 permissions covering all modules)
+ * Permission IDs:  100-177 (78 permissions covering all modules)
  * Role IDs from 20260724000002-seed-roles:
  *   100 - SUPER_ADMIN
  *   101 - CFO
@@ -21,6 +21,8 @@
 const rolePermissions = [
   // SUPER_ADMIN (100) - all permissions 100-176
   ...Array.from({ length: 77 }, (_, i) => [100, 100 + i]),
+  // SUPER_ADMIN (100) - system logs viewer (177) — SUPER_ADMIN only
+  [100, 177],
 
   // CFO (101)
   [101, 100], [101, 101], [101, 102], [101, 103],

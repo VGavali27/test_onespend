@@ -3,6 +3,7 @@ import { Sequelize } from 'sequelize';
 import sequelize from '../config/database.js';
 import { fileURLToPath, pathToFileURL } from 'url';
 import path from 'path';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,19 +31,19 @@ const umzug = new Umzug({
 const run = async () => {
   try {
     await sequelize.authenticate();
-    console.log('✓ Database connected\n');
+    logger.info('Database connected');
 
     const pending = await umzug.pending();
     if (pending.length === 0) {
-      console.log('✓ All migrations are up to date');
+      logger.info('All migrations are up to date');
     } else {
-      console.log(`→ ${pending.length} migration(s) pending\n`);
+      logger.info(`${pending.length} migration(s) pending`);
       const migrated = await umzug.up();
-      migrated.forEach((m) => console.log(`  ✓ ${m.name}`));
-      console.log('\n✓ Migrations completed successfully');
+      migrated.forEach((m) => logger.info(`Migrated: ${m.name}`));
+      logger.info('Migrations completed successfully');
     }
   } catch (err) {
-    console.error('✗ Migration failed:', err.message);
+    logger.error(`Migration failed: ${err.message}`);
     process.exit(1);
   } finally {
     await sequelize.close();

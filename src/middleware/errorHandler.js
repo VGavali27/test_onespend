@@ -1,12 +1,14 @@
 import ApiResponse from '../utils/apiResponse.js';
 import ApiError from '../utils/ApiError.js';
 import env from '../config/env.js';
+import logger from '../utils/logger.js';
 
 const errorHandler = (err, req, res, _next) => {
-  // Log in development
-  if (env.isDev) {
-    console.error('✗ Error:', err);
-  }
+  // Log with request context — always to error.log (stacks included).
+  const actor = req.user
+    ? ` user=${req.user.userUuid || req.user.userId || '?'} route=${req.method} ${req.originalUrl}`
+    : ` route=${req.method} ${req.originalUrl}`;
+  logger.error(`Request error${actor}: ${err.message}`, { stack: err?.stack });
 
   // Known operational error — send structured response
   if (err instanceof ApiError && err.isOperational) {

@@ -1,5 +1,6 @@
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
+import logger from '../../utils/logger.js';
 import { decrypt } from '../../utils/encryption.js';
 import {
   getEmploymentIdsByUser,
@@ -140,7 +141,7 @@ export const getDashboard = async (user, query = {}) => {
       pendingMyApproval = summarize(await fetchScopedExpenses({ current_role_id: role.id, status: 'SUBMITTED', ...inPeriod }));
     }
   } catch (e) {
-    console.warn('Failed to fetch pending approval:', e.message);
+    logger.warn(`Failed to fetch pending approval: ${e.message}`);
   }
 
   const approvedCur = summarize(byStatus(rowsCurrent, 'APPROVED'));
@@ -179,7 +180,7 @@ export const getDashboard = async (user, query = {}) => {
     }
     spendingTrend = monthBuckets.map(({ label, amount }) => ({ label, amount }));
   } catch (e) {
-    console.warn('Failed to fetch spending trend:', e.message);
+    logger.warn(`Failed to fetch spending trend: ${e.message}`);
     spendingTrend = [];
   }
 
@@ -202,7 +203,7 @@ export const getDashboard = async (user, query = {}) => {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 6);
   } catch (e) {
-    console.warn('Failed to fetch spending by category:', e.message);
+    logger.warn(`Failed to fetch spending by category: ${e.message}`);
     spendingByCategory = [];
   }
 
@@ -235,7 +236,7 @@ export const getDashboard = async (user, query = {}) => {
       limit: 8,
     });
   } catch (e) {
-    console.warn('Failed to fetch recent activity:', e.message);
+    logger.warn(`Failed to fetch recent activity: ${e.message}`);
     recentHandovers = [];
   }
 

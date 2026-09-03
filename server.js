@@ -1,11 +1,12 @@
 import app from './src/app.js';
 import env from './src/config/env.js';
 import sequelize from './src/config/database.js';
+import logger from './src/utils/logger.js';
 
 const start = async () => {
   try {
     await sequelize.authenticate();
-    console.log('✓ Database connected successfully');
+    logger.info('Database connected successfully');
 
     // ── Sync models (dev only) ──
     // NOTE: use sync() WITHOUT alter. alter:true re-adds unique indexes on every
@@ -14,16 +15,16 @@ const start = async () => {
     // sync() only creates missing tables and never touches existing ones.
     if (env.isDev) {
       await sequelize.sync();
-      console.log('✓ Models synchronized');
+      logger.info('Models synchronized');
     }
   } catch (error) {
-    console.warn('⚠ Database connection failed:', error.message);
-    console.warn('  Server will start without database');
+    logger.warn(`Database connection failed: ${error.message}`);
+    logger.warn('Server will start without database');
   }
 
   app.listen(env.port, () => {
-    console.log(`\n  🚀 Server running on port ${env.port}`);
-    console.log(`  📦 Environment: ${env.nodeEnv}\n`);
+    logger.info(`Server running on port ${env.port}`);
+    logger.info(`Environment: ${env.nodeEnv}`);
   });
 };
 

@@ -16,6 +16,10 @@ const env = {
 
   corsOrigin: process.env.CORS_ORIGIN || '*',
 
+  // Logging
+  logLevel: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+  logDir: process.env.LOG_DIR || 'logs',
+
   // 64-char hex key for AES-256-CBC encryption
   encryptionKey: process.env.ENCRYPTION_KEY,
 

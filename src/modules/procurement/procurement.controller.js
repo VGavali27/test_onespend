@@ -1,5 +1,6 @@
 import * as procurementService from './procurement.service.js';
 import ApiResponse from '../../utils/apiResponse.js';
+import logger from '../../utils/logger.js';
 
 export const getAllProcurements = async (req, res, next) => {
   try {
@@ -97,7 +98,7 @@ export const createPr = async (req, res, next) => {
 
 export const createPo = async (req, res, next) => {
   try {
-    console.log('DEBUG CONTROLLER createPo - uuid:', req.params.uuid);
+    logger.debug(`createPo - uuid: ${req.params.uuid}`);
     const doc = await procurementService.createPo(req.params.uuid, req.user);
     return ApiResponse.created(res, doc, 'Purchase order created from the PR');
   } catch (error) {

@@ -23,7 +23,8 @@ import travelMiscExpenseRoutes from '../modules/travel_misc_expense/travel_misc_
 import authRoutes from '../modules/auth/auth.routes.js';
 import uploadRoutes from '../modules/upload/upload.routes.js';
 import groupRoutes from '../modules/group/group.routes.js';
-import dashboardRoutes from '../modules/dashboard/dashboard.routes.js';;
+import dashboardRoutes from '../modules/dashboard/dashboard.routes.js';
+import systemLogsRoutes from '../modules/system_logs/system_logs.routes.js';
 
 const router = Router();
 
@@ -52,5 +53,6 @@ router.use('/travel-misc-expenses', travelMiscExpenseRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/groups', groupRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/system/logs', systemLogsRoutes);
 
 export default router;

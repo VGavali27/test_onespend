@@ -4,6 +4,7 @@ import * as roleRepository from '../role/role.repository.js';
 import * as expenseService from '../expense/expense.service.js';
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
+import logger from '../../utils/logger.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
 import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser, getActiveEmploymentByUserAndCompany } from '../../modules/user_employment/user_employment.service.js';
 
@@ -785,7 +786,7 @@ export const createPo = async (uuid, user) => {
   const resolved = await resolveDoc(uuid);
   if (!resolved || resolved.type !== 'PR') throw ApiError.badRequest('A purchase order can only be created from a PR');
   const pr = resolved.doc;
-  console.log('DEBUG createPo - PR status:', pr.status, '| vendor_id:', pr.vendor_id, '| uuid:', uuid);
+  logger.debug(`createPo - PR status: ${pr.status} | vendor_id: ${pr.vendor_id} | uuid: ${uuid}`);
   if (pr.status !== 'QUOTATION_APPROVED') throw ApiError.badRequest('The PR must have an approved quotation before creating a PO');
   if (!pr.vendor_id) throw ApiError.badRequest('The PR has no selected vendor yet');
 

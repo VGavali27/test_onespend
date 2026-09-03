@@ -4,6 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import routes from './routes/index.js';
 import errorHandler from './middleware/errorHandler.js';
+import requestLogger from './middleware/requestLogger.js';
+import logger from './utils/logger.js';
 import env from './config/env.js';
 import { HTTP_STATUS } from './constants/index.js';
 
@@ -23,13 +25,15 @@ app.use(
 );
 app.use(express.json({ limit: '100kb' }));
 
+// ---------- Request logging (method, path, status, duration) ----------
+app.use(requestLogger);
+
 // ---------- Uploaded files (static) ----------
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use(express.urlencoded({ extended: true }));
 
 // ---------- Health Check ----------
 app.get('/health', (_req, res) => {
-  console.log('Health check endpoint hit');
   res.status(HTTP_STATUS.OK).json({
     success: true,
     message: 'API is running',
@@ -42,7 +46,8 @@ app.get('/health', (_req, res) => {
 app.use('/api/v1', routes);
 
 // ---------- 404 Handler ----------
-app.use((_req, res) => {
+app.use((req, res) => {
+  logger.warn(`Route not found${req.user ? ` user=${req.user.userUuid || req.user.userId || '?'}` : ''}: ${req.method} ${req.originalUrl}`);
   res.status(HTTP_STATUS.NOT_FOUND).json({
     success: false,
     message: 'Route not found',

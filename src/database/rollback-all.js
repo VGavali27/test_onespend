@@ -6,6 +6,7 @@ import { Sequelize } from 'sequelize';
 import sequelize from '../config/database.js';
 import { fileURLToPath, pathToFileURL } from 'url';
 import path from 'path';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,17 +30,17 @@ const umzug = new Umzug({
 const run = async () => {
   try {
     await sequelize.authenticate();
-    console.log('✓ Database connected\n');
+    logger.info('Database connected');
 
     let rolledBack = 0;
     while (true) {
       const executed = await umzug.executed();
       if (executed.length === 0) {
-        console.log('✓ No migrations to roll back');
+        logger.info('No migrations to roll back');
         break;
       }
       const rolled = await umzug.down();
-      rolled.forEach((m) => console.log(`  ✗ Rolled back: ${m.name}`));
+      rolled.forEach((m) => logger.info(`Rolled back: ${m.name}`));
       rolledBack += rolled.length;
     }
 
@@ -48,12 +49,12 @@ const run = async () => {
     const tables = await qi.showAllTables();
     if (tables.includes('sequelize_data')) {
       await qi.bulkDelete('sequelize_data', null);
-      console.log('✓ Cleared seeder tracking (sequelize_data)');
+      logger.info('Cleared seeder tracking (sequelize_data)');
     }
 
-    console.log(`\n✓ Rollback completed successfully (${rolledBack} migration(s) rolled back)`);
+    logger.info(`Rollback completed successfully (${rolledBack} migration(s) rolled back)`);
   } catch (err) {
-    console.error('✗ Rollback failed:', err.message);
+    logger.error(`Rollback failed: ${err.message}`);
     process.exit(1);
   } finally {
     await sequelize.close();
