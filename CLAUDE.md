@@ -236,6 +236,17 @@ VITE_APP_ENV=development
 - **`expenseService.js`**: added `handoverForPayment(uuid, payload)`, `getPaymentHandoverRoles(uuid)`, and `getMyPaymentRequests(params, config)`.
 - **Pending amount fix (backend-driven, no frontend change)**: The "Pending payment" figure in **both** the detail `PaymentSection` card and the **RecordPaymentModal** comes from `getPaymentSummary.amount_due`. The modal **defaults its amount input to `amount_due`** and **clamps any entry to it** (`Amount cannot exceed the due balance`). Because the backend previously returned `amount_due` without subtracting recorded payments (partial payment on a 5000 travel expense still showed 5000 pending), this readout was stale even though the `paid_amount` card was correct. The fix landed in the backend `getPaymentSummary`; the frontend already refreshes via `refreshPayments()` (re-fetches `getPayments` + `getPaymentSummary`) in the modal's `onSaved`. After the backend fix, the due/pending figure and the modal's max default down to the true remaining balance.
 
+### Today's Updates (2026-09-03) — Role-based Dashboard
+- **`Dashboard.jsx`**: The dashboard is now **persona-driven** by the logged-in role (frontend-only, `PERSONA` map; the backend already returns `metrics.isGlobal/isManager`). New personas: **employee** (`EMPLOYEE`), **approver** (`HOD`/`EMP_MGR`/`TRAVEL_MGR`/`FINANCE_MGR`/`FINANCE_JR`), **payment** (`PAYMENT_MGR`/`PAYMENT_JR`), **procurement** (`ADMIN_MGR`/`ADMIN_JR`), and **global** (`SUPER_ADMIN`/`CFO`). Each persona drives a **role-aware welcome subtitle** and a **persona-specific primary quick-action**:
+  - employee → "Submit Expense" (`/expenses/new`)
+  - approver/global → "My Approvals" (`/expenses/assigned`)
+  - payment → "Payment Requests" (`/expenses/payments`)
+  - procurement → "Procurement" (`/procurement`)
+  Secondary actions (All Expenses, Procurement, Payment Requests, New Expense for employees) appear per the existing `APPROVER_ROLES`/`PROCUREMENT_ROLES`/`PAYMENT_ROLES`/`GLOBAL_ROLES` gates. This surfaces the new **Payment Requests** page for payment/finance roles.
+- **Bug fixed: quick-action role gates used `user?.roleCode`**, which the login payload never provides (the API returns `user.role`). This made `isManager`/`isGlobal`/`isProcurement` always `false`, so secondary actions never rendered for anyone. Changed all three to `user?.role` (consistent with the rest of the app). Also removed a leftover `console.log('Dashboard API response:', res)` debug line.
+- **Quick actions layout**: the quick-action buttons now render in a **responsive 4-per-row grid** (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` — 1 col mobile, 2 on tablet, 4 on desktop), matching the stat-card row layout, so "New Expense / My Approvals / All Expenses / Procurement / Payment Requests" line up like a menu.
+- **Backend is UI-free**: confirmed the API returns only data — `GET /dashboard` returns `{ charts, recentActivity, metrics, roleContext }` and no frontend presentation (labels, icons, `className`, HTML) is emitted. All presentation stays in `Dashboard.jsx`.
+
 ### Today's Updates (2026-08-17)
 - **Procurement tabs**: Added three tabs to Procurement list — "All Requests", "My Requests", and reserved "Role-based" (commented out for future).
 - **Sidebar highlighting fixed**: "My Requests" tab now properly highlights when URL contains `?scope=mine`.

@@ -20,9 +20,19 @@ const ICON_MAP = {
 };
 
 // Roles that see specific quick actions
-const MANAGER_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR', 'PAYMENT_MGR', 'PAYMENT_JR', 'FINANCE_MGR', 'FINANCE_JR', 'TRAVEL_MGR', 'HOD', 'EMP_MGR'];
+const APPROVER_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR', 'PAYMENT_MGR', 'PAYMENT_JR', 'FINANCE_MGR', 'FINANCE_JR', 'TRAVEL_MGR', 'HOD', 'EMP_MGR'];
 const PROCUREMENT_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR', 'ADMIN_JR'];
 const GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO'];
+const PAYMENT_ROLES = ['PAYMENT_MGR', 'PAYMENT_JR', 'FINANCE_MGR', 'FINANCE_JR', 'SUPER_ADMIN', 'CFO'];
+
+// Role persona — drives the welcome banner + quick actions shown to the user
+const PERSONA = {
+  employee:   { roles: ['EMPLOYEE'],                    key: 'employee',   primary: { label: 'Submit Expense', href: '/expenses/new', icon: 'plus' }, title: 'Employee Expense', subtitle: 'Here\'s your financial overview', accent: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/25 dark:text-indigo-400' },
+  approver:   { roles: ['HOD', 'EMP_MGR', 'TRAVEL_MGR', 'FINANCE_MGR', 'FINANCE_JR'], key: 'approver', primary: { label: 'My Approvals', href: '/expenses/assigned', icon: 'clock' }, title: 'Approver', subtitle: 'Here\'s the expenses awaiting your approval', accent: 'bg-amber-50 text-amber-600 dark:bg-amber-900/25 dark:text-amber-400' },
+  payment:    { roles: ['PAYMENT_MGR', 'PAYMENT_JR'],   key: 'payment',    primary: { label: 'Payment Requests', href: '/expenses/payments', icon: 'receipt' }, title: 'Payments', subtitle: 'Here\'s the spend awaiting payment processing', accent: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/25 dark:text-emerald-400' },
+  procurement:{ roles: ['ADMIN_MGR', 'ADMIN_JR'],       key: 'procurement',primary: { label: 'Procurement', href: '/procurement', icon: 'cart' }, title: 'Procurement', subtitle: 'Here\'s the buying pipeline overview', accent: 'bg-purple-50 text-purple-600 dark:bg-purple-900/25 dark:text-purple-400' },
+  global:     { roles: ['SUPER_ADMIN', 'CFO'],          key: 'global',     primary: { label: 'My Approvals', href: '/expenses/assigned', icon: 'clock' }, title: 'Finance Oversight', subtitle: 'Here\'s the company-wide financial overview', accent: 'bg-blue-50 text-blue-600 dark:bg-blue-900/25 dark:text-blue-400' },
+};
 
 const ACCENT_MAP = {
   indigo: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400',
@@ -80,7 +90,6 @@ export default function Dashboard() {
     setError(null);
     try {
       const { data: res } = await getDashboard({ period });
-      console.log('Dashboard API response:', res);
       if (res.success && res.data) {
         setData(res.data);
       } else {
@@ -105,6 +114,9 @@ export default function Dashboard() {
   const getIcon = (name) => ICON_MAP[name] || Wallet;
   const getAccent = (name) => ACCENT_MAP[name] || ACCENT_MAP.indigo;
   const getRing = (name) => RING_MAP[name] || RING_MAP.indigo;
+
+  // Resolve the logged-in user's role persona (drives banner + quick actions)
+  const persona = Object.values(PERSONA).find((p) => p.roles.includes(user?.role)) || PERSONA.employee;
 
   const renderSkeleton = (count = 4) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -351,19 +363,25 @@ export default function Dashboard() {
   };
 
   const renderQuickActions = () => {
-    const isManager = MANAGER_ROLES.includes(user?.roleCode);
-    const isGlobal = GLOBAL_ROLES.includes(user?.roleCode);
-    const isProcurement = PROCUREMENT_ROLES.includes(user?.roleCode);
+    const role = user?.role;
+    const isManager = APPROVER_ROLES.includes(role);
+    const isGlobal = GLOBAL_ROLES.includes(role);
+    const isProcurement = PROCUREMENT_ROLES.includes(role);
+    const isPayment = PAYMENT_ROLES.includes(role);
 
     const actions = [
-      { label: 'New Expense', href: '/expenses/new', icon: 'plus', primary: true },
-      ...(isManager || isGlobal ? [{ label: 'My Approvals', href: '/expenses/assigned', icon: 'clock', primary: false }] : []),
+      { ...persona.primary, primary: true },
       ...(isManager || isGlobal ? [{ label: 'All Expenses', href: '/expenses/all', icon: 'receipt', primary: false }] : []),
       ...(isProcurement ? [{ label: 'Procurement', href: '/procurement', icon: 'cart', primary: false }] : []),
+      ...(isPayment ? [{ label: 'Payment Requests', href: '/expenses/payments', icon: 'wallet', primary: false }] : role === 'EMPLOYEE' ? [] : []),
     ];
+    // Employees additionally get a New-Expense shortcut next to their primary.
+    if (role === 'EMPLOYEE' && !actions.some((a) => a.href === '/expenses/new')) {
+      actions.push({ label: 'New Expense', href: '/expenses/new', icon: 'plus', primary: false });
+    }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {actions.map((action) => {
           const Icon = getIcon(action.icon);
           return (
@@ -386,7 +404,8 @@ export default function Dashboard() {
                 <p className={`text-xs ${action.primary ? 'text-indigo-100' : 'text-slate-400'}`}>
                   {action.icon === 'clock' ? 'Review pending items' :
                    action.icon === 'receipt' ? 'View all expenses' :
-                   action.icon === 'cart' ? 'Procurement pipeline' : 'Create expense report'}
+                   action.icon === 'cart' ? 'Procurement pipeline' :
+                   action.icon === 'wallet' ? 'Process pending payments' : 'Create expense report'}
                 </p>
               </div>
               <ChevronRight className={`ml-auto h-4 w-4 ${action.primary ? 'text-indigo-200' : 'text-slate-300 dark:text-slate-600'}`} />
@@ -445,7 +464,7 @@ export default function Dashboard() {
             {user ? `Good morning, ${user.first_name || user.email.split('@')[0]}` : 'Dashboard'}
           </h1>
           <p className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">
-            Here's your financial overview for {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+            {persona.subtitle || 'Here\'s your financial overview'} for {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
         <div className="flex items-center gap-2">
