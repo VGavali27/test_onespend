@@ -296,6 +296,9 @@ VITE_APP_ENV=development
   - Clicking an item **marks it read (session-only)** via a module-scoped-read set and navigates to its `link`.
 - **Read state is session-local** (deliberate — the derived feed has no per-user `is_read` table): items stay highlighted until viewed this session/tab, then persist only for the session.
 
+### Today's Updates (2026-09-08) — Notification Fetch Resilience Fix
+- **`NotificationContext.jsx`** previously fetched count + feed in a single `Promise.all`. A failure on either (e.g. the backend `GET /notifications` 500 — see backend note) rejected the whole call, so `setCount`/`setFeed` never ran and the badge stayed at `0`. Now uses `Promise.allSettled` and updates each independently, so a feed error can never hide the count badge (and vice versa). Failures are non-fatal (existing data preserved).
+
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
 - [ ] Employments list/create pages (`/master/employments`)
