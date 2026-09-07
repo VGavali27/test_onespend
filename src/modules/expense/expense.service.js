@@ -188,22 +188,52 @@ const buildProcurementChain = async (expense, requesterIsOwner) => {
 
   const fin = (v) => (v != null ? Number(decrypt(String(v))) || null : null);
   const vendorOf = (doc) => (requesterIsOwner ? null : doc?.vendor?.name || null);
-  const handovers = await procurementRepository.findChainHandovers({ piId: pi?.id, prId: pr.id, poId: chainPo?.id });
+  const docsOf = (doc) =>
+    requesterIsOwner
+      ? [] // blind-vendor rule: a scanned quotation would reveal the supplier
+      : (doc?.documents || []).map((d) => ({
+          uuid: d.uuid,
+          original_file_name: d.original_file_name,
+          file_path: d.file_path,
+        }));
+  const mapItems = (items) =>
+    (items || []).map((it) => {
+      const s = it.get ? it.get({ plain: true }) : it;
+      return {
+        id: s.id,
+        name: s.item_name,
+        description: s.description,
+        quantity: s.quantity,
+        unit_price: fin(s.unit_price),
+        tax_rate: s.tax_rate,
+        total_with_tax: fin(s.total_with_tax),
+      };
+    });
 
   // Find the selected quotation (status = 'SELECTED')
   const selectedQuotation = (quotations || []).find(q => q.status === 'SELECTED');
 
+  // The chain's own approval journey (PI submit → approve → create PR → quotations →
+  // select → PO). Kept separate from the expense's handovers because the procurement
+  // chain runs its own lifecycle; merged chronologically on the expense detail.
+  const handovers = await procurementRepository.findChainHandovers({ piId: pi?.id, prId: pr.id, poId: chainPo?.id });
+
   return {
-    pi: pi ? { uuid: pi.uuid, document_number: pi.document_number, title: pi.title, status: pi.status, grand_total: fin(pi.grand_total) } : null,
-    pr: { uuid: pr.uuid, document_number: pr.document_number, title: pr.title, status: pr.status, vendor: vendorOf(pr), grand_total: fin(pr.grand_total) },
+    pi: pi ? { uuid: pi.uuid, document_number: pi.document_number, title: pi.title, status: pi.status, grand_total: fin(pi.grand_total), items: mapItems(pi.items) } : null,
+    // The PR predates vendor selection — it never exposes a vendor; the supplier
+    // only appears from the quotation stage onward (quotations / selected / PO).
+    pr: { uuid: pr.uuid, document_number: pr.document_number, title: pr.title, status: pr.status, vendor: null, grand_total: fin(pr.grand_total), items: mapItems(pr.items) },
     quotations: (quotations || []).map((q) => ({
       uuid: q.uuid,
       vendor: vendorOf(q),
       status: q.status,
       valid_until: q.valid_until,
+      notes: q.notes,
       total_amount: fin(q.total_amount),
       tax_amount: fin(q.tax_amount),
       grand_total: fin(q.grand_total),
+      items: mapItems(q.items),
+      documents: docsOf(q),
     })),
     // Include selected quotation with its items for display on expense detail
     selectedQuotation: selectedQuotation ? {
@@ -211,20 +241,14 @@ const buildProcurementChain = async (expense, requesterIsOwner) => {
       vendor: vendorOf(selectedQuotation),
       status: selectedQuotation.status,
       valid_until: selectedQuotation.valid_until,
+      notes: selectedQuotation.notes,
       total_amount: fin(selectedQuotation.total_amount),
       tax_amount: fin(selectedQuotation.tax_amount),
       grand_total: fin(selectedQuotation.grand_total),
-      items: (selectedQuotation.items || []).map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: fin(item.unit_price),
-        tax_rate: item.tax_rate,
-        total_with_tax: fin(item.total_with_tax),
-      })),
+      items: mapItems(selectedQuotation.items),
+      documents: docsOf(selectedQuotation),
     } : null,
-    po: chainPo ? { uuid: chainPo.uuid, document_number: chainPo.document_number, status: chainPo.status, vendor: vendorOf(chainPo), grand_total: fin(chainPo.grand_total) } : null,
+    po: chainPo ? { uuid: chainPo.uuid, document_number: chainPo.document_number, title: chainPo.title, status: chainPo.status, vendor: vendorOf(chainPo), grand_total: fin(chainPo.grand_total), items: mapItems(chainPo.items) } : null,
     handovers: (handovers || []).map((h) => {
       const p = h.get ? h.get({ plain: true }) : h;
       const u = p.actionBy?.user;
@@ -659,7 +683,7 @@ const logExpenseHandover = async ({ expenseId, fromRoleId, toRoleId, employmentI
 // handover (requester → first receiver). Used by PO auto-creation.
 // Runs inside the caller's transaction (atomic with it).
 const createProcurementExpenseRecord = async ({
-  title, companyId, requestedByEmploymentId, grandTotal, t,
+  title, companyId, requestedByEmploymentId, grandTotal, estimatedGrandTotal, t,
 }) => {
   const category = await ExpenseCategory.findOne({ where: { module: 'procurement' } });
   if (!category) throw ApiError.notFound('PROCUREMENT expense category not found');
@@ -682,7 +706,10 @@ const createProcurementExpenseRecord = async ({
       current_employment_id: null,
       status: 'SUBMITTED',
       submitted_at: new Date(),
-      estimated_amount: grandTotal,
+      // estimated_amount = the PR's total (the pre-quotation estimate); final_amount
+      // = the PO's grand total (= the SELECTED quotation's price, the committed amount).
+      estimated_amount: estimatedGrandTotal,
+      final_amount: grandTotal,
     },
     { transaction: t },
   );
@@ -704,14 +731,15 @@ const createProcurementExpenseRecord = async ({
 // Create the expense that backs a procurement PO. Called inside createPo's
 // transaction so the PO + expense commit atomically.
 // The PO is updated with expense_id after the expense is created (in procurement service).
-export const createProcurementExpense = async ({ po, t }) =>
+export const createProcurementExpense = async ({ po, pr, t }) =>
   createProcurementExpenseRecord({
     title: po.title,
     companyId: po.company_id,
     requestedByEmploymentId: po.requested_by_employment_id,
-    // po.grand_total is already the AES ciphertext (the PO model's beforeCreate hook
-    // encrypts amount fields, mutating the in-memory instance). Decrypt it back to the
-    // plaintext so the expense hook encrypts it exactly once.
+    // Amounts here are AES ciphertext: pr.grand_total is read from the DB, and
+    // po.grand_total was already encrypted in-memory by the PO model's beforeCreate
+    // hook. Decrypt both once so the expense hook encrypts exactly once.
+    estimatedGrandTotal: pr?.grand_total != null ? decrypt(String(pr.grand_total)) : null,
     grandTotal: po.grand_total != null ? decrypt(String(po.grand_total)) : null,
     t,
   });
@@ -801,8 +829,10 @@ export const approve = async (uuid, user, remarks, toRoleId = null) => {
           finalAmount = (reim.items || []).reduce((s, x) => s + (Number(decrypt(String(x.total_amount || '0'))) || 0), 0);
         }
       } else if (category.module === 'procurement') {
-        // For procurement-linked expenses, final_amount = estimated_amount (set from PO grand total at creation)
-        finalAmount = Number(decrypt(String(expense.estimated_amount || '0')));
+        // The final amount was already set at PO creation (the selected quotation's
+        // total) — keep it. Fall back to estimated_amount only for legacy rows that
+        // predate the field.
+        finalAmount = Number(decrypt(String(expense.final_amount || expense.estimated_amount || '0')));
       }
 
       const initialPaymentStatus = computePaymentStatus([], finalAmount, advanceAmount);

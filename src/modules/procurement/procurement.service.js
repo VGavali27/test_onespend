@@ -296,11 +296,16 @@ export const getByUuid = async (uuid, user) => {
   const chain = await procurementRepository.findByUuidWithChain(uuid);
   if (chain) {
     const toPlain = (v) => (v?.get ? v.get({ plain: true }) : v);
-    const dec = (v) => (v ? (decryptRequest(v), decryptQuotations(v.quotations), v) : null);
+    const dec = (v) => (v ? (decryptRequest(v), decryptItems(v.items), decryptQuotations(v.quotations), v) : null);
     chain.pi = dec(toPlain(chain.pi));
     chain.pr = dec(toPlain(chain.pr));
     chain.po = dec(toPlain(chain.po));
     chain.quotations = decryptQuotations((chain.quotations || []).map((q) => (q.get ? q.get({ plain: true }) : q)));
+    // The PR stage predates vendor selection — its card never exposes the vendor.
+    if (chain.pr) {
+      chain.pr.vendor_id = null;
+      chain.pr.vendor = null;
+    }
     // hide vendors from the requester across the whole chain
     if (plain.is_requester) {
       [chain.pi, chain.pr, chain.po].forEach((v) => {
@@ -624,6 +629,8 @@ export const selectQuotation = async (uuid, user, quotationUuid) => {
 
   return sequelize.transaction(async (t) => {
     await quotation.update({ status: 'SELECTED' }, { transaction: t });
+    // The PR keeps its own line-item totals (it is the pre-quotation estimate) —
+    // only the PO (and its auto-created expense) stream the chosen quotation's prices.
     await pr.update(
       {
         status: 'QUOTATION_APPROVED',
@@ -636,7 +643,8 @@ export const selectQuotation = async (uuid, user, quotationUuid) => {
     await logHandover({
       type: 'PR', docId: pr.id, actionType: 'SELECT_QUOTATION',
       fromRoleId: null, toRoleId: ROLE_IDS.ADMIN_MGR,
-      employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
+      employmentId: actorEmployment?.id, remarks: null,
+      amount: quotation.grand_total != null ? decrypt(String(quotation.grand_total)) : null, t,
     });
     return procurementRepository.findByUuid(uuid, t);
   });
@@ -745,6 +753,10 @@ export const createPr = async (uuid, user) => {
   const documentNumber = await generateDocumentNumber('PR');
 
   return sequelize.transaction(async (t) => {
+    // PR line items are copies of the PI's; the PR header totals are recomputed
+    // server-side from those copied items (never inherited from the PI header row).
+    const copiedItems = copyItems(pi.items);
+    const totals = computeTotals(copiedItems);
     const pr = await ProcurementRequest.create(
       {
         document_number: documentNumber,
@@ -758,15 +770,14 @@ export const createPr = async (uuid, user) => {
         current_role_id: null,
         current_employment_id: null,
         requested_by_employment_id: pi.requested_by_employment_id,
-        total_amount: pi.total_amount != null ? decrypt(String(pi.total_amount)) : null,
-        tax_amount: pi.tax_amount != null ? decrypt(String(pi.tax_amount)) : null,
-        grand_total: pi.grand_total != null ? decrypt(String(pi.grand_total)) : null,
+        total_amount: totals.total_amount,
+        tax_amount: totals.tax_amount,
+        grand_total: totals.grand_total,
         expected_delivery_date: pi.expected_delivery_date,
         notes: pi.notes,
       },
       { transaction: t },
     );
-    const copiedItems = copyItems(pi.items);
     if (copiedItems.length) {
       await db.ProcurementItem.bulkCreate(
         copiedItems.map((it, i) => ({ ...it, pr_id: pr.id, sort_order: i })),
@@ -806,6 +817,21 @@ export const createPo = async (uuid, user) => {
       transaction: t,
     });
 
+    // Source of truth for the PO header totals: the SELECTED quotation (fallback:
+    // PR). The PI estimate must not leak through — the quoted price is what the
+    // buyer committed to, and the auto-created expense inherits this grand total.
+    const sourceTotals = selectedQuotation
+      ? {
+          total_amount: selectedQuotation.total_amount != null ? decrypt(String(selectedQuotation.total_amount)) : null,
+          tax_amount: selectedQuotation.tax_amount != null ? decrypt(String(selectedQuotation.tax_amount)) : null,
+          grand_total: selectedQuotation.grand_total != null ? decrypt(String(selectedQuotation.grand_total)) : null,
+        }
+      : {
+          total_amount: pr.total_amount != null ? decrypt(String(pr.total_amount)) : null,
+          tax_amount: pr.tax_amount != null ? decrypt(String(pr.tax_amount)) : null,
+          grand_total: pr.grand_total != null ? decrypt(String(pr.grand_total)) : null,
+        };
+
     const po = await ProcurementOrder.create(
       {
         document_number: documentNumber,
@@ -817,9 +843,9 @@ export const createPo = async (uuid, user) => {
         current_role_id: ROLE_IDS.ADMIN_MGR,
         current_employment_id: null,
         requested_by_employment_id: pr.requested_by_employment_id,
-        total_amount: pr.total_amount != null ? decrypt(String(pr.total_amount)) : null,
-        tax_amount: pr.tax_amount != null ? decrypt(String(pr.tax_amount)) : null,
-        grand_total: pr.grand_total != null ? decrypt(String(pr.grand_total)) : null,
+        total_amount: sourceTotals.total_amount,
+        tax_amount: sourceTotals.tax_amount,
+        grand_total: sourceTotals.grand_total,
         expected_delivery_date: pr.expected_delivery_date,
         notes: pr.notes,
       },
@@ -838,11 +864,11 @@ export const createPo = async (uuid, user) => {
     await logHandover({
       type: 'PO', docId: po.id, actionType: 'CREATE_PO',
       fromRoleId: ROLE_IDS.ADMIN_MGR, toRoleId: null,
-      employmentId: actorEmployment?.id, remarks: null, amount: plainGrandTotal(pr), t,
+      employmentId: actorEmployment?.id, remarks: null, amount: sourceTotals.grand_total, t,
     });
     // Create the expense linked to this PO — same transaction, atomic.
     // The expense is the parent; we set expense_id on the PO after creating it.
-    const expense = await expenseService.createProcurementExpense({ po, t });
+    const expense = await expenseService.createProcurementExpense({ po, pr, t });
     await po.update({ expense_id: expense.id }, { transaction: t });
     return procurementRepository.findByUuid(po.uuid, t);
   });

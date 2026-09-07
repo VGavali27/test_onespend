@@ -255,8 +255,15 @@ export const findByUuidWithChain = async (uuid) => {
 
   const chain = { type, pi: null, pr: null, quotations: [], po: null };
 
+  // Each stage document carries its own line items so a tabbed detail view can
+  // render every stage's stored data (not just printable totals).
+  const chainItems = { model: ProcurementItem, as: 'items' };
+  const piChainInclude = [...baseListInclude, chainItems];
+  const prChainInclude = withVendor([...baseListInclude, chainItems]);
+  const poChainInclude = withVendor([...baseListInclude, chainItems]);
+
   if (type === 'PI') {
-    chain.pi = await ProcurementIntention.findOne({ where: { uuid }, include: baseListInclude });
+    chain.pi = await ProcurementIntention.findOne({ where: { uuid }, include: piChainInclude });
     const pr = await ProcurementRequest.findOne({
       where: { pi_id: chain.pi?.id },
       include: withVendor([{ model: ProcurementQuotation, as: 'quotations', include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }] }]),
@@ -264,29 +271,29 @@ export const findByUuidWithChain = async (uuid) => {
     if (pr) {
       chain.pr = pr;
       chain.quotations = pr.quotations || [];
-      const po = await ProcurementOrder.findOne({ where: { pr_id: pr.id }, include: withVendor(baseListInclude) });
+      const po = await ProcurementOrder.findOne({ where: { pr_id: pr.id }, include: poChainInclude });
       chain.po = po;
     }
   } else if (type === 'PR') {
-    const pr = await ProcurementRequest.findOne({ where: { uuid }, include: withVendor(baseListInclude) });
+    const pr = await ProcurementRequest.findOne({ where: { uuid }, include: prChainInclude });
     chain.pr = pr;
     chain.quotations = await ProcurementQuotation.findAll({
       where: { pr_id: pr?.id },
       include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
     });
-    if (pr?.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
-    chain.po = await ProcurementOrder.findOne({ where: { pr_id: pr?.id }, include: withVendor(baseListInclude) });
+    if (pr?.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: piChainInclude });
+    chain.po = await ProcurementOrder.findOne({ where: { pr_id: pr?.id }, include: poChainInclude });
   } else {
-    const po = await ProcurementOrder.findOne({ where: { uuid }, include: withVendor(baseListInclude) });
+    const po = await ProcurementOrder.findOne({ where: { uuid }, include: poChainInclude });
     chain.po = po;
     if (po?.pr_id) {
-      const pr = await ProcurementRequest.findOne({ where: { id: po.pr_id }, include: withVendor(baseListInclude) });
+      const pr = await ProcurementRequest.findOne({ where: { id: po.pr_id }, include: prChainInclude });
       chain.pr = pr;
       chain.quotations = await ProcurementQuotation.findAll({
         where: { pr_id: po.pr_id },
         include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
       });
-      if (pr?.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
+      if (pr?.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: piChainInclude });
     }
   }
 
@@ -294,18 +301,34 @@ export const findByUuidWithChain = async (uuid) => {
 };
 
 // Chain (PI → PR → quotations → PO) rooted at a PR id — used by the expense detail
-// to render the procurement history behind a PO-created / converted expense.
+// to render the procurement history behind a PO-created / converted expense. Each
+// document carries its own line items so every stage's stored data is showable.
 export const findChainByPrId = async (prId) => {
   if (prId == null) return null;
-  const pr = await ProcurementRequest.findOne({ where: { id: prId }, include: withVendor(baseListInclude) });
+  const pr = await ProcurementRequest.findOne({
+    where: { id: prId },
+    include: [...withVendor(baseListInclude), { model: ProcurementItem, as: 'items' }],
+  });
   if (!pr) return null;
   const chain = { type: 'PR', pi: null, pr, quotations: [], po: null };
-  if (pr.pi_id) chain.pi = await ProcurementIntention.findOne({ where: { id: pr.pi_id }, include: baseListInclude });
+  if (pr.pi_id) {
+    chain.pi = await ProcurementIntention.findOne({
+      where: { id: pr.pi_id },
+      include: [...baseListInclude, { model: ProcurementItem, as: 'items' }],
+    });
+  }
   chain.quotations = await ProcurementQuotation.findAll({
     where: { pr_id: pr.id },
-    include: [{ model: Vendor, as: 'vendor' }, { model: ProcurementItem, as: 'items' }],
+    include: [
+      { model: Vendor, as: 'vendor' },
+      { model: ProcurementItem, as: 'items' },
+      { model: ProcurementDocument, as: 'documents' },
+    ],
   });
-  chain.po = await ProcurementOrder.findOne({ where: { pr_id: pr.id }, include: withVendor(baseListInclude) });
+  chain.po = await ProcurementOrder.findOne({
+    where: { pr_id: pr.id },
+    include: [...withVendor(baseListInclude), { model: ProcurementItem, as: 'items' }],
+  });
   return chain;
 };
 
