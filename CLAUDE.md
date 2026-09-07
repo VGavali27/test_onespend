@@ -366,6 +366,10 @@ Zero new tables/migrations — the bell feed is **computed live** from the exist
 - **Activity feed** = recent `expense_handovers`/`procurement_handovers` where `to_role_id = my role`, company-scoped; enabled only for manager/global roles. Procurement handovers are resolved to their parent header (PI/PR/PO via `pi_id`/`pr_id`/`po_id`) so they deep-link correctly.
 - Scope/role/company helpers mirror `expense.service.js` (`EXPENSE_GLOBAL_ROLES`/`EXPENSE_MANAGER_ROLES`, imported) and `procurement.service.js` (`GLOBAL_ROLES`/`MANAGER_ROLES`, duplicated here).
 
+### Today's Updates (2026-09-08) — Notification Feed Bugfix
+- **Fixed `ReferenceError: expenseRoleIds is not defined`** in `notification.service.js` expense-activity feed. A cleanup pass removed the `expenseRoleIds` variable but left the reference at line 136; it should be `roleId` (the logged-in user's role). This made `GET /notifications` (the dropdown feed) throw a 500 for manager/global roles (e.g. CFO), and — because the frontend originally fetched count and feed in one `Promise.all` — a feed error also blanked the count badge to 0.
+- Lesson for future edits: when a helper/repositories cleanup deletes a variable, grep the whole file for stale references before committing.
+
 ## Pending Improvements (future backlog)
 
 > Cross-cutting ideas for hardening, observability, and finishing the payment/logging work. Pick up in rough priority order.
