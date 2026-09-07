@@ -6,7 +6,8 @@ const NotificationContext = createContext(null);
 
 // How often (ms) to poll the backend for the unread count + feed. Polling (rather than
 // SSE) keeps this dependency-free; approved for this no-table, derived feed.
-const POLL_INTERVAL = 30000;
+// 150s = 2.5 min — tuned so the bell stays reasonably fresh without spamming api.log.
+const POLL_INTERVAL = 150000;
 
 export function NotificationProvider({ children }) {
   const { isAuthenticated } = useAuth();
