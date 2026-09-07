@@ -13,6 +13,17 @@ export const getAllProcurements = async (req, res, next) => {
   }
 };
 
+export const getAssignedProcurements = async (req, res, next) => {
+  try {
+    const result = await procurementService.getAssigned(req.user, req.query);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
+    return ApiResponse.paginated(res, result.rows, { page, limit, total: result.total });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getProcurementByUuid = async (req, res, next) => {
   try {
     const doc = await procurementService.getByUuid(req.params.uuid, req.user);

@@ -1,7 +1,7 @@
 /**
  * Seeder: Assign permissions to roles
  *
- * Permission IDs:  100-177 (78 permissions covering all modules)
+ * Permission IDs:  100-178 (79 permissions covering all modules)
  * Role IDs from 20260724000002-seed-roles:
  *   100 - SUPER_ADMIN
  *   101 - CFO
@@ -23,6 +23,8 @@ const rolePermissions = [
   ...Array.from({ length: 77 }, (_, i) => [100, 100 + i]),
   // SUPER_ADMIN (100) - system logs viewer (177) — SUPER_ADMIN only
   [100, 177],
+  // SUPER_ADMIN (100) - procurement reject (178)
+  [100, 178],
 
   // CFO (101)
   [101, 100], [101, 101], [101, 102], [101, 103],
@@ -34,6 +36,8 @@ const rolePermissions = [
   [101, 155], [101, 156], [101, 157], [101, 158],
   [101, 159], [101, 160], [101, 161], [101, 162],
   [101, 164], [101, 165], [101, 166], [101, 176],
+  // CFO (101) - procurement reject (178)
+  [101, 178],
 
   // PAYMENT_MGR (102)
   [102, 105], [102, 107], [102, 110], [102, 112],
@@ -44,6 +48,8 @@ const rolePermissions = [
   [102, 162], [102, 164], [102, 165], [102, 166],
   [102, 168], [102, 170], [102, 171], [102, 172],
   [102, 173], [102, 174], [102, 175], [102, 176],
+  // PAYMENT_MGR (102) - procurement reject (178)
+  [102, 178],
 
   // PAYMENT_JR (103)
   [103, 150], [103, 151], [103, 152], [103, 153],
@@ -61,6 +67,8 @@ const rolePermissions = [
   [104, 165], [104, 166], [104, 168], [104, 169],
   [104, 170], [104, 171], [104, 172], [104, 173],
   [104, 174], [104, 175], [104, 176],
+  // FINANCE_MGR (104) - procurement reject (178)
+  [104, 178],
 
   // FINANCE_JR (105)
   [105, 151], [105, 152], [105, 153], [105, 154],
@@ -83,6 +91,8 @@ const rolePermissions = [
   [106, 166], [106, 168], [106, 169], [106, 170],
   [106, 171], [106, 172], [106, 173], [106, 174],
   [106, 175], [106, 176],
+  // ADMIN_MGR (106) - procurement reject (178)
+  [106, 178],
 
   // ADMIN_JR (107)
   [107, 100], [107, 102], [107, 105], [107, 107],

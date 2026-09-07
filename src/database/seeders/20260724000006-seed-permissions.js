@@ -802,7 +802,18 @@ export async function up({ context }) {
       resource: 'procurement',
       action: 'approve',
       permission_key: 'procurement:approve',
-      description: 'Approve or reject procurement documents',
+      description: 'Approve procurement documents',
+      status: 'ACTIVE',
+      created_at: new Date(),
+      updated_at: new Date(),
+    },
+    {
+      id: 178,
+      uuid: 'f1a2b3c4-d5e6-7890-fabc-123456789079',
+      resource: 'procurement',
+      action: 'reject',
+      permission_key: 'procurement:reject',
+      description: 'Reject procurement documents',
       status: 'ACTIVE',
       created_at: new Date(),
       updated_at: new Date(),
@@ -869,7 +880,7 @@ export async function down({ context }) {
   return context.bulkDelete(
     'permissions',
     {
-      id: Array.from({ length: 78 }, (_, i) => 100 + i),
+      id: Array.from({ length: 79 }, (_, i) => 100 + i),
     },
     {},
   );

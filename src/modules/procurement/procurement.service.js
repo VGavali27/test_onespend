@@ -211,7 +211,46 @@ const copyItems = (sourceItems = []) =>
     });
   });
 
-// ── List / detail ──
+// ── List / detail / assigned ──
+
+// Documents pending the logged-in user's role for approval / action.
+// Mirrors the expense module's GET /expenses/assigned pattern.
+export const getAssigned = async (user, params = {}) => {
+  const employmentIds = await getEmploymentIdsByUser(user.userId);
+  const companyIds = await getActiveCompanyIdsByUser(user.userId);
+
+  const role = await findRoleByCode(user.roleCode);
+  if (!role) return { rows: [], total: 0 };
+
+  // Base visibility scope (same as getVisible)
+  let scopeWhere = {};
+  if (GLOBAL_ROLES.includes(user.roleCode)) {
+    scopeWhere = {};
+  } else if (MANAGER_ROLES.includes(user.roleCode)) {
+    if (companyIds.length === 0) return { rows: [], total: 0 };
+    scopeWhere = { company_id: { [Op.in]: companyIds } };
+  } else {
+    if (employmentIds.length === 0) return { rows: [], total: 0 };
+    scopeWhere = { requested_by_employment_id: { [Op.in]: employmentIds } };
+  }
+
+  // Only documents where the user's role is the current handler
+  const combinedWhere = {
+    [Op.and]: [
+      scopeWhere,
+      { current_role_id: role.id },
+    ],
+  };
+
+  let result = await procurementRepository.findAll(combinedWhere, params);
+
+  result.rows = (result.rows || []).map((r) => {
+    decryptRequest(r);
+    maskVendorForRequester(r, employmentIds);
+    return r;
+  });
+  return result;
+};
 
 export const getVisible = async (user, params = {}) => {
   const employmentIds = await getEmploymentIdsByUser(user.userId);

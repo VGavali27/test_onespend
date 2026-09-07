@@ -16,7 +16,8 @@ import {
 const router = Router();
 router.use(authMiddleware);
 
-// List procurement documents (role-scoped) / detail
+// List procurement documents (role-scoped) / assigned / detail
+router.get('/assigned', requirePermission('procurement:approve'), procurementController.getAssignedProcurements);
 router.get('/', requirePermission('procurement:read_all'), procurementController.getAllProcurements);
 router.get('/:uuid', requirePermission('procurement:read'), procurementController.getProcurementByUuid);
 
@@ -44,7 +45,7 @@ router.post('/:uuid/select-quotation', requirePermission('procurement:approve'),
 // Workflow actions
 router.post('/:uuid/submit', requirePermission('procurement:create'), validate(actionSchema), procurementController.submitProcurement);
 router.post('/:uuid/approve', requirePermission('procurement:approve'), validate(actionSchema), procurementController.approveProcurement);
-router.post('/:uuid/reject', requirePermission('procurement:approve'), validate(actionSchema), procurementController.rejectProcurement);
+router.post('/:uuid/reject', requirePermission('procurement:reject'), validate(actionSchema), procurementController.rejectProcurement);
 router.post('/:uuid/create-pr', requirePermission('procurement:po'), procurementController.createPr);
 router.post('/:uuid/create-po', requirePermission('procurement:po'), procurementController.createPo);
 // router.post('/:uuid/create-po', requireRole('SUPER_ADMIN', 'ADMIN_MGR'), (req,res)=>{
