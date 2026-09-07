@@ -2,7 +2,9 @@ import logger from '../utils/logger.js';
 
 // Paths whose own request traffic should NOT be written to api.log, otherwise
 // viewing the logs page would fill the API log with its own GET /system/logs* calls.
-const SKIP_PREFIXES = ['/api/v1/system/logs'];
+// Notifications are also excluded because the bell polls count + feed every 30s,
+// which would spam api.log with near-identical GET /notifications* lines.
+const SKIP_PREFIXES = ['/api/v1/system/logs', '/api/v1/notifications'];
 
 // Log every incoming API request at http level: method, path, status, duration,
 // and (when available) the acting user.
