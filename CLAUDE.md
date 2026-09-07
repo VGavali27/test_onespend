@@ -287,6 +287,15 @@ VITE_APP_ENV=development
 - **Menu item** — added "Approvals" to the procurement children in `src/data/menuConfig.js`, shown only to roles holding `procurement:approve`.
 - **`procurementService.js`** — added `getAssignedProcurements({ page, type, status })`.
 
+### Today's Updates (2026-09-08) — Real Notification Bell (derived feed, no table)
+- **`src/services/notificationService.js`** — `getNotificationCount()` → `GET /notifications/count`, `getNotifications(params)` → `GET /notifications`.
+- **`src/context/NotificationContext.jsx`** — wraps the app **inside** `AuthProvider`; exposes `{ count, feed, loading, refresh }`. Polls `GET /notifications/count` + `GET /notifications` every **30s**, on window **focus**, and on login; clears on logout. Wired into `App.jsx`.
+- **`Navbar.jsx`** — the placeholder bell (hardcoded array) is replaced with real data:
+  - The static red dot is now a live **count badge** (indigo badge `0`-hidden, `99+` cap) from `count.total`.
+  - Dropdown renders the merged **feed** (expense/procurement/payment icons via `KIND_ICON`, ref + status + ₹amount, relative `timeAgo`), an empty state ("You're all caught up"), a "pending" counter, and a **View all** link → `/expenses/assigned`.
+  - Clicking an item **marks it read (session-only)** via a module-scoped-read set and navigates to its `link`.
+- **Read state is session-local** (deliberate — the derived feed has no per-user `is_read` table): items stay highlighted until viewed this session/tab, then persist only for the session.
+
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
 - [ ] Employments list/create pages (`/master/employments`)
