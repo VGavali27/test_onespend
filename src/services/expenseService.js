@@ -12,8 +12,9 @@ export const getAssignedExpenses = (params, config) =>
 export const getMyExpenses = (params, config) =>
   api.get('/expenses/my', { ...config, params: { decrypt: 'true', ...params } });
 export const getExpenseById = (uuid) => api.get(`/expenses/${uuid}`, { params: { decrypt: 'true' } });
-// Lazy-load the source procurement chain (PI → PR → quotations → PO + approval logs) —
-// called when the user expands the "Procurement history" section on the expense detail.
+// Eagerly load the source procurement chain (PI → PR → quotations → PO + approval logs) —
+// called on mount for procurement-linked expenses so the detail's stage tabs (PI/PR/Quotes/PO)
+// and the Approvals tab's merged timeline are ready.
 export const getExpenseProcurementChain = (uuid) => api.get(`/expenses/${uuid}/procurement-chain`);
 export const createExpense = (payload) => api.post('/expenses', payload);
 export const updateExpense = (uuid, payload) => api.put(`/expenses/${uuid}`, payload);
@@ -181,10 +182,10 @@ export const normalizeExpense = (e) => {
       from_role: h.fromRole?.name,
       to_role: h.toRole?.name,
       action_by: employmentName(h.actionBy),
-      at: h.created_at,
+      at: h.created_at ?? h.createdAt,
     })),
     // Is this expense tied to a procurement chain? (PO-created or converted) — gates the
-    // "Procurement history" toggle on the detail; the chain itself is lazy-loaded on expand.
+    // PI/PR/Quotations/PO stage tabs on the expense detail; the chain is eagerly loaded on mount.
     // The expense is the parent; the linked PO has expense_id FK. Check for procurementOrder.
     isProcurement: Boolean(e.procurementOrder),
     documents: (e.documents || []).map((d) => ({ name: d.original_file_name })),

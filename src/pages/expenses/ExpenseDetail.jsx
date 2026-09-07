@@ -18,9 +18,7 @@ import {
   Inbox,
   Loader2,
   ShoppingCart,
-  History,
   Eye,
-  ChevronDown,
   Edit,
   Upload,
   Info,
@@ -84,6 +82,7 @@ export default function ExpenseDetail() {
   const [selectedPaymentHandoverRoleId, setSelectedPaymentHandoverRoleId] = useState(null);
   const [paymentHandoverRemarks, setPaymentHandoverRemarks] = useState("");
   const [actingPaymentHandover, setActingPaymentHandover] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview"); // 'overview' | 'approvals' | 'payments'
   const toast = useToast();
 
   const loadExpense = useCallback(async () => {
@@ -300,6 +299,27 @@ export default function ExpenseDetail() {
         .join(" ") || submittedBy.email
     : null;
 
+  // Top-level tabs — procurement stages (PI → PR → Quotations → PO) appear between
+  // Overview and Approvals only for procurement-linked expenses.
+  const tabs = [
+    { id: "overview", label: "Overview", icon: Info },
+    ...(expense.isProcurement
+      ? [
+          { id: "pi", label: "Purchase Intent", icon: Send },
+          { id: "pr", label: "Purchase Request", icon: FileText },
+          {
+            id: "quotes",
+            label: "Quotations",
+            icon: ReceiptText,
+            count: (procurementChain?.quotations || []).length,
+          },
+          { id: "po", label: "Purchase Order", icon: ShoppingCart },
+        ]
+      : []),
+    { id: "approvals", label: "Approvals", icon: ArrowRightLeft },
+    { id: "payments", label: "Payments", icon: Banknote },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <DetailHeader
@@ -337,195 +357,41 @@ export default function ExpenseDetail() {
         </div>
       </div>
 
-      {/* Role-aware actions — Submit for DRAFT (creator only), Edit+Resubmit for REJECTED (creator only), or Approve/Reject for SUBMITTED (current handler or SUPER_ADMIN). */}
-      {expense.status === "DRAFT" && expense.canEdit && (
-        <div className="flex flex-wrap items-center gap-2">
-          <ActionButton
-            icon={Send}
-            label="Submit expense"
-            tone="primary"
-            disabled={acting}
-            onClick={() => setConfirmAction("submit")}
-          />
-          <span className="text-[12px] text-slate-400">
-            This expense is still a draft — submit it to send it to the first
-            approver.
-          </span>
-        </div>
-      )}
+      {/* Tabs — Overview [PI | PR | Quotations | PO] Approvals Payments.
+          flex-wrap (not overflow-x-auto) so the tab strip reflows to multiple rows
+          on narrow screens instead of forcing a horizontal scrollbar. */}
+      <div className="flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 dark:bg-gray-800 p-1">
+        {tabs.map((t) => {
+          const active = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-semibold transition-colors ${active
+                ? "bg-white dark:bg-gray-900 text-slate-900 dark:text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              }`}
+            >
+              <t.icon className="h-4 w-4" />
+              {t.label}
+              {t.count != null && (
+                <span className="text-[11px] text-slate-400">({t.count})</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-      {expense.status === "REJECTED" && expense.canEdit && (
-        <div className="flex flex-wrap items-center gap-2">
-          <ActionButton
-            icon={Edit}
-            label="Edit expense"
-            tone="secondary"
-            disabled={acting}
-            onClick={() => navigate(`/expenses/${expense.uuid}/edit`)}
-          />
-          <ActionButton
-            icon={Loader2}
-            label="Resubmit for approval"
-            tone="primary"
-            disabled={acting}
-            onClick={() => setConfirmAction("resubmit")}
-          />
-          <span className="text-[12px] text-slate-400">
-            Expense was rejected — edit if needed, then resubmit to send it through the approval flow again.
-          </span>
-        </div>
-      )}
-
-      {expense.status === "SUBMITTED" &&
-        (user?.role === "SUPER_ADMIN" ||
-          user?.role === expense.currentRole?.code) && (
-          <div className="flex flex-wrap items-center gap-2">
-            <ActionButton
-              icon={CheckCircle2}
-              label="Approve"
-              tone="success"
-              disabled={acting}
-              onClick={handleApproveClick}
-            />
-            <ActionButton
-              icon={XCircle}
-              label="Reject"
-              tone="danger"
-              disabled={acting}
-              onClick={() => setConfirmAction("reject")}
-            />
-            {(expense.currentRole?.name || expense.currentRole?.code) && (
-              <span className="text-[12px] text-slate-400">
-                Current handler:{" "}
-                {expense.currentRole.name || expense.currentRole.code}
-              </span>
-            )}
-          </div>
-        )}
-
-      {/* Payments — shown once the expense is APPROVED (final approver closed it). Only
-          roles with the expenses:pay permission can record new payments. */}
-      {(expense.status === "APPROVED" || expense.status === "PAID") && (
-        <PaymentSection
-          expense={expense}
-          canPay={canPay}
-          isCurrentHandler={isCurrentHandler}
-          payments={payments}
-          summary={paymentSummary}
-          loading={loadingPayments}
-          onRecord={() => setShowPaymentModal(true)}
-        />
-      )}
-
-      {/* Payment handover — shown to the requester (current holder) when the expense is
-          APPROVED/PAID and not yet settled, regardless of expenses:pay. Both buttons show. */}
-      {(expense.status === "APPROVED" || expense.status === "PAID") &&
-        isCurrentHandler &&
-        !["SETTLED", "PAID"].includes(expense.payment_status) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {canPay && (
-              <ActionButton
-                icon={Banknote}
-                label="Record Payment"
-                tone="success"
-                disabled={acting}
-                onClick={() => setShowPaymentModal(true)}
-              />
-            )}
-            <ActionButton
-              icon={ArrowRightLeft}
-              label="Handover for Payment"
-              tone="primary"
-              disabled={acting}
-              onClick={() => {
-                setSelectedPaymentHandoverRoleId(null);
-                setPaymentHandoverRemarks("");
-                loadPaymentHandoverRoles();
-                setShowPaymentHandoverModal(true);
-              }}
-            />
-            <span className="text-[12px] text-slate-400">
-              This expense needs payment processing.
-            </span>
-          </div>
-        )}
-
-      {/* Record payment modal — amount + method + date + type + optional proofs */}
-      {showPaymentModal && (
-        <RecordPaymentModal
-          expense={expense}
-          summary={paymentSummary}
-          onClose={() => setShowPaymentModal(false)}
-          onSaved={async () => {
-            setShowPaymentModal(false);
-            await refreshPayments();
-            await loadExpense();
-          }}
-        />
-      )}
-
-      {/* Handover for payment modal — requester forwards to a payment-eligible role */}
-      {showPaymentHandoverModal && (
-        <PaymentHandoverModal
-          expense={expense}
-          roles={paymentHandoverRoles}
-          loading={loadingPaymentHandoverRoles}
-          acting={actingPaymentHandover}
-          selectedRoleId={selectedPaymentHandoverRoleId}
-          onSelectRole={setSelectedPaymentHandoverRoleId}
-          remarks={paymentHandoverRemarks}
-          onRemarksChange={setPaymentHandoverRemarks}
-          onClose={() => setShowPaymentHandoverModal(false)}
-          onSave={handlePaymentHandover}
-        />
-      )}
-
+      {/* === Overview tab: expense details, line items, procurement history, documents === */}
+      {activeTab === "overview" && (
+        <>
       {/* Info cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <InfoCard icon={Wallet} title="Expense">
-          <InfoRow label="Expense number" value={expense.expense_number} />
-          <InfoRow
-            label="Category"
-            value={<CategoryBadge name={expense.category?.name} />}
-          />
-          <InfoRow label="Company" value={expense.company?.name || "—"} />
-          <InfoRow
-            label="Submitted by"
-            value={
-              submittedBy ? (
-                <button
-                  type="button"
-                  onClick={() => setViewUser(expense.requestedByEmployment)}
-                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
-                  title="View user details"
-                >
-                  {submittedByName}
-                </button>
-              ) : (
-                "—"
-              )
-            }
-          />
-          <InfoRow
-            label="Status"
-            value={<StatusBadge status={expense.status} />}
-          />
-          <InfoRow
-            label="Submitted"
-            value={
-              expense.submitted_at ? formatDate(expense.submitted_at) : "-"
-            }
-          />
-          <InfoRow
-            label="Created"
-            value={formatDate(expense.createdAt ?? expense.created_at)}
-          />
-          <InfoRow
-            label="Last updated"
-            value={formatDate(expense.updatedAt ?? expense.updated_at)}
-          />
-          <InfoRow label="Remarks" value={expense.remarks || "—"} />
-        </InfoCard>
+        <ExpenseContextCard
+          expense={expense}
+          submittedByName={submittedByName}
+          onViewUser={() => setViewUser(expense.requestedByEmployment)}
+        />
 
         {travel ? (
           <InfoCard icon={Plane} title="Travel">
@@ -1006,19 +872,6 @@ export default function ExpenseDetail() {
         </TravelSection>
       )}
 
-      {/* Selected Quotation — always visible above procurement history for procurement expenses */}
-      {expense.isProcurement && procurementChain?.selectedQuotation && (
-        <SelectedQuotationDisplay quotation={procurementChain.selectedQuotation} />
-      )}
-
-      {/* Procurement history — collapsible; chain is pre-loaded */}
-      {expense.isProcurement && (
-        <ProcurementHistorySection expense={expense} chain={procurementChain} loading={loadingChain} />
-      )}
-
-      {/* Approval trail */}
-      <ApprovalTrail handovers={expense.handovers} />
-
       {/* Documents */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
         <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
@@ -1053,6 +906,226 @@ export default function ExpenseDetail() {
           )}
         </div>
       </div>
+        </>
+      )}
+
+      {/* === Purchase Intent tab (procurement-linked expenses only) === */}
+      {activeTab === "pi" && (
+        <ProcurementStage loading={loadingChain} available={Boolean(procurementChain)}>
+          <ProcurementDocCard title="Purchase Intention" doc={procurementChain?.pi} />
+        </ProcurementStage>
+      )}
+
+      {/* === Purchase Request tab === */}
+      {activeTab === "pr" && (
+        <ProcurementStage loading={loadingChain} available={Boolean(procurementChain)}>
+          <ProcurementDocCard title="Purchase Request" doc={procurementChain?.pr} />
+        </ProcurementStage>
+      )}
+
+      {/* === Quotations tab === */}
+      {activeTab === "quotes" && (
+        <ProcurementStage loading={loadingChain} available={Boolean(procurementChain)}>
+          <QuotationsTab chain={procurementChain} />
+        </ProcurementStage>
+      )}
+
+      {/* === Purchase Order tab === */}
+      {activeTab === "po" && (
+        <ProcurementStage loading={loadingChain} available={Boolean(procurementChain)}>
+          <ProcurementDocCard title="Purchase Order" doc={procurementChain?.po} />
+        </ProcurementStage>
+      )}
+
+      {/* === Approvals tab: workflow actions + approval trail timeline === */}
+      {activeTab === "approvals" && (
+        <>
+          {expense.status === "DRAFT" && expense.canEdit && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
+                icon={Send}
+                label="Submit expense"
+                tone="primary"
+                disabled={acting}
+                onClick={() => setConfirmAction("submit")}
+              />
+              <span className="text-[12px] text-slate-400">
+                This expense is still a draft — submit it to send it to the first
+                approver.
+              </span>
+            </div>
+          )}
+
+          {expense.status === "REJECTED" && expense.canEdit && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
+                icon={Edit}
+                label="Edit expense"
+                tone="secondary"
+                disabled={acting}
+                onClick={() => navigate(`/expenses/${expense.uuid}/edit`)}
+              />
+              <ActionButton
+                icon={Loader2}
+                label="Resubmit for approval"
+                tone="primary"
+                disabled={acting}
+                onClick={() => setConfirmAction("resubmit")}
+              />
+              <span className="text-[12px] text-slate-400">
+                Expense was rejected — edit if needed, then resubmit to send it through the approval flow again.
+              </span>
+            </div>
+          )}
+
+          {expense.status === "SUBMITTED" &&
+            (user?.role === "SUPER_ADMIN" ||
+              user?.role === expense.currentRole?.code) && (
+              <div className="flex flex-wrap items-center gap-2">
+                <ActionButton
+                  icon={CheckCircle2}
+                  label="Approve"
+                  tone="success"
+                  disabled={acting}
+                  onClick={handleApproveClick}
+                />
+                <ActionButton
+                  icon={XCircle}
+                  label="Reject"
+                  tone="danger"
+                  disabled={acting}
+                  onClick={() => setConfirmAction("reject")}
+                />
+                {(expense.currentRole?.name || expense.currentRole?.code) && (
+                  <span className="text-[12px] text-slate-400">
+                    Current handler:{" "}
+                    {expense.currentRole.name || expense.currentRole.code}
+                  </span>
+                )}
+              </div>
+            )}
+
+          <ApprovalTrail
+            handovers={[
+              ...(procurementChain?.handovers || []).map((h) => ({
+                action_type: h.action_type,
+                remarks: h.remarks,
+                from_role: h.from_role,
+                to_role: h.to_role,
+                action_by: h.action_by,
+                at: h.created_at,
+                sourceLabel: "Procurement chain",
+              })),
+              ...(expense.handovers || []).map((h) => ({
+                ...h,
+                ...(procurementChain ? { sourceLabel: "Expense" } : {}),
+              })),
+            ]
+              .filter((h) => h.at)
+              .sort((a, b) => new Date(a.at) - new Date(b.at))}
+          />
+        </>
+      )}
+
+      {/* === Payments tab: payment summary, history, recording + handover === */}
+      {activeTab === "payments" && (
+        <>
+          {expense.status === "APPROVED" || expense.status === "PAID" ? (
+            <>
+              <PaymentSection
+                expense={expense}
+                canPay={canPay}
+                isCurrentHandler={isCurrentHandler}
+                payments={payments}
+                summary={paymentSummary}
+                loading={loadingPayments}
+                onRecord={() => setShowPaymentModal(true)}
+              />
+
+              {isCurrentHandler &&
+                !["SETTLED", "PAID"].includes(expense.payment_status) && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canPay && (
+                      <ActionButton
+                        icon={Banknote}
+                        label="Record Payment"
+                        tone="success"
+                        disabled={acting}
+                        onClick={() => setShowPaymentModal(true)}
+                      />
+                    )}
+                    <ActionButton
+                      icon={ArrowRightLeft}
+                      label="Handover for Payment"
+                      tone="primary"
+                      disabled={acting}
+                      onClick={() => {
+                        setSelectedPaymentHandoverRoleId(null);
+                        setPaymentHandoverRemarks("");
+                        loadPaymentHandoverRoles();
+                        setShowPaymentHandoverModal(true);
+                      }}
+                    />
+                    <span className="text-[12px] text-slate-400">
+                      This expense needs payment processing.
+                    </span>
+                  </div>
+                )}
+            </>
+          ) : (
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <Banknote className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    Payments
+                  </h3>
+                  <p className="text-[12px] text-slate-400">
+                    No payment information yet
+                  </p>
+                </div>
+              </div>
+              <div className="px-4 sm:px-6 py-8 text-center">
+                <p className="text-[13px] text-slate-400">
+                  Payments only begin after this expense is approved.
+                </p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Record payment modal — amount + method + date + type + optional proofs */}
+      {showPaymentModal && (
+        <RecordPaymentModal
+          expense={expense}
+          summary={paymentSummary}
+          onClose={() => setShowPaymentModal(false)}
+          onSaved={async () => {
+            setShowPaymentModal(false);
+            await refreshPayments();
+            await loadExpense();
+          }}
+        />
+      )}
+
+      {/* Handover for payment modal — requester forwards to a payment-eligible role */}
+      {showPaymentHandoverModal && (
+        <PaymentHandoverModal
+          expense={expense}
+          roles={paymentHandoverRoles}
+          loading={loadingPaymentHandoverRoles}
+          acting={actingPaymentHandover}
+          selectedRoleId={selectedPaymentHandoverRoleId}
+          onSelectRole={setSelectedPaymentHandoverRoleId}
+          remarks={paymentHandoverRemarks}
+          onRemarksChange={setPaymentHandoverRemarks}
+          onClose={() => setShowPaymentHandoverModal(false)}
+          onSave={handlePaymentHandover}
+        />
+      )}
 
       <UserDetailsModal
         employment={viewUser}
@@ -1817,7 +1890,9 @@ function ApprovalTrail({ handovers }) {
             Approval Trail
           </h3>
           <p className="text-[12px] text-slate-400">
-            {handovers.length} step{handovers.length === 1 ? "" : "s"}
+            {handovers.some((h) => h.sourceLabel)
+            ? "Source procurement chain + expense approvals, chronologically"
+            : `${handovers.length} step${handovers.length === 1 ? "" : "s"}`}
           </p>
         </div>
       </div>
@@ -1849,6 +1924,11 @@ function ApprovalTrail({ handovers }) {
                     <span className="text-[12px] text-slate-400">
                       {h.from_role} → {h.to_role}
                     </span>
+                    {h.sourceLabel && (
+                      <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-gray-800 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        {h.sourceLabel}
+                      </span>
+                    )}
                   </div>
                   {h.remarks && (
                     <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
@@ -1868,314 +1948,299 @@ function ApprovalTrail({ handovers }) {
   );
 }
 
-// Selected Quotation Display — always visible above procurement history
-// Shows the selected quotation's items with qty, unit price, tax rate, and totals
-function SelectedQuotationDisplay({ quotation }) {
-  if (!quotation?.items?.length) return null;
-  const items = quotation.items;
-
-  return (
-    <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 sm:p-6 mb-4">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
-            <CheckCircle2 className="h-4 w-4" />
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Selected Quotation</h4>
-            <p className="text-[12px] text-emerald-600 dark:text-emerald-400">
-              Vendor: {quotation.vendor || "—"} • Grand Total: {formatCurrency(quotation.grand_total)}
-            </p>
-          </div>
-        </div>
-        <span className="px-2 py-0.5 text-[11px] font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full">
-          SELECTED
-        </span>
+// Wrapper for a procurement stage tab — a loader while the chain loads, an empty
+// state when no chain exists, otherwise the tab's content rendered directly.
+function ProcurementStage({ loading, available, children }) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700">
+        <Loader2 className="h-5 w-5 text-indigo-500 animate-spin" />
       </div>
-
-      {/* Items Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px] table-fixed">
-          <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400 border-b border-emerald-200 dark:border-emerald-800">
-              <th className="px-4 sm:px-6 py-2.5 font-semibold w-[30%]">Item</th>
-              <th className="px-4 py-2.5 font-semibold w-[20%] text-center">Qty</th>
-              <th className="px-4 sm:px-6 py-2.5 font-semibold w-[20%] text-right">Unit Price</th>
-              <th className="px-4 py-2.5 font-semibold w-[15%] text-center">Tax %</th>
-              <th className="px-4 sm:px-6 py-2.5 font-semibold w-[15%] text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-emerald-100 dark:divide-emerald-800">
-            {items.map((item, i) => (
-              <tr key={item.id ?? i} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10">
-                <td className="px-4 sm:px-6 py-3 text-slate-800 dark:text-slate-200">
-                  <p className="font-medium break-words">{item.name}</p>
-                  {item.description && (
-                    <p className="text-[12px] text-slate-500 dark:text-slate-400 truncate">{item.description}</p>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-400 font-mono">{item.quantity}</td>
-                <td className="px-4 sm:px-6 py-3 text-right text-slate-800 dark:text-slate-200 font-mono">{formatCurrency(item.unit_price)}</td>
-                <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-400 font-mono">{item.tax_rate}%</td>
-                <td className="px-4 sm:px-6 py-3 text-right text-slate-800 dark:text-slate-200 font-medium font-mono">{formatCurrency(item.total_with_tax)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="bg-emerald-50 dark:bg-emerald-900/20">
-              <td colSpan={4} className="px-4 sm:px-6 py-3 text-right font-semibold text-emerald-800 dark:text-emerald-200">Grand Total</td>
-              <td className="px-4 sm:px-6 py-3 text-right font-bold text-emerald-800 dark:text-emerald-200 font-mono">{formatCurrency(quotation.grand_total)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// Source procurement chain behind a PO-created / converted expense: the PI → PR →
-// quotations → PO documents (as a stage table like the PR price-history card) plus
-// the chain's approval logs.
-// Collapsible "Procurement history" card for a procurement-linked expense. Chain is pre-loaded.
-function ProcurementHistorySection({ expense, chain: preloadedChain, loading: loadingChain }) {
-  const [open, setOpen] = useState(false);
-  const chain = preloadedChain;
-  const loading = loadingChain;
-
-  return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        className="w-full flex items-center justify-between gap-3 px-4 sm:px-6 py-4 bg-slate-50/50 dark:bg-gray-800/40 hover:bg-slate-100 dark:hover:bg-gray-800/60 transition-colors text-left"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-            <ShoppingCart className="h-4 w-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Procurement history
-            </h3>
-            <p className="text-[12px] text-slate-400">
-              Source chain PI → PR → Quotations → PO with approval logs
-            </p>
-          </div>
-        </div>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-[12px] font-semibold transition-colors">
-          {open ? "Hide" : "Show"}
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
-          />
-        </span>
-      </button>
-      {/* Smooth height reveal via grid-template-rows — big payloads open gently instead of jumping in */}
-      <div
-        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
-        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
-      >
-        <div className="overflow-hidden">
-          <div className="px-4 sm:px-6 py-5">
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-5 w-5 text-indigo-500 animate-spin" />
-              </div>
-            ) : chain ? (
-              <ProcurementHistory chain={chain} />
-            ) : (
-              <p className="text-[13px] text-slate-400">
-                No procurement history available.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Content of the Procurement history section — the source chain as a responsive stage
-// table (Stage | Document | Grand total | View) plus the chain's approval logs.
-function ProcurementHistory({ chain }) {
-  if (!chain) return null;
-  const stages = [
-    ...(chain.pi
-      ? [
-          {
-            label: "Purchase Intention",
-            num: chain.pi.document_number,
-            total: chain.pi.grand_total,
-            uuid: chain.pi.uuid,
-          },
-        ]
-      : []),
-    {
-      label: "Purchase Request",
-      num: chain.pr?.document_number,
-      total: chain.pr?.grand_total,
-      uuid: chain.pr?.uuid,
-    },
-    ...(chain.quotations || []).map((q, i) => ({
-      label: `Quotation ${i + 1}`,
-      num: q.vendor || "—",
-      total: q.grand_total,
-      uuid: null, // quotations live on the PR page, no standalone route
-    })),
-    ...(chain.po
-      ? [
-          {
-            label: "Purchase Order",
-            num: chain.po.document_number,
-            total: chain.po.grand_total,
-            uuid: chain.po.uuid,
-          },
-        ]
-      : []),
-  ].filter((s) => s.total != null);
-
-  // Format selected quotation items for display
-  const selectedQuotationItems = chain.selectedQuotation?.items || [];
-
-  return (
-    <div className="space-y-6">
-      {/* Documents in the chain — stage / document / grand total / view */}
-      {stages.length > 0 && (
-        <>
-          {/* Desktop table */}
-          <div className="hidden md:block w-full">
-            <table className="w-full text-[13px] table-fixed">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
-                  <th className="px-4 sm:px-6 py-2.5 font-semibold w-[34%]">
-                    Stage
-                  </th>
-                  <th className="px-4 py-2.5 font-semibold w-[38%]">
-                    Document
-                  </th>
-                  <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[17%]">
-                    Grand total
-                  </th>
-                  <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[11%]">
-                    View
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {stages.map((s, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-slate-100 dark:border-gray-800 last:border-0"
-                  >
-                    <td className="px-4 sm:px-6 py-3 font-medium text-slate-800 dark:text-slate-200 break-words">
-                      {s.label}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 break-words">
-                      {s.num || "—"}
-                    </td>
-                    <td className="px-4 sm:px-6 py-3 text-right font-medium text-slate-800 dark:text-slate-200">
-                      {formatCurrency(s.total)}
-                    </td>
-                    <td className="px-4 sm:px-6 py-3 text-right">
-                      {s.uuid ? (
-                        <Link
-                          to={`/procurement/${s.uuid}`}
-                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View
-                        </Link>
-                      ) : (
-                        <span className="text-slate-300 dark:text-gray-600">
-                          —
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {/* Mobile cards */}
-          <div className="md:hidden divide-y divide-slate-100 dark:divide-gray-800">
-            {stages.map((s, i) => (
-              <div
-                key={i}
-                className="px-4 py-3 flex items-center justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 break-words">
-                    {s.label}
-                  </p>
-                  <p className="text-[12px] text-slate-400 truncate">
-                    {s.num || "—"}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-[13px] font-semibold text-slate-900 dark:text-white">
-                    {formatCurrency(s.total)}
-                  </p>
-                  {s.uuid && (
-                    <Link
-                      to={`/procurement/${s.uuid}`}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                    >
-                      <Eye className="h-3 w-3" />
-                      View
-                    </Link>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Approval logs across the chain */}
-      <div>
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-400 mb-3">
-          Approval logs
+    );
+  }
+  if (!available) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700">
+        <Inbox className="h-10 w-10 text-slate-300 dark:text-slate-600 mb-3" />
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+          No procurement history available.
         </p>
-        {(chain.handovers || []).length === 0 ? (
-          <p className="text-[13px] text-slate-400">No approval logs.</p>
-        ) : (
-          <ol className="relative border-l border-slate-200 dark:border-gray-700 ml-3 space-y-5">
-            {chain.handovers.map((h, i) => {
-              const Icon = ACTION_ICONS[h.action_type] ?? History;
-              return (
-                <li key={i} className="ml-6">
-                  <span
-                    className={`absolute -left-[7px] mt-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 ${
-                      h.action_type === "REJECT"
-                        ? "bg-red-500"
-                        : "bg-indigo-500"
-                    }`}
-                  />
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Icon className="h-4 w-4 text-slate-400" />
-                    <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">
-                      {formatType(h.action_type)}
-                    </p>
-                    {(h.from_role || h.to_role) && (
-                      <span className="text-[12px] text-slate-400">
-                        {h.from_role || "—"} → {h.to_role || "—"}
-                      </span>
-                    )}
-                  </div>
-                  {h.remarks && (
-                    <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
-                      {h.remarks}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    {h.action_by || "—"} · {formatDateTime(h.created_at)}
+      </div>
+    );
+  }
+  return <div className="space-y-6">{children}</div>;
+}
+
+// Read-only line-items table for a procurement document. PI/PR items carry no tax
+// (tax is applied only at the quotation stage), so those cells render as "—" and
+// the row total falls back to qty × unit price.
+function ProcurementItemsTable({ items }) {
+  if (!items?.length) return null;
+  const hasTax = items.some((it) => it.tax_rate != null);
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[13px] table-fixed">
+        <thead>
+          <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-gray-700">
+            <th className="px-4 sm:px-6 py-2.5 font-semibold w-[40%]">Item</th>
+            <th className="px-4 py-2.5 font-semibold w-[15%] text-center">Qty</th>
+            <th className="px-4 py-2.5 font-semibold w-[22%] text-right">Unit Price</th>
+            {hasTax && (
+              <th className="px-4 py-2.5 font-semibold w-[10%] text-center">Tax %</th>
+            )}
+            <th className="px-4 sm:px-6 py-2.5 font-semibold w-[13%] text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+          {items.map((item, i) => (
+            <tr key={item.id ?? i} className="hover:bg-slate-50/50 dark:hover:bg-gray-800/40">
+              <td className="px-4 sm:px-6 py-3 text-slate-800 dark:text-slate-200">
+                <p className="font-medium break-words">{item.name}</p>
+                {item.description && (
+                  <p className="text-[12px] text-slate-500 dark:text-slate-400 truncate">
+                    {item.description}
                   </p>
-                </li>
-              );
-            })}
-          </ol>
+                )}
+              </td>
+              <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-400 font-mono">
+                {item.quantity}
+              </td>
+              <td className="px-4 py-3 text-right text-slate-800 dark:text-slate-200 font-mono">
+                {formatCurrency(item.unit_price)}
+              </td>
+              {hasTax && (
+                <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-400 font-mono">
+                  {item.tax_rate != null ? `${item.tax_rate}%` : "—"}
+                </td>
+              )}
+              <td className="px-4 sm:px-6 py-3 text-right text-slate-800 dark:text-slate-200 font-medium font-mono">
+                {formatCurrency(
+                  item.total_with_tax != null
+                    ? item.total_with_tax
+                    : Number(item.quantity) * Number(item.unit_price),
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Read-only card for a single chain document (PI / PR / PO) — key info shown
+// directly with a link into the procurement detail page.
+// Compact expense context card — shows the same expense-level details as the
+// Overview tab. Rendered above every procurement stage tab (PI / PR / Quotations)
+// so the expense's identity is never lost while comparing chain documents.
+function ExpenseContextCard({ expense, submittedByName, onViewUser }) {
+  return (
+    <InfoCard icon={Wallet} title="Expense">
+      <InfoRow label="Expense number" value={expense.expense_number} />
+      <InfoRow label="Category" value={<CategoryBadge name={expense.category?.name} />} />
+      <InfoRow label="Company" value={expense.company?.name || "—"} />
+      <InfoRow
+        label="Submitted by"
+        value={
+          submittedByName ? (
+            <button
+              type="button"
+              onClick={onViewUser}
+              className="text-indigo-600 dark:text-indigo-400 hover:underline"
+              title="View user details"
+            >
+              {submittedByName}
+            </button>
+          ) : (
+            "—"
+          )
+        }
+      />
+      <InfoRow label="Status" value={<StatusBadge status={expense.status} />} />
+      <InfoRow
+        label="Submitted"
+        value={expense.submitted_at ? formatDate(expense.submitted_at) : "-"}
+      />
+      <InfoRow
+        label="Created"
+        value={formatDate(expense.createdAt ?? expense.created_at)}
+      />
+      <InfoRow
+        label="Last updated"
+        value={formatDate(expense.updatedAt ?? expense.updated_at)}
+      />
+      <InfoRow label="Remarks" value={expense.remarks || "—"} />
+    </InfoCard>
+  );
+}
+
+// A single procurement stage card — header (stage name + status), title /
+// document number / vendor / grand total, and its own stored line items.
+function ProcurementDocCard({ title, doc }) {
+  if (!doc) {
+    return (
+      <div className="text-center py-10 bg-slate-50/50 dark:bg-gray-800/40 rounded-xl border border-dashed border-slate-200 dark:border-gray-700">
+        <p className="text-[13px] text-slate-400">{title} not created yet.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="flex items-center gap-2 min-w-0">
+          <h4 className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+            {title}
+          </h4>
+          <StatusBadge status={doc.status} />
+        </div>
+        {doc.uuid && (
+          <Link
+            to={`/procurement/${doc.uuid}`}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            View
+          </Link>
         )}
       </div>
+      <div className="px-4 sm:px-6 py-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-slate-400">Title</p>
+            <p className="mt-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200 break-words">
+              {doc.title || "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-slate-400">Document number</p>
+            <p className="mt-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200 break-words">
+              {doc.document_number || "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-slate-400">Vendor</p>
+            <p className="mt-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200 break-words">
+              {doc.vendor || "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-slate-400">Grand total</p>
+            <p className="mt-0.5 text-[13px] font-bold text-slate-900 dark:text-white">
+              {formatCurrency(doc.grand_total)}
+            </p>
+          </div>
+        </div>
+      </div>
+      {doc.items?.length > 0 && (
+        <div className="border-t border-slate-200 dark:border-gray-700 px-4 sm:px-6 py-4">
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+            Line items
+          </p>
+          <ProcurementItemsTable items={doc.items} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Quotations stage — every quotation rendered with its own line items as stored;
+// the chosen one is marked with a success-colored SELECTED pill.
+function QuotationsTab({ chain }) {
+  const quotations = chain.quotations || [];
+  const selectedUuid = chain.selectedQuotation?.uuid || quotations.find((q) => q.status === "SELECTED")?.uuid;
+  const ordered = [...quotations].sort((a, b) => {
+    if (a.uuid === selectedUuid) return -1;
+    if (b.uuid === selectedUuid) return 1;
+    return 0;
+  });
+
+  if (quotations.length === 0) {
+    return (
+      <div className="text-center py-10 bg-slate-50/50 dark:bg-gray-800/40 rounded-xl border border-dashed border-slate-200 dark:border-gray-700">
+        <p className="text-[13px] text-slate-400">No quotations yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {ordered.map((q, i) => (
+        <QuotationCard key={q.uuid ?? i} quotation={q} selected={q.uuid === selectedUuid} />
+      ))}
+    </div>
+  );
+}
+
+// Quotation card — vendor (masked for the requester), validity, the header
+// totals (subtotal / tax / grand total), and its own stored line items.
+function QuotationCard({ quotation, selected = false }) {
+  const hasItems = (quotation.items || []).length > 0;
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate">
+            {quotation.vendor || "—"}
+          </p>
+          {selected && <StatusBadge status="SELECTED" />}
+        </div>
+        <p className="text-[13px] font-bold text-amber-700 dark:text-amber-300">
+          {formatCurrency(quotation.grand_total)}
+        </p>
+      </div>
+      <div className="px-4 sm:px-6 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-slate-400">Valid until</p>
+          <p className="mt-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200">
+            {quotation.valid_until ? formatDate(quotation.valid_until) : "—"}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-slate-400">Subtotal</p>
+          <p className="mt-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200">
+            {formatCurrency(quotation.total_amount)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-slate-400">Tax</p>
+          <p className="mt-0.5 text-[13px] font-medium text-slate-800 dark:text-slate-200">
+            {formatCurrency(quotation.tax_amount)}
+          </p>
+        </div>
+      </div>
+      {quotation.notes ? (
+        <div className="border-t border-slate-200 dark:border-gray-700 px-4 sm:px-6 py-4">
+          <p className="text-[11px] uppercase tracking-wider text-slate-400">Notes</p>
+          <p className="mt-0.5 text-[13px] text-slate-600 dark:text-slate-300 whitespace-pre-wrap break-words">
+            {quotation.notes}
+          </p>
+        </div>
+      ) : null}
+      {hasItems && (
+        <div className="border-t border-slate-200 dark:border-gray-700 px-4 sm:px-6 py-4">
+          <p className="text-[12px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+            Line items
+          </p>
+          <ProcurementItemsTable items={quotation.items} />
+        </div>
+      )}
+      {(quotation.documents || []).length > 0 && (
+        <div className="border-t border-slate-200 dark:border-gray-700 px-4 sm:px-6 py-4 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Attached documents</p>
+          {quotation.documents.map((d) => (
+            <a
+              key={d.uuid}
+              href={d.file_path}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline min-w-0"
+            >
+              <Paperclip className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+              <span className="truncate">{d.original_file_name || d.file_path}</span>
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

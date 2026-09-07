@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ShoppingCart, Truck, Users, Plus, Trash2, Loader2, Wallet,
-  Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil, Eye, X, ChevronDown,
+  Paperclip, Clock, ArrowRight, CheckCircle2, XCircle, History, Quote, Pencil, X,
+  Info, Send, FileText, ReceiptText, ArrowRightLeft,
 } from 'lucide-react';
 import { procurementApi, submitProcurement, approveProcurement, rejectProcurement, createPurchaseRequest, createPurchaseOrder, markReceived, markPaid, procurementDocumentApi, procurementQuotationApi, submitQuotations, selectQuotation, updateProcurementItems } from '@/services/procurementService';
 import { getVendorOptions } from '@/services/vendorService';
@@ -15,6 +16,8 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import DatePicker from '@/components/ui/DatePicker';
 import { InfoCard, InfoRow, DetailHeader } from '@/components/ui/detail';
 import { useToast } from '@/components/ui/Toast';
+import PurchaseOrderPdfOverlay from '@/components/ui/PurchaseOrderPdf';
+import PurchaseRequestPdfOverlay from '@/components/ui/PurchaseRequestPdf';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
 
 // Workflow status colors (dark-mode aware). Mirrors the list page's map so the
@@ -55,6 +58,9 @@ export default function ProcurementDetail() {
   const [acting, setActing] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // { key, label }
   const [remarks, setRemarks] = useState('');
+  const [activeTab, setActiveTab] = useState('overview'); // overview | pi | pr | quotes | po | approvals
+  const [showPoPdf, setShowPoPdf] = useState(false); // Purchase Order PDF preview overlay
+  const [showPrPdf, setShowPrPdf] = useState(false); // Purchase Request PDF preview overlay (vendor picker first)
 
   // Quotation builder state (admin fills quotations on a PR)
   const [vendorOptions, setVendorOptions] = useState([]);
@@ -320,6 +326,25 @@ export default function ProcurementDetail() {
 
   const canEdit = doc?.request_type === 'PI' && doc?.status === 'DRAFT';
 
+  // Chain data used by the per-stage tabs (price_history holds the whole PI → PR →
+  // quotations → PO chain for any host document). Quotes are hosted on the PR, so
+  // a PR page gets the full admin/select experience; other hosts get a read-only view.
+  const chain = doc?.price_history || {};
+  const hostQuotations = doc?.request_type === 'PR' ? (doc?.quotations || []) : (chain.quotations || []);
+  const hasQuotesTab = doc?.request_type === 'PR' || (chain.quotations || []).length > 0;
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: Info },
+    ...(chain.pi ? [{ id: 'pi', label: 'Purchase Intent', icon: Send }] : []),
+    ...(chain.pr ? [{ id: 'pr', label: 'Purchase Request', icon: FileText }] : []),
+    ...(hasQuotesTab ? [{ id: 'quotes', label: 'Quotations', icon: ReceiptText, count: hostQuotations.length }] : []),
+    ...(chain.po ? [{ id: 'po', label: 'Purchase Order', icon: ShoppingCart }] : []),
+    { id: 'approvals', label: 'Approvals', icon: ArrowRightLeft },
+  ];
+  // Fall back to Overview if the active stage vanished after a reload (compute,
+  // don't set state during render).
+  const active = tabs.some((t) => t.id === activeTab) ? activeTab : 'overview';
+
   return (
     <div className="space-y-6 animate-fade-in">
       <DetailHeader
@@ -384,9 +409,36 @@ export default function ProcurementDetail() {
             )}
           </div>
 
-          {/* Selected quotation — always prominently displayed above procurement history */}
+          {/* Tabs — Overview [PI | PR | Quotations | PO] Approvals. flex-wrap (not
+              overflow-x-auto) so the tab strip reflows to multiple rows on narrow
+              screens instead of forcing a horizontal scrollbar. */}
+          <div className="flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 dark:bg-gray-800 p-1">
+            {tabs.map((t) => {
+              const isActive = active === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setActiveTab(t.id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
+                    isActive
+                      ? 'bg-white dark:bg-gray-900 text-slate-900 dark:text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <t.icon className="h-4 w-4" />
+                  {t.label}
+                  {t.count != null && <span className="text-[11px] text-slate-400">({t.count})</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* === Quotations tab: selected quotation (top) + the quotations section === */}
+          {active === 'quotes' && (
+            <>
           {(() => {
-            const selectedQuotation = (doc.quotations || []).find((q) => q.status === 'SELECTED');
+            const selectedQuotation = hostQuotations.find((q) => q.status === 'SELECTED');
             if (!selectedQuotation) return null;
             return (
               <div key="selected-quotation" className="bg-white dark:bg-gray-900 rounded-xl border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/10 ring-1 ring-emerald-200 dark:ring-emerald-800 shadow-sm overflow-hidden">
@@ -483,11 +535,51 @@ export default function ProcurementDetail() {
             );
           })()}
 
-          {/* Price history — stage-by-stage comparison across PI → PR → Quotations → PO */}
-          {doc.price_history && (
-            <PriceHistoryCard history={doc.price_history} />
+          {/* Quotations section — full admin/select UX only on the PR host; a
+              read-only chain list on PI/PO hosts (quotes are hosted on the PR). */}
+          {doc.request_type === 'PR' ? (
+            <QuotationsSection
+              doc={doc}
+              role={role}
+              vendorOptions={vendorOptions}
+              qForm={qForm}
+              setQForm={setQForm}
+              qEditingId={qEditingId}
+              qFormFile={qFormFile}
+              setQFormFile={setQFormFile}
+              qFormFileRef={qFormFileRef}
+              savingQuote={savingQuote}
+              submittingQuotes={submittingQuotes}
+              selectingQuote={selectingQuote}
+              startEditQuotation={startEditQuotation}
+              resetQuoteForm={resetQuoteForm}
+              saveQuotation={saveQuotation}
+              removeQuotation={removeQuotation}
+              runSubmitQuotations={runSubmitQuotations}
+              runSelectQuotation={runSelectQuotation}
+              reload={load}
+            />
+          ) : (
+            <div className="space-y-3">
+              {hostQuotations.length === 0 ? (
+                <p className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm px-4 sm:px-6 py-4 text-[13px] text-slate-400">
+                  No quotations yet.
+                </p>
+              ) : (
+                hostQuotations
+                  .filter((q) => q.status !== 'SELECTED')
+                  .map((q, i) => (
+                    <ChainQuotationCard key={q.uuid} quotation={q} index={i} />
+                  ))
+              )}
+            </div>
+          )}
+            </>
           )}
 
+          {/* === Overview tab: chain summary, links, current document context === */}
+          {active === 'overview' && (
+            <>
           {/* Chain links */}
           {(doc.parent || (doc.children || []).length > 0) && (
             <div className="flex flex-wrap items-center gap-2 text-[13px]">
@@ -593,34 +685,60 @@ export default function ProcurementDetail() {
               </>
             )}
           </div>
-
-          {/* Quotations — the list is always visible; the "Add a quotation" form
-              is hidden until the admin clicks the button */}
-          {doc.quotations && (
-            <QuotationsSection
-              doc={doc}
-              role={role}
-              vendorOptions={vendorOptions}
-              qForm={qForm}
-              setQForm={setQForm}
-              qEditingId={qEditingId}
-              qFormFile={qFormFile}
-              setQFormFile={setQFormFile}
-              qFormFileRef={qFormFileRef}
-              savingQuote={savingQuote}
-              submittingQuotes={submittingQuotes}
-              selectingQuote={selectingQuote}
-              startEditQuotation={startEditQuotation}
-              resetQuoteForm={resetQuoteForm}
-              saveQuotation={saveQuotation}
-              removeQuotation={removeQuotation}
-              runSubmitQuotations={runSubmitQuotations}
-              runSelectQuotation={runSelectQuotation}
-              reload={load}
-            />
+            </>
           )}
 
-          {/* Handover timeline */}
+          {/* === Per-stage tabs: stored document per stage === */}
+          {active === 'pi' && (
+            <ProcurementStageCard stage={chain.pi} label="Purchase Intent" icon={Send} />
+          )}
+
+          {active === 'pr' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  Purchase Request
+                </h3>
+                {chain.pr && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPrPdf(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View / Print PR as PDF
+                  </button>
+                )}
+              </div>
+              <ProcurementStageCard stage={chain.pr} label="Purchase Request" icon={FileText} vendorHidden />
+            </>
+          )}
+
+          {active === 'po' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  Purchase Order
+                </h3>
+                {chain.po && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPoPdf(true)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View / Print PO as PDF
+                  </button>
+                )}
+              </div>
+              <ProcurementStageCard stage={chain.po} label="Purchase Order" icon={ShoppingCart} />
+            </>
+          )}
+
+          {/* === Approvals tab: merged chain-wide handover timeline === */}
+          {active === 'approvals' && (
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
             <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
               <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
@@ -657,6 +775,8 @@ export default function ProcurementDetail() {
               </ol>
             )}
           </div>
+          )}
+
         </>
       ) : null}
 
@@ -766,6 +886,12 @@ export default function ProcurementDetail() {
           {itemsDraft.length === 0 && <p className="text-[13px] text-slate-400">No line items on this PR.</p>}
         </div>
       </Modal>
+
+      {/* Purchase Order PDF preview & print */}
+      <PurchaseOrderPdfOverlay po={chain.po} open={showPoPdf} onClose={() => setShowPoPdf(false)} />
+
+      {/* Purchase Request PDF preview & print (vendor picked before the sheet opens) */}
+      <PurchaseRequestPdfOverlay pr={chain.pr} open={showPrPdf} onClose={() => setShowPrPdf(false)} />
     </div>
   );
 }
@@ -796,7 +922,6 @@ function QuotationsSection({
   const selectedQuotation = quotations.find((q) => q.status === 'SELECTED') || null;
   const otherQuotations = quotations.filter((q) => q.status !== 'SELECTED');
   // Only show other quotations here (selected is shown above)
-  const [showOtherQuotations, setShowOtherQuotations] = useState(false);
 
   // When editing starts, bring the builder form into view.
   useEffect(() => {
@@ -1189,21 +1314,7 @@ function QuotationsSection({
 
           {/* Quotation list — shows only OTHER quotations (not the selected one).
               The selected quotation is displayed prominently above the procurement history. */}
-          {(() => {
-            const list = showOtherQuotations ? otherQuotations : [];
-            if (list.length === 0 && otherQuotations.length > 0) {
-              return (
-                <button
-                  type="button"
-                  onClick={() => setShowOtherQuotations(true)}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                  Show {otherQuotations.length} other quotation{otherQuotations.length > 1 ? 's' : ''}
-                </button>
-              );
-            }
-            return list.map((q) => {
+          {otherQuotations.map((q) => {
               const idx = quotations.indexOf(q);
               return (
             <div key={q.uuid} className="rounded-xl border border-slate-200 dark:border-gray-700 p-4 transition-colors">
@@ -1345,11 +1456,8 @@ function QuotationsSection({
               </div>
             </div>
             );
-            });
-          })()}
+            })}
 
-          {/* Toggle to reveal the remaining quotations after one is selected */}
-          
           {/* Admin: submit quotations for requester selection */}
           {fillMode && otherQuotations.length > 0 && (
             <div className="flex justify-end pt-1 border-t border-slate-100 dark:border-gray-800">
@@ -1370,90 +1478,207 @@ function QuotationsSection({
   );
 }
 
-// ── Price history card ──
-// Stage-by-stage comparison: PI → PR → each quotation → PO, each with its own
-// document number + grand total. Vendors stay masked for the requester (the API
-// already nulls them out on the chain).
-function PriceHistoryCard({ history }) {
-  const { pi, pr, quotations = [], po } = history || {};
-
-  const stages = [
-    { label: 'Purchase Intention', num: pi?.document_number, total: pi?.grand_total, uuid: pi?.uuid },
-    { label: 'Purchase Request', num: pr?.document_number, total: pr?.grand_total, uuid: pr?.uuid },
-    ...quotations
-      .filter((q) => q.status !== 'SELECTED') // Selected quotation shown separately above
-      .map((q, i) => ({
-        label: `Quotation ${i + 1}`,
-        num: q.vendor?.name || '—', // quotations no longer carry a title — show vendor
-        total: q.grand_total,
-        uuid: null, // quotations live on the PR's detail page, no standalone route
-      })),
-    { label: 'Purchase Order', num: po?.document_number, total: po?.grand_total, uuid: po?.uuid },
-  ].filter((s) => s.total != null);
-
-  if (stages.length === 0) return null;
+// ── Per-stage document card (PI / PR / PO tabs) ──
+// Renders one stored procurement document from the chain's price_history with its
+// own line items. The PR stage never shows a vendor (vendor is selected after it).
+function ProcurementStageCard({ stage, label, icon: Icon, vendorHidden }) {
+  if (!stage) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6">
+        <p className="text-[13px] text-slate-400">This chain has not reached the {label} stage yet.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+      <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
         <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-          <ArrowRight className="h-4 w-4" />
+          <Icon className="h-4 w-4" />
         </div>
-        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Price history</h3>
-        <span className="ml-auto text-[11px] text-slate-400">PI → PR → Quotation → PO</span>
-      </div>
-      {/* Desktop table */}
-      <div className="hidden md:block w-full">
-        <table className="w-full text-[13px] table-fixed">
-          <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
-              <th className="px-4 sm:px-6 py-2.5 font-semibold w-[34%]">Stage</th>
-              <th className="px-4 py-2.5 font-semibold w-[38%]">Document</th>
-              <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[17%]">Grand total</th>
-              <th className="px-4 sm:px-6 py-2.5 font-semibold text-right w-[11%]">View</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stages.map((s, i) => (
-              <tr key={i} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
-                <td className="px-4 sm:px-6 py-3 font-medium text-slate-800 dark:text-slate-200 break-words">{s.label}</td>
-                <td className="px-4 py-3 text-slate-500 dark:text-slate-400 break-words">{s.num || '—'}</td>
-                <td className="px-4 sm:px-6 py-3 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(s.total)}</td>
-                <td className="px-4 sm:px-6 py-3 text-right">
-                  {s.uuid ? (
-                    <Link to={`/procurement/${s.uuid}`} className="inline-flex items-center gap-1 text-[12px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
-                      <Eye className="h-3.5 w-3.5" />
-                      View
-                    </Link>
-                  ) : (
-                    <span className="text-slate-300 dark:text-gray-600">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">{label}</h3>
+        <span className="ml-auto">
+          <StatusBadge status={stage.status} styles={PROCUREMENT_STATUS_STYLES} />
+        </span>
       </div>
 
-      {/* Mobile cards */}
-      <div className="md:hidden divide-y divide-slate-100 dark:divide-gray-800">
-        {stages.map((s, i) => (
-          <div key={i} className="px-4 py-3 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 break-words">{s.label}</p>
-              <p className="text-[12px] text-slate-400 truncate">{s.num || '—'}</p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-[13px] font-semibold text-slate-900 dark:text-white">{formatCurrency(s.total)}</p>
-              {s.uuid && (
-                <Link to={`/procurement/${s.uuid}`} className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
-                  <Eye className="h-3 w-3" />
-                  View
-                </Link>
-              )}
-            </div>
+      <div className="p-4 sm:p-6 space-y-4">
+        {/* Meta + amount */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white break-words">{stage.document_number || '—'}</p>
+            {stage.title && <p className="text-[12px] text-slate-400 break-words">{stage.title}</p>}
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 break-words">
+              {stage.company?.name || '—'}
+              {stage.requestedByEmployment?.user
+                ? ` · ${stage.requestedByEmployment.user.first_name || ''} ${stage.requestedByEmployment.user.last_name || ''}`.trim()
+                : ''}
+              {!vendorHidden && stage.vendor?.name ? ` · ${stage.vendor.name}` : ''}
+            </p>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400">
+              Expected delivery {formatDate(stage.expected_delivery_date)}
+            </p>
+            {stage.notes && <p className="text-[12px] text-slate-400 break-words">{stage.notes}</p>}
           </div>
-        ))}
+          <div className="text-right flex-shrink-0">
+            <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(stage.grand_total)}</p>
+            {stage.total_amount != null && stage.tax_amount != null && (
+              <p className="text-[11px] text-slate-400">
+                {formatCurrency(stage.total_amount)} + {formatCurrency(stage.tax_amount)} tax
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Line items — table on desktop, cards on mobile */}
+        {(stage.items || []).length === 0 ? (
+          <p className="text-[13px] text-slate-400">No line items.</p>
+        ) : (
+          <>
+            <div className="hidden md:block w-full rounded-lg border border-slate-200 dark:border-gray-700">
+              <table className="w-full text-[13px] table-fixed">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
+                    <th className="px-3 py-2 font-semibold w-[38%]">Item</th>
+                    <th className="px-3 py-2 font-semibold text-right w-[13%]">Qty</th>
+                    <th className="px-3 py-2 font-semibold text-right w-[16%]">Unit price</th>
+                    <th className="px-3 py-2 font-semibold text-right w-[13%]">Tax %</th>
+                    <th className="px-3 py-2 font-semibold text-right w-[16%]">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(stage.items || []).map((it, idx) => {
+                    const lineTotal = it.total_with_tax != null
+                      ? it.total_with_tax
+                      : (Number(it.unit_price) || 0) * (Number(it.quantity) || 0);
+                    return (
+                      <tr key={it.uuid ?? idx} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
+                        <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</td>
+                        <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{it.quantity}</td>
+                        <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{formatCurrency(it.unit_price)}</td>
+                        <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{it.tax_rate != null ? `${it.tax_rate}%` : '—'}</td>
+                        <td className="px-3 py-2 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(lineTotal)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="md:hidden space-y-1.5">
+              {(stage.items || []).map((it, idx) => {
+                const lineTotal = it.total_with_tax != null
+                  ? it.total_with_tax
+                  : (Number(it.unit_price) || 0) * (Number(it.quantity) || 0);
+                return (
+                  <div key={it.uuid ?? idx} className="rounded-lg border border-slate-200 dark:border-gray-700 px-3 py-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</p>
+                      <p className="text-[13px] font-semibold text-slate-900 dark:text-white flex-shrink-0">{formatCurrency(lineTotal)}</p>
+                    </div>
+                    <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                      Qty {it.quantity} · Unit {formatCurrency(it.unit_price)}
+                      {it.tax_rate != null ? ` · Tax ${it.tax_rate}%` : ''}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Read-only quotation card (chain view on PI/PO hosts) ──
+// Used when the page host isn't the PR — the quotations belong to the PR, so on
+// other documents we just show the stored quotes without admin/select actions.
+function ChainQuotationCard({ quotation: q, index }) {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3 px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+          <Quote className="h-4 w-4" />
+        </div>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Quotation {index + 1}</h3>
+        <span className="ml-auto">
+          <StatusBadge status={q.status} styles={PROCUREMENT_STATUS_STYLES} />
+        </span>
+      </div>
+
+      <div className="p-4 sm:p-6 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 break-words">{q.vendor?.name || '—'}</p>
+            {q.valid_until && <p className="text-[12px] text-slate-400 mt-0.5">Valid until {formatDate(q.valid_until)}</p>}
+            {q.notes && <p className="text-[12px] text-slate-400 mt-1 break-words">Comments: {q.notes}</p>}
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(q.grand_total)}</p>
+            {q.total_amount != null && q.tax_amount != null && (
+              <p className="text-[11px] text-slate-400">
+                {formatCurrency(q.total_amount)} + {formatCurrency(q.tax_amount)} tax
+              </p>
+            )}
+          </div>
+        </div>
+
+        {(q.items || []).length > 0 && (
+          <>
+            <div className="hidden md:block w-full rounded-lg border border-slate-200 dark:border-gray-700">
+              <table className="w-full text-[13px] table-fixed">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-gray-700">
+                    <th className="px-3 py-2 font-semibold w-[38%]">Item</th>
+                    <th className="px-3 py-2 font-semibold text-right w-[13%]">Qty</th>
+                    <th className="px-3 py-2 font-semibold text-right w-[16%]">Unit price</th>
+                    <th className="px-3 py-2 font-semibold text-right w-[13%]">Tax %</th>
+                    <th className="px-3 py-2 font-semibold text-right w-[16%]">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(q.items || []).map((it, idx) => (
+                    <tr key={it.uuid ?? idx} className="border-b border-slate-100 dark:border-gray-800 last:border-0">
+                      <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</td>
+                      <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{it.quantity}</td>
+                      <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{formatCurrency(it.unit_price)}</td>
+                      <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">{it.tax_rate != null ? `${it.tax_rate}%` : '—'}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-800 dark:text-slate-200">{formatCurrency(it.total_with_tax)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="md:hidden space-y-1.5">
+              {(q.items || []).map((it, idx) => (
+                <div key={it.uuid ?? idx} className="rounded-lg border border-slate-200 dark:border-gray-700 px-3 py-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{it.item_name}</p>
+                    <p className="text-[13px] font-semibold text-slate-900 dark:text-white flex-shrink-0">{formatCurrency(it.total_with_tax)}</p>
+                  </div>
+                  <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                    Qty {it.quantity} · Unit {formatCurrency(it.unit_price)}
+                    {it.tax_rate != null ? ` · Tax ${it.tax_rate}%` : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {(q.documents || []).length > 0 && (
+          <div className="pt-3 border-t border-slate-100 dark:border-gray-800 space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Attached documents</p>
+            {q.documents.map((d) => (
+              <div key={d.uuid} className="flex items-center justify-between gap-2">
+                <a href={d.file_path} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline min-w-0">
+                  <Paperclip className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <span className="truncate">{d.original_file_name || d.file_path}</span>
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

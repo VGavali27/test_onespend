@@ -332,3 +332,33 @@ input[type='number'] {
 .react-datepicker__close-icon {
   right: 8px;
 }
+
+/* ═══════════════════════════════════════
+   PRINT — Purchase Order PDF
+   Hides the app UI and prints only the PO sheet.
+   ═══════════════════════════════════════ */
+@media print {
+  body { background: #fff !important; }
+  body * { visibility: hidden; }
+  #po-print-sheet, #po-print-sheet *, #pr-print-sheet, #pr-print-sheet * { visibility: visible; }
+  #po-print-sheet, #pr-print-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100%;
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+  .po-pdf-overlay {
+    position: static !important;
+    overflow: visible !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+  }
+  .po-pdf-overlay .sticky {
+    display: none !important;
+  }
+  @page { size: A4; margin: 12mm; }
+}
