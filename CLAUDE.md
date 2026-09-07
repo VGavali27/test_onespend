@@ -358,6 +358,14 @@ The expense detail became a tabbed view (Overview / PI / PR / Quotations / PO / 
 - **New permission `procurement:reject`** (id 178, uuid `f1a2b3c4-d5e6-7890-fabc-123456789079`) — separated from `procurement:approve` (which now has description "Approve procurement documents" only). Granted to SUPER_ADMIN (100), CFO (101), PAYMENT_MGR (102), FINANCE_MGR (104), ADMIN_MGR (106). Permissions seeder `down()` bumped to 79.
 - **Reject route updated** — `POST /procurement/:uuid/reject` now uses `requirePermission('procurement:reject')` instead of `requirePermission('procurement:approve')`.
 
+### Today's Updates (2026-09-08) — Derived Notifications API (no table)
+Zero new tables/migrations — the bell feed is **computed live** from the existing `assigned`/`my-payments` where-clauses plus the handover trails. New `src/modules/notification/` module, auth-only, mounted at `/api/v1/notifications`.
+- **`GET /notifications/count`** — `{ expenses, procurement, payments, total }` for the badge. COUNTs reuse the exact same visibility scoping as the assigned lists: expense assigned (`current_role_id = role`, `SUBMITTED`, company-scoped except global), procurement assigned (same scoping via `GLOBAL_ROLES`/`MANAGER_ROLES`), and payment requests (`current_role_id`, `APPROVED`/`PAID`, `payment_status NOT IN ('SETTLED','PAID')`).
+- **`GET /notifications?limit=&type=&scope=`** — merged dropdown feed, newest-first. `type=assigned|activity`, `scope=expense|procurement`. Each item: `{ bundle, kind, module, uuid, ref, title, status, amount, at, link }`; `link` deep-links to `/expenses/:uuid` or `/procurement/:uuid`. Amounts AES-decrypted (`formatAmount`).
+- **Assignment feed** = expense + procurement + payment rows pending the user's role (via the existing repositories).
+- **Activity feed** = recent `expense_handovers`/`procurement_handovers` where `to_role_id = my role`, company-scoped; enabled only for manager/global roles. Procurement handovers are resolved to their parent header (PI/PR/PO via `pi_id`/`pr_id`/`po_id`) so they deep-link correctly.
+- Scope/role/company helpers mirror `expense.service.js` (`EXPENSE_GLOBAL_ROLES`/`EXPENSE_MANAGER_ROLES`, imported) and `procurement.service.js` (`GLOBAL_ROLES`/`MANAGER_ROLES`, duplicated here).
+
 ## Pending Improvements (future backlog)
 
 > Cross-cutting ideas for hardening, observability, and finishing the payment/logging work. Pick up in rough priority order.

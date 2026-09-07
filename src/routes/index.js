@@ -25,6 +25,7 @@ import uploadRoutes from '../modules/upload/upload.routes.js';
 import groupRoutes from '../modules/group/group.routes.js';
 import dashboardRoutes from '../modules/dashboard/dashboard.routes.js';
 import systemLogsRoutes from '../modules/system_logs/system_logs.routes.js';
+import notificationRoutes from '../modules/notification/notification.routes.js';
 
 const router = Router();
 
@@ -54,5 +55,6 @@ router.use('/uploads', uploadRoutes);
 router.use('/groups', groupRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/system/logs', systemLogsRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;
