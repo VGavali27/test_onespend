@@ -281,6 +281,12 @@ VITE_APP_ENV=development
 - **PDFs live in procurement only** — once a PO is converted to an expense, the procurement PDF is no longer needed, so **no PDF button/overlay exists on the expense detail** for PO (the requirement is: generate during the procurement process only).
 - **Resolved a pending item**: the "Resubmit rejected expenses" entry (below) is now built — Edit + Resubmit live on the Approvals tab.
 
+### Today's Updates (2026-09-08) — Procurement Approvals Page (Assigned)
+- **`AssignedProcurements.jsx`** — new page (`src/pages/procurement/AssignedProcurements.jsx`) rendering a `DataTablePage` with the same columns as the main `Procurements` list (type/status filters, no tabs). Backed by `GET /procurement/assigned` via `getAssignedProcurements()`.
+- **Route** — added `/procurement/assigned` in `src/routes/index.jsx` guarded by `PermissionGuard permission="procurement:approve"`.
+- **Menu item** — added "Approvals" to the procurement children in `src/data/menuConfig.js`, shown only to roles holding `procurement:approve`.
+- **`procurementService.js`** — added `getAssignedProcurements({ page, type, status })`.
+
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
 - [ ] Employments list/create pages (`/master/employments`)

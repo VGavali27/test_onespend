@@ -9,6 +9,9 @@ export const procurementApiWithScope = {
   list: (params = {}, options = {}) => api.get('/procurement', { params, ...options }),
 };
 
+// Assigned procurement documents (pending the logged-in user's role approval)
+export const getAssignedProcurements = (params = {}, options = {}) => api.get('/procurement/assigned', { params, ...options });
+
 // ── Workflow actions ──
 export const submitProcurement = (uuid, remarks) => api.post(`/procurement/${uuid}/submit`, { remarks });
 export const approveProcurement = (uuid, remarks) => api.post(`/procurement/${uuid}/approve`, { remarks });

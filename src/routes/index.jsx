@@ -38,6 +38,7 @@ const EditVendorCategory = lazy(() => import('@/pages/master/vendorCategories/Ed
 const ViewVendorCategory = lazy(() => import('@/pages/master/vendorCategories/ViewVendorCategory'));
 
 const Procurements = lazy(() => import('@/pages/procurement/Procurements'));
+const AssignedProcurements = lazy(() => import('@/pages/procurement/AssignedProcurements'));
 const CreateProcurement = lazy(() => import('@/pages/procurement/CreateProcurement'));
 const EditProcurement = lazy(() => import('@/pages/procurement/EditProcurement'));
 const ProcurementDetail = lazy(() => import('@/pages/procurement/ProcurementDetail'));
@@ -118,6 +119,7 @@ export default function AppRoutes() {
           <Route path="master/vendor-categories/:uuid/edit" element={<PermissionGuard permission="vendor_categories:update"><EditVendorCategory /></PermissionGuard>} />
           <Route path="master/vendor-categories/:uuid" element={<PermissionGuard permission="vendor_categories:read"><ViewVendorCategory /></PermissionGuard>} />
 
+          <Route path="procurement/assigned" element={<PermissionGuard permission="procurement:approve"><AssignedProcurements /></PermissionGuard>} />
           <Route path="procurement" element={<PermissionGuard permission="procurement:read_all"><Procurements /></PermissionGuard>} />
           <Route path="procurement/new" element={<PermissionGuard permission="procurement:create"><CreateProcurement /></PermissionGuard>} />
           <Route path="procurement/:uuid/edit" element={<PermissionGuard permission="procurement:update"><EditProcurement /></PermissionGuard>} />

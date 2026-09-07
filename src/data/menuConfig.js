@@ -41,6 +41,7 @@ export const menuConfig = [
     children: [
       { id: 'all-procurement', label: 'All Requests', icon: Inbox, to: '/procurement', permission: 'procurement:read_all' },
       { id: 'my-procurement', label: 'My Requests', icon: FileText, to: '/procurement?scope=mine', permission: 'procurement:read' },
+      { id: 'assigned-procurement', label: 'Approvals', icon: CheckCircle2, to: '/procurement/assigned', permission: 'procurement:approve' },
       { id: 'new-procurement', label: 'Create New', icon: Plus, to: '/procurement/new', permission: 'procurement:create' },
     ],
   },
