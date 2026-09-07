@@ -19,9 +19,18 @@ export function NotificationProvider({ children }) {
     if (!isAuthenticated) return;
     setLoading(true);
     try {
-      const [countRes, feedRes] = await Promise.all([getNotificationCount(), getNotifications({ limit: 20 })]);
-      setCount(countRes.data.data || { expenses: 0, procurement: 0, payments: 0, total: 0 });
-      setFeed(feedRes.data.data || []);
+      // Fetch count and feed independently so a failure on one never blanks the
+      // other (e.g. a feed error must not hide the count badge).
+      const [countRes, feedRes] = await Promise.allSettled([
+        getNotificationCount(),
+        getNotifications({ limit: 20 }),
+      ]);
+      if (countRes.status === 'fulfilled') {
+        setCount(countRes.value?.data?.data || { expenses: 0, procurement: 0, payments: 0, total: 0 });
+      }
+      if (feedRes.status === 'fulfilled') {
+        setFeed(feedRes.value?.data?.data || []);
+      }
     } catch {
       // Non-fatal — leave existing data untouched on failure.
     } finally {
