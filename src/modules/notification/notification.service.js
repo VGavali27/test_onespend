@@ -133,7 +133,7 @@ const getActivityRows = async (user, roleId) => {
     if (scope !== null) {
       const rows = await ExpenseHandover.findAll({
         where: {
-          to_role_id: expenseRoleIds,
+          to_role_id: roleId,
         },
         include: [
           {
