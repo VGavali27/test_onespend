@@ -2,8 +2,10 @@
  * Seeder: Procurement expense category
  *
  * Adds the 'procurement' module to the Expense Categories master so a
- * converted procurement expense (deferred) has a category to land on.
- * First receiver = ADMIN_MGR, final approver = CFO (matches the procurement chain).
+ * converted procurement expense has a category to land on.
+ * First receiver = CFO, final approver = CFO (the ordered approval flow
+ * CFO → ADMIN_MGR → FINANCE_MGR → CFO → PAYMENT_MGR → CFO → APPROVED is driven
+ * by expenses.flow_position, so first/final approver are both the CFO).
  */
 export async function up({ context }) {
   return context.bulkInsert('expense_categories', [
@@ -14,7 +16,7 @@ export async function up({ context }) {
       module: 'procurement',
       name: 'Procurement',
       description: 'Expenses converted from approved purchase orders',
-      first_receiver_role_id: 106, // ADMIN_MGR
+      first_receiver_role_id: 101, // CFO
       final_approver_role_id: 101, // CFO
       status: 'ACTIVE',
       created_at: new Date(),

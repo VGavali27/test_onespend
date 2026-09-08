@@ -20,6 +20,8 @@ export async function up(queryInterface, Sequelize) {
       allowNull: false,
       defaultValue: 'UNPAID',
     },
+    // 1-based ordered approval step for procurement expenses (null for other modules / rejected)
+    flow_position: { type: Sequelize.SMALLINT.UNSIGNED, allowNull: true },
     submitted_at: { type: Sequelize.DATE, allowNull: true },
     closed_at: { type: Sequelize.DATE, allowNull: true },
     created_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
@@ -33,6 +35,7 @@ export async function up(queryInterface, Sequelize) {
   await queryInterface.addIndex('expenses', ['category_id'], { name: 'idx_exp_category' });
   await queryInterface.addIndex('expenses', ['company_id'], { name: 'idx_exp_company' });
   await queryInterface.addIndex('expenses', ['status'], { name: 'idx_exp_status' });
+  await queryInterface.addIndex('expenses', ['flow_position'], { name: 'idx_expenses_flow_position' });
   await queryInterface.addConstraint('expenses', {
     fields: ['category_id'],
     type: 'foreign key',

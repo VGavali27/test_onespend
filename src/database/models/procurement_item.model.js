@@ -29,6 +29,8 @@ export default (sequelize, DataTypes) => {
       description: DataTypes.TEXT,
       category: DataTypes.STRING(100),
       quantity: { type: DataTypes.INTEGER, defaultValue: 1 },
+      // Delivered quantity on PO line items (partial deliveries allowed)
+      received_quantity: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
       unit_price: DataTypes.TEXT,
       // tax rate (%) stored plain — only sensitive amounts are encrypted
       tax_rate: DataTypes.DECIMAL(10, 2),

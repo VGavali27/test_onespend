@@ -34,6 +34,8 @@ export async function up({ context }) {
     [104, 101],
     // ── CFO approves → PAYMENT_MGR ──
     [101, 102],
+    // ── PAYMENT_MGR hands back to CFO for the pre-payment re-approval ──
+    [102, 101],
     // ── SUPER_ADMIN overrides (can act as any handler) ──
     [100, 110], [100, 101], [100, 104], [100, 102],
   ];

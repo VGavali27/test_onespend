@@ -23,6 +23,22 @@ const {
 // must be able to see the result in All Expenses.
 export const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR'];
 
+// Ordered approval chain for procurement-category expenses, driven by
+// expenses.flow_position (1-based). The flow ignores any to_role_id a client
+// sends and moves deterministically to the next step on each approve. The final
+// step (CFO, position 7) closes the expense as APPROVED routed to PAYMENT_MGR —
+// gated on every PO line item being fully received.
+// 1 CFO → 2 ADMIN_MGR → 3 FINANCE_MGR → 4 CFO → 5 PAYMENT_MGR → 6 CFO → 7 CFO (final)
+export const PROCUREMENT_EXPENSE_FLOW = [
+  { position: 1, roleCode: 'CFO' },
+  { position: 2, roleCode: 'ADMIN_MGR' },
+  { position: 3, roleCode: 'FINANCE_MGR' },
+  { position: 4, roleCode: 'CFO' },
+  { position: 5, roleCode: 'PAYMENT_MGR' },
+  { position: 6, roleCode: 'CFO' },
+  { position: 7, roleCode: 'CFO', final: true },
+];
+
 // Roles allowed to view the "all expenses" list (everyone else uses /expenses/my)
 // Also used for /expenses/assigned (expenses pending approval for the user's role)
 export const EXPENSE_MANAGER_ROLES = [
@@ -201,9 +217,12 @@ const buildProcurementChain = async (expense, requesterIsOwner) => {
       const s = it.get ? it.get({ plain: true }) : it;
       return {
         id: s.id,
+        uuid: s.uuid,
+        item_name: s.item_name,
         name: s.item_name,
         description: s.description,
         quantity: s.quantity,
+        received_quantity: Number(s.received_quantity) || 0,
         unit_price: fin(s.unit_price),
         tax_rate: s.tax_rate,
         total_with_tax: fin(s.total_with_tax),
@@ -248,7 +267,61 @@ const buildProcurementChain = async (expense, requesterIsOwner) => {
       items: mapItems(selectedQuotation.items),
       documents: docsOf(selectedQuotation),
     } : null,
-    po: chainPo ? { uuid: chainPo.uuid, document_number: chainPo.document_number, title: chainPo.title, status: chainPo.status, vendor: vendorOf(chainPo), grand_total: fin(chainPo.grand_total), items: mapItems(chainPo.items) } : null,
+    // po carries the full record (company / vendor / requester / totals) so the expense
+    // detail can preview the same A4 PO PDF the procurement detail renders. Vendor
+    // stays masked from the requester (vendor_record = null); vendor is the display name.
+    po: chainPo
+      ? {
+          uuid: chainPo.uuid,
+          document_number: chainPo.document_number,
+          title: chainPo.title,
+          status: chainPo.status,
+          vendor: vendorOf(chainPo),
+          vendor_record: requesterIsOwner
+            ? null
+            : chainPo.vendor
+              ? {
+                  name: chainPo.vendor.name,
+                  code: chainPo.vendor.code,
+                  gst_number: chainPo.vendor.gst_number,
+                  payment_terms: chainPo.vendor.payment_terms,
+                  website: chainPo.vendor.website,
+                }
+              : null,
+          company: chainPo.company
+            ? {
+                name: chainPo.company.name,
+                code: chainPo.company.code,
+                address_line_1: chainPo.company.address_line_1,
+                address_line_2: chainPo.company.address_line_2,
+                city: chainPo.company.city,
+                state: chainPo.company.state,
+                pincode: chainPo.company.pincode,
+                phone: chainPo.company.phone,
+                email: chainPo.company.email,
+                website: chainPo.company.website,
+                gst_number: chainPo.company.gst_number,
+                pan_number: chainPo.company.pan_number,
+              }
+            : null,
+          requestedByEmployment: chainPo.requestedByEmployment
+            ? {
+                user: {
+                  first_name: chainPo.requestedByEmployment.user?.first_name,
+                  last_name: chainPo.requestedByEmployment.user?.last_name,
+                  email: chainPo.requestedByEmployment.user?.email,
+                },
+              }
+            : null,
+          notes: chainPo.notes,
+          created_at: chainPo.created_at ?? chainPo.createdAt,
+          expected_delivery_date: chainPo.expected_delivery_date,
+          total_amount: fin(chainPo.total_amount),
+          tax_amount: fin(chainPo.tax_amount),
+          grand_total: fin(chainPo.grand_total),
+          items: mapItems(chainPo.items),
+        }
+      : null,
     handovers: (handovers || []).map((h) => {
       const p = h.get ? h.get({ plain: true }) : h;
       const u = p.actionBy?.user;
@@ -705,6 +778,7 @@ const createProcurementExpenseRecord = async ({
       current_role_id: category.first_receiver_role_id,
       current_employment_id: null,
       status: 'SUBMITTED',
+      flow_position: 1,
       submitted_at: new Date(),
       // estimated_amount = the PR's total (the pre-quotation estimate); final_amount
       // = the PO's grand total (= the SELECTED quotation's price, the committed amount).
@@ -754,19 +828,34 @@ export const submit = async (uuid, user, remarks) => {
     throw ApiError.badRequest('Only a draft or rejected expense can be submitted');
   }
 
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+
   const employmentIds = await getEmploymentIdsByUser(user.userId);
-  if (!employmentIds.includes(expense.requested_by_employment_id)) {
+  const isRequester = employmentIds.includes(expense.requested_by_employment_id);
+  // A REJECTED procurement expense is resubmitted by the procurement admin (ADMIN_MGR)
+  // or SUPER_ADMIN — the rejection routes it back to them, not the requester.
+  const isProcurementAdminResubmit =
+    category?.module === 'procurement' &&
+    expense.status === 'REJECTED' &&
+    ['ADMIN_MGR', 'SUPER_ADMIN'].includes(user.roleCode);
+  if (!isRequester && !isProcurementAdminResubmit) {
     throw ApiError.forbidden('You can only submit your own expenses');
   }
 
-  const category = await ExpenseCategory.findByPk(expense.category_id);
   const actorRole = await findRoleByCode(user.roleCode);
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
   const firstReceiver = category?.first_receiver_role_id ?? null;
 
   return sequelize.transaction(async (t) => {
     await expense.update(
-      { status: 'SUBMITTED', current_role_id: firstReceiver, current_employment_id: null, submitted_at: new Date() },
+      {
+        status: 'SUBMITTED',
+        current_role_id: firstReceiver,
+        current_employment_id: null,
+        submitted_at: new Date(),
+        // Procurement resubmits restart the ordered flow at step 1 (CFO).
+        ...(category?.module === 'procurement' ? { flow_position: 1 } : {}),
+      },
       { transaction: t },
     );
     await logExpenseHandover({
@@ -779,6 +868,75 @@ export const submit = async (uuid, user, remarks) => {
       t,
     });
     return expenseRepository.findByUuid(uuid, t);
+  });
+};
+
+// True when every line item on the PO (found via the expense) has been fully
+// received (received_quantity >= quantity). Payment may not start before this.
+const allProcurementItemsReceived = async (expenseId) => {
+  const po = await ProcurementOrder.findOne({ where: { expense_id: expenseId } });
+  if (!po) return false;
+  const items = await db.ProcurementItem.findAll({ where: { po_id: po.id } });
+  if (items.length === 0) return false;
+  return items.every((it) => Number(it.received_quantity) >= Number(it.quantity));
+};
+
+// Ordered approval for procurement expenses. Ignores to_role_id — the next role is
+// read from PROCUREMENT_EXPENSE_FLOW by flow_position, so a client can't skip a step.
+// The final CFO step (position 7) closes as APPROVED routed to PAYMENT_MGR, but only
+// after every PO line item has been received.
+const approveProcurementFlow = async (expense, user, remarks, actorRole, actorEmployment) => {
+  const step = PROCUREMENT_EXPENSE_FLOW.find((s) => s.position === (expense.flow_position || 1));
+  const handlerRole = await findRoleByCode(step.roleCode);
+
+  if (user.roleCode !== 'SUPER_ADMIN' && expense.current_role_id !== handlerRole?.id) {
+    throw ApiError.forbidden('Only the current handler can approve this expense');
+  }
+  const fromRole = expense.current_role_id;
+
+  return sequelize.transaction(async (t) => {
+    if (step.final) {
+      if (!(await allProcurementItemsReceived(expense.id))) {
+        throw ApiError.badRequest('All PO items must be marked as received before final approval');
+      }
+
+      // The final amount was already set at PO creation (the selected quotation's
+      // total). Procurement expenses carry no advance.
+      const finalAmount = Number(decrypt(String(expense.final_amount || expense.estimated_amount || '0')));
+      const initialPaymentStatus = computePaymentStatus([], finalAmount, 0);
+      const paymentMgr = await findRoleByCode('PAYMENT_MGR');
+
+      await expense.update(
+        {
+          status: 'APPROVED',
+          current_role_id: paymentMgr?.id ?? null,
+          current_employment_id: null,
+          closed_at: new Date(),
+          final_amount: String(finalAmount),
+          advance_amount: '0',
+          paid_amount: '0',
+          payment_status: initialPaymentStatus,
+        },
+        { transaction: t },
+      );
+      await logExpenseHandover({
+        expenseId: expense.id, fromRoleId: fromRole, toRoleId: fromRole,
+        employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
+      });
+    } else {
+      const nextStep = PROCUREMENT_EXPENSE_FLOW.find((s) => s.position === step.position + 1);
+      const nextRole = await findRoleByCode(nextStep.roleCode);
+
+      await expense.update(
+        { current_role_id: nextRole?.id ?? null, current_employment_id: null, flow_position: nextStep.position },
+        { transaction: t },
+      );
+      await logExpenseHandover({
+        expenseId: expense.id, fromRoleId: fromRole, toRoleId: nextRole?.id ?? null,
+        employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
+      });
+    }
+    return expenseRepository.findByUuid(expense.uuid, t);
   });
 };
 
@@ -798,9 +956,16 @@ export const approve = async (uuid, user, remarks, toRoleId = null) => {
   }
 
   const category = await ExpenseCategory.findByPk(expense.category_id);
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
+
+  // Procurement expenses run a deterministic ordered flow (flow_position) that
+  // ignores to_role_id — approve advances to the next step in the chain.
+  if (category?.module === 'procurement') {
+    return approveProcurementFlow(expense, user, remarks, actorRole, actorEmployment);
+  }
+
   const finalApprover = category?.final_approver_role_id ?? null;
   const fromRole = expense.current_role_id;
-  const actorEmployment = await getActiveEmploymentByUser(user.userId);
 
   // Determine the target role for handover
   const targetRoleId = toRoleId ?? finalApprover;
@@ -928,10 +1093,23 @@ export const reject = async (uuid, user, remarks) => {
   }
   const fromRole = expense.current_role_id;
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
+  const category = await ExpenseCategory.findByPk(expense.category_id);
 
   return sequelize.transaction(async (t) => {
+    // Procurement rejections route back to the procurement admin (ADMIN_MGR) who
+    // resubmits after fixing the cited issues; the ordered flow restarts at step 1.
+    const procurementAdmin = category?.module === 'procurement'
+      ? await findRoleByCode('ADMIN_MGR')
+      : null;
+
     await expense.update(
-      { status: 'REJECTED', current_role_id: null, current_employment_id: null, closed_at: new Date() },
+      {
+        status: 'REJECTED',
+        current_role_id: procurementAdmin?.id ?? null,
+        current_employment_id: null,
+        flow_position: category?.module === 'procurement' ? null : expense.flow_position,
+        closed_at: new Date(),
+      },
       { transaction: t },
     );
     await logExpenseHandover({
@@ -1020,6 +1198,12 @@ export const recordPayment = async (uuid, user, paymentData) => {
     throw ApiError.badRequest('This expense is already paid');
   }
 
+  // Procurement expenses: payment may not start until every PO line item has been
+  // delivered (backstop — the final CFO approval already enforces this too).
+  if (expense.category?.module === 'procurement' && !(await allProcurementItemsReceived(expense.id))) {
+    throw ApiError.badRequest('All PO items must be marked as received before payment');
+  }
+
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
   const { amount, payment_method, payment_date, payment_type, reference_number, remarks, proofs } = paymentData;
 
@@ -1091,8 +1275,11 @@ export const recordPayment = async (uuid, user, paymentData) => {
         payment_status: newPaymentStatus,
         // Keep the approval status (APPROVED) untouched — only the payment_status
         // reflects payment. When fully settled/paid, route the expense to its handler.
+        // Procurement expenses close as COMPLETED (no handler) — fully paid = done.
         ...(isSettled
-          ? { current_role_id: settledHandler, current_employment_id: null }
+          ? expense.category?.module === 'procurement'
+            ? { status: 'COMPLETED', current_role_id: null, current_employment_id: null }
+            : { current_role_id: settledHandler, current_employment_id: null }
           : {}),
       },
       { transaction: t },
@@ -1331,4 +1518,120 @@ export const getMyPaymentRequests = async (user, params = {}) => {
   const result = await expenseRepository.findAll(where, params);
   if (params.decrypt) decryptResults(result.rows);
   return result;
+};
+
+// ── Procurement expense fulfilment (admin) ──
+
+// Record delivered quantities on the PO line items of a procurement expense.
+// `items` = [{ procurement_item_id, received_quantity }] — quantities clamp to
+// 0..quantity so a partial delivery can never exceed the ordered amount.
+export const updateItemsReceived = async (uuid, user, items) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+  if (category?.module !== 'procurement') {
+    throw ApiError.badRequest('Items received only applies to procurement expenses');
+  }
+  if (expense.status !== 'SUBMITTED') {
+    throw ApiError.badRequest('You can only mark received quantities while the expense is pending approval');
+  }
+  if (!['ADMIN_MGR', 'SUPER_ADMIN'].includes(user.roleCode)) {
+    throw ApiError.forbidden('Only the procurement admin can mark received quantities');
+  }
+
+  const po = await ProcurementOrder.findOne({ where: { expense_id: expense.id } });
+  if (!po) throw ApiError.badRequest('No purchase order linked to this expense');
+
+  const rows = Array.isArray(items) ? items : [];
+  return sequelize.transaction(async (t) => {
+    const receivedRows = [];
+    for (const row of rows) {
+      const item = await db.ProcurementItem.findOne({
+        where: { id: row.procurement_item_id, po_id: po.id },
+        transaction: t,
+      });
+      if (!item) continue;
+      const maxQty = Number(item.quantity) || 0;
+      const received = Math.min(Math.max(Number(row.received_quantity) || 0, 0), maxQty);
+      await item.update({ received_quantity: received }, { transaction: t });
+      receivedRows.push({
+        name: item.item_name || 'Item',
+        ordered: item.quantity,
+        received,
+      });
+    }
+
+    // Log who marked the items as received and how much of each item was received.
+    if (receivedRows.length) {
+      const actorRole = await findRoleByCode(user.roleCode);
+      const actorEmployment = await getActiveEmploymentByUser(user.userId);
+      const summary = receivedRows
+        .map((r) => `${r.name} ×${r.received}/${r.ordered}`)
+        .join(', ');
+      await logExpenseHandover({
+        expenseId: expense.id,
+        fromRoleId: actorRole?.id,
+        toRoleId: actorRole?.id,
+        employmentId: actorEmployment?.id,
+        actionType: 'ITEMS_RECEIVED',
+        remarks: `Items received: ${summary}`,
+        t,
+      });
+    }
+
+    return expenseRepository.findByUuid(uuid, t);
+  });
+};
+
+// Attach a PO PDF or vendor invoice to a procurement expense. The file is uploaded
+// to /uploads first and stored here as an expense_document row with module_name =
+// 'PO_PDF' / 'INVOICE' (module_record_id stays null — it's a header-level file).
+export const addExpenseDocument = async (uuid, user, payload) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+  if (category?.module !== 'procurement') {
+    throw ApiError.badRequest('Documents only apply to procurement expenses');
+  }
+  if (['DRAFT', 'REJECTED', 'COMPLETED'].includes(expense.status)) {
+    throw ApiError.badRequest('Cannot attach a document to this expense in its current status');
+  }
+
+  const { document_type, url, original_file_name, file_size, mime_type, file_extension } = payload;
+  const employment = await getActiveEmploymentByUser(user.userId);
+  const fileName = (url || '').split('/').pop();
+
+  const doc = await db.ExpenseDocument.create({
+    expense_id: expense.id,
+    module_name: document_type,
+    module_record_id: null,
+    original_file_name: original_file_name || fileName,
+    stored_file_name: fileName,
+    file_path: url,
+    mime_type: mime_type || null,
+    file_extension: file_extension || null,
+    file_size: file_size || null,
+    uploaded_by_employment_id: employment?.id ?? null,
+  });
+
+  return {
+    uuid: doc.uuid,
+    document_type,
+    original_file_name: doc.original_file_name,
+    file_path: doc.file_path,
+  };
+};
+
+// Remove a header-level document (PO PDF / invoice) from a procurement expense.
+export const deleteExpenseDocument = async (uuid, user, documentUuid) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+
+  const doc = await db.ExpenseDocument.findOne({ where: { uuid: documentUuid, expense_id: expense.id } });
+  if (!doc) throw ApiError.notFound('Document not found');
+
+  await doc.destroy({ force: true });
+  return { message: 'Document removed' };
 };

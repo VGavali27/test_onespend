@@ -1,7 +1,7 @@
 /**
  * Seeder: Assign permissions to roles
  *
- * Permission IDs:  100-178 (79 permissions covering all modules)
+ * Permission IDs:  100-179 (80 permissions covering all modules)
  * Role IDs from 20260724000002-seed-roles:
  *   100 - SUPER_ADMIN
  *   101 - CFO
@@ -25,6 +25,8 @@ const rolePermissions = [
   [100, 177],
   // SUPER_ADMIN (100) - procurement reject (178)
   [100, 178],
+  // SUPER_ADMIN (100) - procurement print PR (179)
+  [100, 179],
 
   // CFO (101)
   [101, 100], [101, 101], [101, 102], [101, 103],
@@ -93,6 +95,8 @@ const rolePermissions = [
   [106, 175], [106, 176],
   // ADMIN_MGR (106) - procurement reject (178)
   [106, 178],
+  // ADMIN_MGR (106) - procurement print PR (179)
+  [106, 179],
 
   // ADMIN_JR (107)
   [107, 100], [107, 102], [107, 105], [107, 107],
@@ -106,6 +110,8 @@ const rolePermissions = [
   [107, 165], [107, 166], [107, 169], [107, 170],
   [107, 171], [107, 172], [107, 173], [107, 174],
   [107, 175], [107, 176],
+  // ADMIN_JR (107) - procurement print PR (179)
+  [107, 179],
 
   // TRAVEL_MGR (108)
   [108, 150], [108, 151], [108, 152], [108, 153],

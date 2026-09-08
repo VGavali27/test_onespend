@@ -463,6 +463,13 @@ export const updateItems = async (uuid, user, items = []) => {
     throw ApiError.forbidden('Only admin can edit PR line items');
   }
 
+  // Once a quotation exists on the PR the requester compares those prices —
+  // the PR line items are frozen (the vendors' quotations are the source of truth).
+  const quotationCount = await db.ProcurementQuotation.count({ where: { pr_id: pr.id } });
+  if (quotationCount > 0) {
+    throw ApiError.badRequest('PR line items are locked once quotations exist — edit the quotations instead');
+  }
+
   const totals = computeTotals(items);
   return sequelize.transaction(async (t) => {
     await pr.update({ ...totals }, { transaction: t });

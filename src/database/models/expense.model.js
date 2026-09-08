@@ -37,6 +37,9 @@ export default (sequelize, DataTypes) => {
       advance_amount: { type: DataTypes.TEXT, allowNull: true, defaultValue: '0' },
       paid_amount: { type: DataTypes.TEXT, allowNull: true, defaultValue: '0' },
       status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'DRAFT' },
+      // Ordered approval step for procurement expenses (1-based); null for other
+      // modules and for REJECTED procurement expenses (restart at 1 on resubmit).
+      flow_position: { type: DataTypes.SMALLINT.UNSIGNED, allowNull: true },
       payment_status: {
         type: DataTypes.ENUM('UNPAID', 'PARTIAL_PAID', 'PAID', 'ADVANCE_REFUND_DUE', 'ADDITIONAL_PAYMENT_DUE', 'SETTLED'),
         allowNull: false,

@@ -1,5 +1,37 @@
 import Joi from 'joi';
 
+// Schema for updating PO delivered quantities on a procurement expense
+export const itemsReceivedSchema = Joi.object({
+  items: Joi.array()
+    .items(
+      Joi.object({
+        procurement_item_id: Joi.number().integer().required().messages({ 'any.required': 'procurement_item_id is required' }),
+        received_quantity: Joi.number().min(0).required().messages({
+          'number.base': 'received_quantity must be a number',
+          'number.min': 'received_quantity cannot be negative',
+          'any.required': 'received_quantity is required',
+        }),
+      })
+    )
+    .min(1)
+    .required()
+    .messages({ 'array.min': 'At least one item is required' }),
+});
+
+// Schema for attaching a header-level document (PO PDF / invoice) to a
+// procurement expense. `document_type` is the module_name stored on the row.
+export const expenseDocumentSchema = Joi.object({
+  document_type: Joi.string().valid('PO_PDF', 'INVOICE').required().messages({
+    'any.only': 'document_type must be one of: PO_PDF, INVOICE',
+    'any.required': 'document_type is required',
+  }),
+  url: Joi.string().required().messages({ 'string.empty': 'File url is required' }),
+  original_file_name: Joi.string(),
+  file_size: Joi.number(),
+  mime_type: Joi.string(),
+  file_extension: Joi.string(),
+});
+
 // Schema for recording a payment installment
 export const recordPaymentSchema = Joi.object({
   amount: Joi.string().required().messages({ 'string.empty': 'Amount is required' }),

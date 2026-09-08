@@ -120,6 +120,8 @@ export async function up(queryInterface, Sequelize) {
     description: { type: Sequelize.TEXT, allowNull: true },
     category: { type: Sequelize.STRING(100), allowNull: true },
     quantity: { type: Sequelize.INTEGER, allowNull: true, defaultValue: 1 },
+    // Delivered quantity on PO line items (partial deliveries allowed)
+    received_quantity: { type: Sequelize.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
     unit_price: { type: Sequelize.TEXT, allowNull: true },
     // tax rate (%) stored plain — only sensitive amounts are encrypted
     tax_rate: { type: Sequelize.DECIMAL(10, 2), allowNull: true },

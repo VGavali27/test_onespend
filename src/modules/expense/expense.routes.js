@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as expenseController from './expense.controller.js';
 import validate from '../../middleware/validate.js';
 import { authMiddleware, requirePermission } from '../../middleware/auth.js';
-import { createExpenseSchema, updateExpenseSchema, actionSchema, recordPaymentSchema } from './expense.validation.js';
+import { createExpenseSchema, updateExpenseSchema, actionSchema, recordPaymentSchema, itemsReceivedSchema, expenseDocumentSchema } from './expense.validation.js';
 const router = Router();
 router.use(authMiddleware);
 // Scoped "all expenses" list (role + company scoping in the service)
@@ -29,6 +29,11 @@ router.delete('/:uuid', requirePermission('expenses:delete'), expenseController.
 router.post('/:uuid/submit', requirePermission('expenses:submit'), validate(actionSchema), expenseController.submitExpense);
 router.post('/:uuid/approve', requirePermission('expenses:approve'), validate(actionSchema), expenseController.approveExpense);
 router.post('/:uuid/reject', requirePermission('expenses:reject'), validate(actionSchema), expenseController.rejectExpense);
+
+// ── Procurement expense fulfilment (admin: mark received + PO PDF / invoice) ──
+router.post('/:uuid/items-received', requirePermission('expenses:update'), validate(itemsReceivedSchema), expenseController.updateItemsReceived);
+router.post('/:uuid/documents', requirePermission('expenses:update'), validate(expenseDocumentSchema), expenseController.addExpenseDocument);
+router.delete('/:uuid/documents/:documentUuid', requirePermission('expenses:update'), expenseController.deleteExpenseDocument);
 
 // ── Payment endpoints (require expenses:pay permission) ──
 router.post('/:uuid/payments', requirePermission('expenses:pay'), validate(recordPaymentSchema), expenseController.recordPayment);

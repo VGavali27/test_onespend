@@ -873,6 +873,17 @@ export async function up({ context }) {
       created_at: new Date(),
       updated_at: new Date(),
     },
+    {
+      id: 179,
+      uuid: 'f1a2b3c4-d5e6-7890-fabc-123456789080',
+      resource: 'procurement',
+      action: 'print_pr',
+      permission_key: 'procurement:print_pr',
+      description: 'View / print a Purchase Request as PDF',
+      status: 'ACTIVE',
+      created_at: new Date(),
+      updated_at: new Date(),
+    },
   ]);
 }
 
@@ -880,7 +891,7 @@ export async function down({ context }) {
   return context.bulkDelete(
     'permissions',
     {
-      id: Array.from({ length: 79 }, (_, i) => 100 + i),
+      id: Array.from({ length: 80 }, (_, i) => 100 + i),
     },
     {},
   );

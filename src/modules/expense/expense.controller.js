@@ -190,3 +190,35 @@ export const getMyPaymentRequests = async (req, res, next) => {
     next(error);
   }
 };
+
+// ── Procurement expense fulfilment (admin) ──
+
+// Record delivered quantities on PO line items (body: { items: [{ procurement_item_id, received_quantity }] })
+export const updateItemsReceived = async (req, res, next) => {
+  try {
+    const expense = await expenseService.updateItemsReceived(req.params.uuid, req.user, req.body.items);
+    return ApiResponse.success(res, expense, 'Received quantities updated');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Attach a PO PDF / invoice to a procurement expense (body: { document_type, url, ... })
+export const addExpenseDocument = async (req, res, next) => {
+  try {
+    const doc = await expenseService.addExpenseDocument(req.params.uuid, req.user, req.body);
+    return ApiResponse.created(res, doc, 'Document attached successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Remove a header-level document (PO PDF / invoice) from a procurement expense
+export const deleteExpenseDocument = async (req, res, next) => {
+  try {
+    const result = await expenseService.deleteExpenseDocument(req.params.uuid, req.user, req.params.documentUuid);
+    return ApiResponse.success(res, null, result.message);
+  } catch (error) {
+    next(error);
+  }
+};
