@@ -22,6 +22,9 @@ import {
   Edit,
   Upload,
   Info,
+  Printer,
+  Trash2,
+  PackageCheck,
 } from "lucide-react";
 import {
   getExpenseById,
@@ -37,8 +40,12 @@ import {
   recordPayment,
   handoverForPayment,
   getPaymentHandoverRoles,
+  updateItemsReceived,
+  addExpenseDocument,
+  deleteExpenseDocument,
 } from "@/services/expenseService";
 import { uploadImage } from "@/services/uploadService";
+import PurchaseOrderPdfOverlay from "@/components/ui/PurchaseOrderPdf";
 import ErrorState from "@/components/ui/ErrorState";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Modal from "@/components/ui/Modal";
@@ -52,6 +59,19 @@ import {
   formatNumber,
   formatType,
 } from "@/utils/format";
+
+// Fixed approval ladder for procurement-category expenses (mirrors the backend
+// PROCUREMENT_EXPENSE_FLOW). Each step carries its position, handler role and a
+// human label used by the Approve modal's contextual banner.
+const PROC_EXPENSE_FLOW_STEPS = [
+  { position: 1, role: "CFO", label: "CFO review" },
+  { position: 2, role: "ADMIN_MGR", label: "Procurement admin" },
+  { position: 3, role: "FINANCE_MGR", label: "Finance manager" },
+  { position: 4, role: "CFO", label: "CFO" },
+  { position: 5, role: "PAYMENT_MGR", label: "Payment manager" },
+  { position: 6, role: "CFO", label: "CFO (pre-payment)" },
+  { position: 7, role: "CFO", label: "CFO (final)", final: true },
+];
 
 export default function ExpenseDetail() {
   const { id } = useParams();
@@ -83,6 +103,13 @@ export default function ExpenseDetail() {
   const [paymentHandoverRemarks, setPaymentHandoverRemarks] = useState("");
   const [actingPaymentHandover, setActingPaymentHandover] = useState(false);
   const [activeTab, setActiveTab] = useState("overview"); // 'overview' | 'approvals' | 'payments'
+  // Procurement fulfilment UI — PO PDF preview/upload, received quantities, invoice
+  const [showPoPdf, setShowPoPdf] = useState(false);
+  const [poPdfUploading, setPoPdfUploading] = useState(false);
+  const [receivedDraft, setReceivedDraft] = useState(null); // { itemId: received_quantity } while editing
+  const [savingReceived, setSavingReceived] = useState(false);
+  const [invoiceUploading, setInvoiceUploading] = useState(false);
+  const [deletingDoc, setDeletingDoc] = useState(null);
   const toast = useToast();
 
   const loadExpense = useCallback(async () => {
@@ -107,8 +134,9 @@ export default function ExpenseDetail() {
         }
       }
 
-      // Load payment history + summary when the expense is approved (or already paid)
-      if (normalized?.status === "APPROVED" || normalized?.status === "PAID") {
+      // Load payment history + summary when the expense is approved, in payment, or
+      // settled (COMPLETED) so the settled state can still be reviewed.
+      if (["APPROVED", "PAID", "COMPLETED"].includes(normalized?.status)) {
         setLoadingPayments(true);
         try {
           const [payRes, sumRes] = await Promise.all([
@@ -179,6 +207,30 @@ export default function ExpenseDetail() {
 
   const isCurrentHandler = user?.role === expense?.currentRole?.code;
 
+  // ── Procurement fulfillment context ──
+  const isProcurement = expense?.isProcurement === true;
+  const isProcAdmin =
+    isProcurement && (user?.role === "ADMIN_MGR" || user?.role === "SUPER_ADMIN");
+  const chainPo = procurementChain?.po || null;
+  // The chain's PO node now carries company / vendor_record / requester / items with
+  // item_name — enough to render the same A4 sheet the procurement detail uses.
+  const poForPdf = chainPo
+    ? {
+        ...chainPo,
+        vendor: chainPo.vendor_record || {},
+        items: (chainPo.items || []).map((it) => ({
+          ...it,
+          item_name: it.item_name ?? it.name,
+        })),
+      }
+    : null;
+  const poPdfDocs = (expense?.documents || []).filter((d) => d.module_name === "PO_PDF");
+  const invoiceDocs = (expense?.documents || []).filter((d) => d.module_name === "INVOICE");
+  const flowStep = PROC_EXPENSE_FLOW_STEPS.find((s) => s.position === expense?.flow_position);
+  const nextFlowStep = isProcurement
+    ? PROC_EXPENSE_FLOW_STEPS.find((s) => s.position === (expense?.flow_position || 0) + 1)
+    : null;
+
   const loadPaymentHandoverRoles = useCallback(async () => {
     setLoadingPaymentHandoverRoles(true);
     try {
@@ -214,6 +266,13 @@ export default function ExpenseDetail() {
   };
 
   const handleApproveClick = useCallback(async () => {
+    // Procurement expenses follow a fixed step ladder (no handover dropdown) — see
+    // the contextual banner in the confirm modal.
+    if (expense?.isProcurement) {
+      setHandoverRoles([]);
+      setConfirmAction("approve");
+      return;
+    }
     // If current handler is the final approver, don't load handover roles —
     // the expense will be closed as APPROVED regardless of any selection
     if (!isFinalApprover) {
@@ -222,7 +281,7 @@ export default function ExpenseDetail() {
       setHandoverRoles([]);
     }
     setConfirmAction("approve");
-  }, [loadHandoverRoles, isFinalApprover]);
+  }, [loadHandoverRoles, isFinalApprover, expense?.isProcurement]);
 
   const runAction = async (key, actionRemarks) => {
     setActing(true);
@@ -250,6 +309,76 @@ export default function ExpenseDetail() {
       toast.error(e?.response?.data?.message || "Action failed.");
     } finally {
       setActing(false);
+    }
+  };
+
+  // ── Procurement fulfillment handlers ──
+
+  const startEditReceived = () => {
+    const draft = {};
+    (chainPo?.items || []).forEach((it) => {
+      draft[it.id] = Number(it.received_quantity) || 0;
+    });
+    setReceivedDraft(draft);
+  };
+
+  const saveReceived = async () => {
+    setSavingReceived(true);
+    try {
+      const items = Object.entries(receivedDraft || {}).map(
+        ([itemId, qty]) => ({
+          procurement_item_id: Number(itemId),
+          received_quantity: Number(qty) || 0, // backend clamps to 0..ordered qty
+        }),
+      );
+      await updateItemsReceived(id, items);
+      toast.success("Received quantities updated");
+      setReceivedDraft(null);
+      await loadExpense();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Failed to update received quantities.");
+    } finally {
+      setSavingReceived(false);
+    }
+  };
+
+  // Upload a signed PO PDF or vendor invoice: POST /uploads first, then register the
+  // expense_document row (module_name = PO_PDF / INVOICE, module_record_id null).
+  const handleDocumentUpload = async (file, documentType) => {
+    if (!file) return;
+    if (documentType === "PO_PDF") setPoPdfUploading(true);
+    else setInvoiceUploading(true);
+    try {
+      const { data: up } = await uploadImage(file, "expenses");
+      const url = up?.data?.url || up?.url;
+      if (!url) throw new Error("Upload failed — no file URL returned");
+      await addExpenseDocument(id, {
+        document_type: documentType,
+        url,
+        original_file_name: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+      });
+      toast.success(documentType === "PO_PDF" ? "PO PDF uploaded" : "Invoice uploaded");
+      await loadExpense();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Failed to upload document.");
+    } finally {
+      setPoPdfUploading(false);
+      setInvoiceUploading(false);
+    }
+  };
+
+  const handleDeleteDocument = async (documentUuid) => {
+    setDeletingDoc(documentUuid);
+    try {
+      await deleteExpenseDocument(id, documentUuid);
+      toast.success("Document removed");
+      await loadExpense();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Failed to remove document.");
+    } finally {
+      setDeletingDoc(null);
     }
   };
 
@@ -314,6 +443,7 @@ export default function ExpenseDetail() {
             count: (procurementChain?.quotations || []).length,
           },
           { id: "po", label: "Purchase Order", icon: ShoppingCart },
+          { id: "invoice", label: "Invoice", icon: ReceiptText, count: invoiceDocs.length },
         ]
       : []),
     { id: "approvals", label: "Approvals", icon: ArrowRightLeft },
@@ -930,10 +1060,120 @@ export default function ExpenseDetail() {
         </ProcurementStage>
       )}
 
-      {/* === Purchase Order tab === */}
+      {/* === Purchase Order tab: doc card + signed-PO-PDF store + received quantities === */}
       {activeTab === "po" && (
         <ProcurementStage loading={loadingChain} available={Boolean(procurementChain)}>
-          <ProcurementDocCard title="Purchase Order" doc={procurementChain?.po} />
+          <ProcurementDocCard title="Purchase Order" doc={chainPo} />
+
+          {/* PO document — preview the A4 sheet admin generates in procurement, then
+              upload the signed copy against the expense (module_name = PO_PDF). */}
+          <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-slate-400" />
+                <h4 className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+                  PO Document
+                </h4>
+              </div>
+              <button
+                type="button"
+                disabled={!chainPo}
+                onClick={() => setShowPoPdf(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                View / Print PO PDF
+              </button>
+            </div>
+            <div className="px-4 sm:px-6 py-4 space-y-3">
+              <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                Review the purchase order, save it as a PDF, get it signed by the vendor,
+                then upload the signed copy here for the audit trail.
+              </p>
+              {isProcAdmin && (
+                <UploadDocRow
+                  label="Upload signed PO PDF"
+                  uploading={poPdfUploading}
+                  onFile={(f) => handleDocumentUpload(f, "PO_PDF")}
+                />
+              )}
+              {poPdfDocs.length === 0 ? (
+                <p className="text-[12px] text-slate-400">No signed PO PDF uploaded yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {poPdfDocs.map((d) => (
+                    <DocFileRow
+                      key={d.uuid}
+                      doc={d}
+                      deletable={isProcAdmin && expense.status !== "COMPLETED"}
+                      deleting={deletingDoc === d.uuid}
+                      onDelete={() => handleDeleteDocument(d.uuid)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {/* Received quantities — the procurement admin marks delivered quantities on
+              the linked PO items while the expense is SUBMITTED. Payment cannot begin
+              until every item is fully received. */}
+          {isProcAdmin && expense.status === "SUBMITTED" && chainPo?.items?.length > 0 && (
+            <ReceivedItemsEditor
+              items={chainPo.items}
+              draft={receivedDraft}
+              saving={savingReceived}
+              onChange={(itemId, qty) =>
+                setReceivedDraft((prev) => ({ ...prev, [itemId]: qty }))
+              }
+              onStartEdit={startEditReceived}
+              onSave={saveReceived}
+              onCancel={() => setReceivedDraft(null)}
+            />
+          )}
+        </ProcurementStage>
+      )}
+
+      {/* === Invoice tab: vendor invoice attached to the expense (module_name = INVOICE) === */}
+      {activeTab === "invoice" && (
+        <ProcurementStage loading={loadingChain} available={Boolean(procurementChain)}>
+          <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+              <div className="flex items-center gap-2 min-w-0">
+                <ReceiptText className="h-4 w-4 text-slate-400" />
+                <h4 className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+                  Invoice
+                </h4>
+              </div>
+              {isProcAdmin && expense.status !== "COMPLETED" && (
+                <UploadDocRow
+                  label="Upload invoice"
+                  uploading={invoiceUploading}
+                  onFile={(f) => handleDocumentUpload(f, "INVOICE")}
+                />
+              )}
+            </div>
+            <div className="px-4 sm:px-6 py-4 space-y-3">
+              <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                Attach the vendor's invoice for this purchase order.
+              </p>
+              {invoiceDocs.length === 0 ? (
+                <p className="text-[12px] text-slate-400">No invoice uploaded yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {invoiceDocs.map((d) => (
+                    <DocFileRow
+                      key={d.uuid}
+                      doc={d}
+                      deletable={isProcAdmin && expense.status !== "COMPLETED"}
+                      deleting={deletingDoc === d.uuid}
+                      onDelete={() => handleDeleteDocument(d.uuid)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </ProcurementStage>
       )}
 
@@ -974,6 +1214,22 @@ export default function ExpenseDetail() {
               />
               <span className="text-[12px] text-slate-400">
                 Expense was rejected — edit if needed, then resubmit to send it through the approval flow again.
+              </span>
+            </div>
+          )}
+
+          {isProcurement && expense.status === "REJECTED" && isProcAdmin && !expense.canEdit && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
+                icon={Loader2}
+                label="Restart approval flow"
+                tone="primary"
+                disabled={acting}
+                onClick={() => setConfirmAction("resubmit")}
+              />
+              <span className="text-[12px] text-slate-400">
+                Rejected by the procurement chain — as the procurement admin you can restart
+                the 7-step approval flow from the CFO.
               </span>
             </div>
           )}
@@ -1030,7 +1286,7 @@ export default function ExpenseDetail() {
       {/* === Payments tab: payment summary, history, recording + handover === */}
       {activeTab === "payments" && (
         <>
-          {expense.status === "APPROVED" || expense.status === "PAID" ? (
+          {expense.status === "APPROVED" || expense.status === "PAID" || expense.status === "COMPLETED" ? (
             <>
               <PaymentSection
                 expense={expense}
@@ -1127,6 +1383,14 @@ export default function ExpenseDetail() {
         />
       )}
 
+      {/* A4 Purchase Order preview — same reusable sheet the procurement detail uses,
+          fed from the enriched chain PO node (company / vendor_record / requester). */}
+      <PurchaseOrderPdfOverlay
+        po={poForPdf}
+        open={showPoPdf}
+        onClose={() => setShowPoPdf(false)}
+      />
+
       <UserDetailsModal
         employment={viewUser}
         onClose={() => setViewUser(null)}
@@ -1163,7 +1427,25 @@ export default function ExpenseDetail() {
                     ? "Mark this expense as rejected and clear the current handler."
                     : "Resubmit this expense to restart the approval flow."}
             </p>
-            {confirmAction === "approve" && isFinalApprover && (
+            {confirmAction === "approve" && isProcurement && (
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800">
+                  <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <span className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
+                    {flowStep?.final
+                      ? "Final approval — the payment manager processes payment once all PO items are received."
+                      : nextFlowStep
+                        ? `Next step: ${nextFlowStep.label} (${nextFlowStep.role}).`
+                        : "This expense will continue routing through the approval chain."}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Procurement expenses follow a fixed 7-step chain — CFO → Admin → Finance →
+                  CFO → Payment Manager → CFO → Final CFO. No handover selection needed.
+                </p>
+              </div>
+            )}
+            {confirmAction === "approve" && !isProcurement && isFinalApprover && (
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -1204,7 +1486,7 @@ export default function ExpenseDetail() {
                 </p>
               </div>
             )}
-            {confirmAction === "approve" && !isFinalApprover &&
+            {confirmAction === "approve" && !isProcurement && !isFinalApprover &&
               handoverRoles.length === 0 &&
               !loadingHandoverRoles && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400">
@@ -1876,6 +2158,7 @@ const ACTION_ICONS = {
   SELECT_QUOTATION: CheckCircle2,
   CONVERT_TO_EXPENSE: Wallet,
   RECEIVED: Inbox,
+  ITEMS_RECEIVED: PackageCheck,
 };
 
 function ApprovalTrail({ handovers }) {
@@ -1913,7 +2196,9 @@ function ApprovalTrail({ handovers }) {
                         ? "bg-red-500"
                         : h.action_type === "PAY"
                           ? "bg-emerald-500"
-                          : "bg-indigo-500"
+                          : h.action_type === "ITEMS_RECEIVED"
+                            ? "bg-amber-500"
+                            : "bg-indigo-500"
                     }`}
                   />
                   <div className="flex items-center gap-2">
@@ -2260,6 +2545,192 @@ const reimbursementTotal = (re) =>
   (re.items || []).reduce((s, it) => s + (Number(it.total_amount) || 0), 0);
 const reimbursementBalance = (re) =>
   reimbursementTotal(re) - (Number(re.advance_amount) || 0);
+
+// Upload button with a hidden file input — the parent decides what happens with the
+// file via `onFile` (upload to /uploads + register the expense_document row).
+function UploadDocRow({ label, uploading, onFile }) {
+  const inputRef = useRef(null);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        disabled={uploading}
+        onClick={() => inputRef.current?.click()}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-60 transition-colors dark:text-indigo-300 dark:bg-indigo-900/20 dark:border-indigo-800/40"
+      >
+        {uploading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Upload className="h-3.5 w-3.5" />
+        )}
+        {uploading ? "Uploading..." : label}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.png,.jpg,.jpeg"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFile(f);
+          e.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
+// A stored header-level document (signed PO PDF / invoice) with a delete button.
+function DocFileRow({ doc, deletable, deleting, onDelete }) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-gray-800/40 border border-slate-200 dark:border-gray-700 rounded-lg px-3 py-2">
+      <a
+        href={doc.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 text-[12px] text-indigo-600 dark:text-indigo-400 hover:underline min-w-0"
+      >
+        <Paperclip className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+        <span className="truncate">{doc.name || doc.url}</span>
+      </a>
+      {deletable && (
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={deleting}
+          title="Remove document"
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 dark:text-red-400 hover:text-red-700 disabled:opacity-60"
+        >
+          {deleting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="h-3.5 w-3.5" />
+          )}
+        </button>
+      )}
+    </li>
+  );
+}
+
+// Received-quantities editor — read-only table of ordered vs received, switching to
+// number inputs while `draft` is set. The backend clamps each entry to 0..ordered qty.
+function ReceivedItemsEditor({ items, draft, saving, onChange, onStartEdit, onSave, onCancel }) {
+  const editing = draft != null;
+  const allReceived =
+    items.length > 0 &&
+    items.every(
+      (it) => (Number(it.received_quantity) || 0) >= (Number(it.quantity) || 0),
+    );
+
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-gray-700 bg-slate-50/50 dark:bg-gray-800/40">
+        <div className="flex items-center gap-2 min-w-0">
+          <PackageCheck className="h-4 w-4 text-slate-400" />
+          <h4 className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
+            Received quantities
+          </h4>
+          {!editing && allReceived && (
+            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+              All items received
+            </span>
+          )}
+        </div>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-3 py-1.5 rounded-lg text-[12px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-60"
+            >
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {saving ? "Saving..." : "Save quantities"}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onStartEdit}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors dark:text-indigo-300 dark:bg-indigo-900/20 dark:border-indigo-800/40"
+          >
+            <Edit className="h-3.5 w-3.5" />
+            Edit received
+          </button>
+        )}
+      </div>
+      <div className="px-4 sm:px-6 py-4">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px] table-fixed">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-gray-700">
+                <th className="px-3 py-2 font-semibold w-[45%]">Item</th>
+                <th className="px-3 py-2 font-semibold w-[20%] text-center">Ordered</th>
+                <th className="px-3 py-2 font-semibold w-[20%] text-center">Received</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td className="px-3 py-2.5 font-medium text-slate-800 dark:text-slate-200 break-words">
+                    {item.name || item.item_name}
+                    {item.description && (
+                      <span className="block text-[11px] font-normal text-slate-400 truncate">
+                        {item.description}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-center text-slate-600 dark:text-slate-400 font-mono">
+                    {Number(item.quantity) || 0}
+                  </td>
+                  <td className="px-3 py-2.5 text-center">
+                    {editing ? (
+                      <input
+                        type="number"
+                        min={0}
+                        max={Number(item.quantity) || 0}
+                        step="1"
+                        value={draft[item.id] ?? 0}
+                        onChange={(e) =>
+                          onChange(item.id, Math.max(Number(e.target.value) || 0, 0))
+                        }
+                        className="w-20 px-2 py-1 rounded-lg text-[13px] text-center text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+                      />
+                    ) : (
+                      <span
+                        className={`font-mono ${
+                          (Number(item.received_quantity) || 0) >= (Number(item.quantity) || 0)
+                            ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                            : Number(item.received_quantity) > 0
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-slate-400"
+                        }`}
+                      >
+                        {Number(item.received_quantity) || 0}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!editing && (
+          <p className="text-[11px] text-slate-400 mt-3">
+            Payments cannot begin until every PO item is fully received.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function ActionButton({
   icon: Icon,

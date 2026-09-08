@@ -10,6 +10,7 @@ const STATUS_STYLES = {
   APPROVED: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-400/20',
   REJECTED: 'bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-400/20',
   PAID: 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-400/20',
+  COMPLETED: 'bg-indigo-950/30 text-indigo-600 ring-indigo-600/20 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-400/30',
 
   // Payment statuses
   UNPAID: 'bg-slate-50 text-slate-700 ring-slate-600/20 dark:bg-gray-800 dark:text-slate-300 dark:ring-slate-400/20',

@@ -281,6 +281,10 @@ VITE_APP_ENV=development
 - **PDFs live in procurement only** — once a PO is converted to an expense, the procurement PDF is no longer needed, so **no PDF button/overlay exists on the expense detail** for PO (the requirement is: generate during the procurement process only).
 - **Resolved a pending item**: the "Resubmit rejected expenses" entry (below) is now built — Edit + Resubmit live on the Approvals tab.
 
+### Today's Updates (2026-09-08) — PR PDF Permission Gate
+- **`ProcurementDetail.jsx`** — the **"View / Print PR as PDF"** button (PR tab) is now **gated by `hasPermission('procurement:print_pr')`** (new backend permission id 179, granted to SUPER_ADMIN / ADMIN_MGR / ADMIN_JR). `useAuth()` now destructures `hasPermission` (`const { user, hasPermission } = useAuth()`); the button renders only for `chain.pr` holders of that permission.
+- **Note**: `user.permissions` is populated at **login** — an existing session must log out/in to pick up the new permission.
+
 ### Today's Updates (2026-09-08) — Procurement Approvals Page (Assigned)
 - **`AssignedProcurements.jsx`** — new page (`src/pages/procurement/AssignedProcurements.jsx`) rendering a `DataTablePage` with the same columns as the main `Procurements` list (type/status filters, no tabs). Backed by `GET /procurement/assigned` via `getAssignedProcurements()`.
 - **Route** — added `/procurement/assigned` in `src/routes/index.jsx` guarded by `PermissionGuard permission="procurement:approve"`.
@@ -298,6 +302,20 @@ VITE_APP_ENV=development
 
 ### Today's Updates (2026-09-08) — Notification Fetch Resilience Fix
 - **`NotificationContext.jsx`** previously fetched count + feed in a single `Promise.all`. A failure on either (e.g. the backend `GET /notifications` 500 — see backend note) rejected the whole call, so `setCount`/`setFeed` never ran and the badge stayed at `0`. Now uses `Promise.allSettled` and updates each independently, so a feed error can never hide the count badge (and vice versa). Failures are non-fatal (existing data preserved).
+
+### Today's Updates (2026-09-08) — Procurement Expense Fulfilment UI
+The procurement expense detail now covers the whole procurement leg: a fixed 7-step approval ladder (no handover dropdown), the procurement admin's fulfilment tasks (sign + upload the PO PDF, mark received quantities, attach the vendor invoice), and the settled end-state. Backend behind it: two new migrations, a two-step expense service flow, and three new endpoints (see backend 2026-09-08 note).
+
+- **`ExpenseDetail.jsx`**:
+  - **PO tab** (`activeTab === "po"`): keeps the PO doc card, then adds a **PO Document** panel — a **View / Print PO PDF** button that opens the shared `PurchaseOrderPdfOverlay` (fed by the enriched chain PO node: `company`, `vendor_record`, requester, items `item_name`/`unit_price`/`tax_rate`/`total_with_tax`, decrypted totals; vendor masked for the requester), an **Upload signed PO PDF** control (ADMIN_MGR/SUPER_ADMIN only; `POST /uploads` → `POST /expenses/:uuid/documents` with `document_type: 'PO_PDF'`) and a list of uploaded PO PDFs with delete. A `ReceivedItemsEditor` (ADMIN_MGR only while `SUBMITTED`) lets the admin type delivered quantities per ordered line item (`POST /expenses/:uuid/items-received`), with an emerald "All items received" marker; `received_quantity`/`quantity` columns read from the chain PO items (backend clamps to 0..ordered).
+  - **Invoice tab** (`activeTab === "invoice"`, only when `expense.isProcurement`, live count badge next to Quotations): lists `expense.documents` where `module_name === "INVOICE"` with **Upload invoice** (`document_type: 'INVOICE'`) + per-file delete; uploads/delete hidden once `COMPLETED`.
+  - **Approvals tab**: procurement **REJECTED** + admin + not-owner shows a **Restart approval flow** button (routes to ADMIN_MGR, resets the ladder via the same `/submit`). The Approve modal for procurement shows a **contextual 7-step banner** (`PROC_EXPENSE_FLOW_STEPS`: CFO → Admin → Finance → CFO → Payment Mgr → CFO final) instead of the handover dropdown — "Next step: X (ROLE)" or the final-approval text; `handleApproveClick` skips handover-role loading for procurement.
+  - **Payments tab**: the `APPROVED || PAID` gate now includes **`COMPLETED`** (settled procurement expenses show their final payment state), and `loadExpense` preloads payments + summary for COMPLETED too. Payment buttons stay correctly hidden (no current handler on a COMPLETED expense).
+- **`expenseService.js`** — new `updateItemsReceived(uuid, items)`, `addExpenseDocument(uuid, payload)`, `deleteExpenseDocument(uuid, documentUuid)`; `normalizeExpense` now emits `documents` as `{ uuid, name, url, module_name }` (was `{ name }`) and adds `flow_position` (null for non-procurement / once closed).
+- **`StatusBadge.jsx`** — added the **`COMPLETED`** expense-status pill.
+- **`ProcurementDetail.jsx`** — **Edit Line Items** is now hidden once any quotation exists on the PR (`(doc.quotations || []).length === 0` required), matching the new backend freeze; the obsolete **Mark Received** action is removed (delivered quantities live on the expense).
+- **Bug fix — re-rendered `expense.documents` null crash**: `ExpenseDetail.jsx` computed `poPdfDocs`/`invoiceDocs` at component top-level as `(expense.documents || [])` — but `expense` starts as `null` and the loading/error guards sit *below* those consts, so **every** detail open threw `Cannot read properties of null (reading 'documents')` at render time (not just procurement expenses). Fixed to `(expense?.documents || [])`. Lesson: any top-level const deref of nullable state must use optional chaining — render-order guards don't protect pre-guard code.
+- **`ApprovalTrail` (ExpenseDetail)** — new action marker for **`ITEMS_RECEIVED`**: `ACTION_ICONS.ITEMS_RECEIVED = PackageCheck` and an amber timeline dot. The demo trail entry shows the actor's name (`action_by`), the label "Items received" and the remarks line `Items received: <item> ×received/ordered, …` from the new backend handover log.
 
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)

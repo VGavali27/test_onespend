@@ -36,6 +36,12 @@ export const getPaymentHandoverRoles = (uuid) => api.get(`/expenses/${uuid}/paym
 export const getMyPaymentRequests = (params, config) =>
   api.get('/expenses/my-payments', { ...config, params: { decrypt: 'true', ...params } });
 
+// Procurement-expense fulfilment (admin): mark delivered quantities on the linked PO
+// line items, and attach header-level files (PO PDF / vendor invoice).
+export const updateItemsReceived = (uuid, items) => api.post(`/expenses/${uuid}/items-received`, { items });
+export const addExpenseDocument = (uuid, payload) => api.post(`/expenses/${uuid}/documents`, payload);
+export const deleteExpenseDocument = (uuid, documentUuid) => api.delete(`/expenses/${uuid}/documents/${documentUuid}`);
+
 // Expense documents & handovers — add here when the backend endpoints exist.
 
 // ── Display normalization ──
@@ -174,6 +180,9 @@ export const normalizeExpense = (e) => {
       : null,
     company: e.company ? { name: e.company.name } : null,
     currentRole: e.currentRole ? { name: e.currentRole.name, code: e.currentRole.code } : null,
+    // Position in the procurement approval ladder (fixed 7-step chain) — null for
+    // travel/reimbursement expenses and once closed.
+    flow_position: e.flow_position ?? null,
     travel,
     reimbursement,
     handovers: (e.handovers || []).map((h) => ({
@@ -188,7 +197,12 @@ export const normalizeExpense = (e) => {
     // PI/PR/Quotations/PO stage tabs on the expense detail; the chain is eagerly loaded on mount.
     // The expense is the parent; the linked PO has expense_id FK. Check for procurementOrder.
     isProcurement: Boolean(e.procurementOrder),
-    documents: (e.documents || []).map((d) => ({ name: d.original_file_name })),
+    documents: (e.documents || []).map((d) => ({
+      uuid: d.uuid,
+      name: d.original_file_name,
+      url: d.file_path,
+      module_name: d.module_name,
+    })),
   };
 };
 

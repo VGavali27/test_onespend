@@ -48,7 +48,7 @@ const APPROVABLE_STATUSES = ['SUBMITTED', 'RECEIVED', 'FINANCE_APPROVED'];
 export default function ProcurementDetail() {
   const { uuid } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const toast = useToast();
   const role = user?.role;
 
@@ -307,15 +307,14 @@ export default function ProcurementDetail() {
     }
     // Admin may adjust PR line items (qty / unit price) while quotations are gathered —
     // once quotations are submitted to the requester (QUOTATION_SELECTION) the items lock.
+    // With any quotation rows present, the line items are frozen (the quotation's prices
+    // trump the PR draft) — edit the quotations instead.
     const PR_ITEM_EDITABLE = ['SUBMITTED', 'PR_CREATED'];
-    if (doc.request_type === 'PR' && PR_ITEM_EDITABLE.includes(doc.status) && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
+    if (doc.request_type === 'PR' && PR_ITEM_EDITABLE.includes(doc.status) && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && (doc.quotations || []).length === 0) {
       availableActions.push({ key: 'edit-items', label: 'Edit Line Items' });
     }
     if (doc.request_type === 'PR' && doc.status === 'QUOTATION_APPROVED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR') && !doc.price_history?.po) {
       availableActions.push({ key: 'create-po', label: 'Create PO' });
-    }
-    if (doc.request_type === 'PO' && doc.status === 'CREATED' && (role === 'SUPER_ADMIN' || role === 'ADMIN_MGR')) {
-      availableActions.push({ key: 'received', label: 'Mark Received' });
     }
     if (doc.request_type === 'PO' && doc.status === 'APPROVED' && (role === 'SUPER_ADMIN' || role === 'CFO' || role === 'PAYMENT_MGR')) {
       availableActions.push({ key: 'pay', label: 'Process Payment' });
@@ -700,7 +699,7 @@ export default function ProcurementDetail() {
                   <FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                   Purchase Request
                 </h3>
-                {chain.pr && (
+                {chain.pr && hasPermission('procurement:print_pr') && (
                   <button
                     type="button"
                     onClick={() => setShowPrPdf(true)}
