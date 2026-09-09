@@ -212,9 +212,20 @@ export const getPaymentSummary = async (user, query = {}) => {
         advance: Number(r.expense.advance_amount) || 0,
         disbursed: 0,
         refunded: 0,
+        advance_date: null,
+        disbursed_date: null,
+        refund_date: null,
+        last_date: null,
       };
-      if (isRefund) entry.refunded += r.amount;
-      else entry.disbursed += r.amount;
+      if (isRefund) {
+        entry.refunded += r.amount;
+        if (r.payment_date && (!entry.refund_date || r.payment_date > entry.refund_date)) entry.refund_date = r.payment_date;
+      } else {
+        entry.disbursed += r.amount;
+        if (r.payment_date && (!entry.disbursed_date || r.payment_date > entry.disbursed_date)) entry.disbursed_date = r.payment_date;
+      }
+      if (r.payment_type === 'ADVANCE') entry.advance_date = r.payment_date;
+      if (r.payment_date && (!entry.last_date || r.payment_date > entry.last_date)) entry.last_date = r.payment_date;
       expenseMap.set(key, entry);
     }
 
