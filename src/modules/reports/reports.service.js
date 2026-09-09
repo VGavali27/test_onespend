@@ -14,7 +14,9 @@ export const REPORT_MANAGER_ROLES = ['SUPER_ADMIN', 'CFO', 'PAYMENT_MGR', 'PAYME
 
 // payment_type direction: these flow company → user/vendor (disbursement);
 // the rest (ADVANCE_REFUND / REFUND_RECEIVED) flow user → company (refund).
-const DISBURSEMENT_TYPES = new Set(['PARTIAL', 'FULL', 'ADDITIONAL']);
+// ADVANCE is synthetic (see buildSyntheticAdvances) — a reimbursement advance
+// is company money paid out up-front, so it counts as a disbursement too.
+const DISBURSEMENT_TYPES = new Set(['PARTIAL', 'FULL', 'ADDITIONAL', 'ADVANCE']);
 
 const SORTABLE_COLUMNS = new Set(['payment_date', 'payment_method', 'payment_type', 'reference_number', 'created_at']);
 
@@ -99,6 +101,7 @@ const mapPayment = (p) => {
           final_amount: Number(decrypt(e.final_amount)) || 0,
           advance_amount: Number(decrypt(e.advance_amount)) || 0,
           paid_amount: Number(decrypt(e.paid_amount)) || 0,
+          submitted_at: e.submitted_at ?? null,
           module: cat?.module ?? null,
           category_name: cat?.name ?? null,
         }
@@ -110,6 +113,47 @@ const mapPayment = (p) => {
   };
 };
 
+// Reimbursement advances are company money paid out up-front, so they count as
+// disbursements — but the DB stores no expense_payments row for them (payments
+// are only recorded after the fact). One synthetic ADVANCE row per expense uuid,
+// dated from the earliest recorded payment for that expense, falling back to its
+// submission date. |rows| must already be mapPayment-mapped.
+const buildSyntheticAdvances = (rows) => {
+  const earliestByExpense = new Map();
+  for (const r of rows) {
+    if (r.expense?.module !== 'reimbursement') continue;
+    const cur = earliestByExpense.get(r.expense.uuid);
+    if (!cur || (r.payment_date && (!cur.payment_date || r.payment_date < cur.payment_date))) {
+      earliestByExpense.set(r.expense.uuid, r);
+    }
+  }
+
+  const advances = [];
+  const seen = new Set();
+  for (const r of rows) {
+    const amt = Number(r.expense?.advance_amount || 0);
+    if (r.expense?.module !== 'reimbursement' || amt <= 0 || seen.has(r.expense.uuid)) continue;
+    seen.add(r.expense.uuid);
+    const earliest = earliestByExpense.get(r.expense.uuid);
+    advances.push({
+      uuid: `advance-${r.expense.uuid}`,
+      payment_date: earliest?.payment_date ?? r.expense.submitted_at ?? null,
+      amount: amt,
+      payment_method: 'ADVANCE',
+      payment_type: 'ADVANCE',
+      reference_number: null,
+      remarks: null,
+      proof_count: 0,
+      expense: { ...r.expense },
+      company: r.company,
+      vendor: r.vendor,
+      requester: r.requester,
+      processed_by: r.processed_by,
+    });
+  }
+  return advances;
+};
+
 // Paginated payments ledger.
 export const getPaymentReport = async (user, query = {}) => {
   const where = await buildWhere(user, query);
@@ -117,20 +161,24 @@ export const getPaymentReport = async (user, query = {}) => {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(200, Math.max(1, Number(query.limit) || 10));
 
-  const { rows, count } = await reportsRepository.findAndCountPayments(
+  const { rows } = await reportsRepository.findAndCountPayments(
     where,
     order,
     limit,
     (page - 1) * limit,
   );
-  return { rows: rows.map(mapPayment), total: count };
+  const mapped = rows.map(mapPayment);
+  const merged = [...mapped, ...buildSyntheticAdvances(mapped)];
+  return { rows: merged, total: merged.length };
 };
 
 // Totals + breakdowns for the summary cards. Composite math runs in JS because
 // amounts are encrypted — they can't be SUM()ed in SQL.
 export const getPaymentSummary = async (user, query = {}) => {
   const where = await buildWhere(user, query);
-  const rows = (await reportsRepository.findAllPayments(where, [['payment_date', 'ASC'], ['id', 'ASC']])).map(mapPayment);
+  const rows = (await reportsRepository.findAllPayments(where, [['payment_date', 'ASC'], ['id', 'ASC']]))
+    .map(mapPayment);
+  rows.push(...buildSyntheticAdvances(rows));
 
   let totalDisbursed = 0;
   let totalRefunds = 0;
@@ -213,7 +261,9 @@ export const getPaymentSummary = async (user, query = {}) => {
 // Full filtered result as a CSV string (BOM-prefixed so Excel opens UTF-8 correctly).
 export const exportPaymentsCsv = async (user, query = {}) => {
   const where = await buildWhere(user, query);
-  const rows = (await reportsRepository.findAllPayments(where, [['payment_date', 'ASC'], ['id', 'ASC']])).map(mapPayment);
+  const rows = (await reportsRepository.findAllPayments(where, [['payment_date', 'ASC'], ['id', 'ASC']]))
+    .map(mapPayment);
+  rows.push(...buildSyntheticAdvances(rows));
 
   const header = [
     'Payment date', 'Amount', 'Method', 'Type', 'Reference', 'Remarks', 'Proofs',
