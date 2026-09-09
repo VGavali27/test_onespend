@@ -69,8 +69,7 @@ const PROC_EXPENSE_FLOW_STEPS = [
   { position: 3, role: "FINANCE_MGR", label: "Finance manager" },
   { position: 4, role: "CFO", label: "CFO" },
   { position: 5, role: "PAYMENT_MGR", label: "Payment manager" },
-  { position: 6, role: "CFO", label: "CFO (pre-payment)" },
-  { position: 7, role: "CFO", label: "CFO (final)", final: true },
+  { position: 6, role: "CFO", label: "CFO (final)", final: true },
 ];
 
 export default function ExpenseDetail() {
@@ -1278,7 +1277,7 @@ export default function ExpenseDetail() {
               })),
             ]
               .filter((h) => h.at)
-              .sort((a, b) => new Date(a.at) - new Date(b.at))}
+              .sort((a, b) => new Date(b.at) - new Date(a.at))}
           />
         </>
       )}
@@ -1440,8 +1439,9 @@ export default function ExpenseDetail() {
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Procurement expenses follow a fixed 7-step chain — CFO → Admin → Finance →
-                  CFO → Payment Manager → CFO → Final CFO. No handover selection needed.
+                  Procurement expenses follow a fixed 6-step chain — CFO → Admin → Finance →
+                  CFO → Payment Manager → Final CFO (then the payment manager processes payment).
+                  No handover selection needed.
                 </p>
               </div>
             )}
@@ -2174,8 +2174,8 @@ function ApprovalTrail({ handovers }) {
           </h3>
           <p className="text-[12px] text-slate-400">
             {handovers.some((h) => h.sourceLabel)
-            ? "Source procurement chain + expense approvals, chronologically"
-            : `${handovers.length} step${handovers.length === 1 ? "" : "s"}`}
+            ? "Source procurement chain + expense approvals, newest first"
+            : `${handovers.length} step${handovers.length === 1 ? "" : "s"}, newest first`}
           </p>
         </div>
       </div>
