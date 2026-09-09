@@ -952,7 +952,7 @@ const approveFixedFlow = async (expense, user, remarks, actorRole, actorEmployme
         { transaction: t },
       );
       await logExpenseHandover({
-        expenseId: expense.id, fromRoleId: fromRole, toRoleId: fromRole,
+        expenseId: expense.id, fromRoleId: fromRole, toRoleId: paymentMgr?.id ?? null,
         employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
       });
     } else {
@@ -1074,7 +1074,7 @@ export const approve = async (uuid, user, remarks, toRoleId = null) => {
         { transaction: t },
       );
       await logExpenseHandover({
-        expenseId: expense.id, fromRoleId: fromRole, toRoleId: fromRole,
+        expenseId: expense.id, fromRoleId: fromRole, toRoleId: paymentHandlerRoleId,
         employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
       });
     } else {
