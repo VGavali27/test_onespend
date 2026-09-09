@@ -173,15 +173,26 @@ export const normalizeExpense = (e) => {
     category: e.category
       ? {
           name: e.category.name,
+          module: e.category.module,
+          flow_mode: e.category.flow_mode || "HANDOVER",
           finalApproverRole: e.category.finalApproverRole
             ? { id: e.category.finalApproverRole.id, name: e.category.finalApproverRole.name, code: e.category.finalApproverRole.code }
             : null,
+          // Approval ladder served by the backend from expense_flow_steps
+          // (empty for HANDOVER categories). Each is { position, role, role_name, label, final }.
+          flow_steps: (e.category.flowSteps || []).map((s) => ({
+            position: s.step_position,
+            role: s.role?.code,
+            role_name: s.role?.name,
+            label: s.step_label,
+            final: Boolean(s.is_final),
+          })),
         }
       : null,
     company: e.company ? { name: e.company.name } : null,
     currentRole: e.currentRole ? { name: e.currentRole.name, code: e.currentRole.code } : null,
-    // Position in the procurement approval ladder (fixed 7-step chain) — null for
-    // travel/reimbursement expenses and once closed.
+    // Position in the FIXED-flow approval ladder (from expense_flow_steps) — null
+    // for travel/reimbursement expenses and once closed.
     flow_position: e.flow_position ?? null,
     travel,
     reimbursement,

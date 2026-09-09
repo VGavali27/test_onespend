@@ -60,18 +60,6 @@ import {
   formatType,
 } from "@/utils/format";
 
-// Fixed approval ladder for procurement-category expenses (mirrors the backend
-// PROCUREMENT_EXPENSE_FLOW). Each step carries its position, handler role and a
-// human label used by the Approve modal's contextual banner.
-const PROC_EXPENSE_FLOW_STEPS = [
-  { position: 1, role: "CFO", label: "CFO review" },
-  { position: 2, role: "ADMIN_MGR", label: "Procurement admin" },
-  { position: 3, role: "FINANCE_MGR", label: "Finance manager" },
-  { position: 4, role: "CFO", label: "CFO" },
-  { position: 5, role: "PAYMENT_MGR", label: "Payment manager" },
-  { position: 6, role: "CFO", label: "CFO (final)", final: true },
-];
-
 export default function ExpenseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -225,9 +213,12 @@ export default function ExpenseDetail() {
     : null;
   const poPdfDocs = (expense?.documents || []).filter((d) => d.module_name === "PO_PDF");
   const invoiceDocs = (expense?.documents || []).filter((d) => d.module_name === "INVOICE");
-  const flowStep = PROC_EXPENSE_FLOW_STEPS.find((s) => s.position === expense?.flow_position);
+  // Approval ladder served from the backend (expense_flow_steps) — procurement
+  // runs a fixed ordered chain, so the UI never hardcodes the steps.
+  const flowSteps = (expense?.category?.flow_steps || []).slice();
+  const flowStep = flowSteps.find((s) => s.position === expense?.flow_position);
   const nextFlowStep = isProcurement
-    ? PROC_EXPENSE_FLOW_STEPS.find((s) => s.position === (expense?.flow_position || 0) + 1)
+    ? flowSteps.find((s) => s.position === (expense?.flow_position || 0) + 1)
     : null;
 
   const loadPaymentHandoverRoles = useCallback(async () => {
@@ -1438,10 +1429,15 @@ export default function ExpenseDetail() {
                         : "This expense will continue routing through the approval chain."}
                   </span>
                 </div>
+                {flowStep?.role === "ADMIN_MGR" && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Requirement before advancing: every PO item marked as received and the
+                    vendor invoice uploaded.
+                  </p>
+                )}
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Procurement expenses follow a fixed 6-step chain — CFO → Admin → Finance →
-                  CFO → Payment Manager → Final CFO (then the payment manager processes payment).
-                  No handover selection needed.
+                  This expense follows a fixed {flowSteps.length}-step chain —{" "}
+                  {flowSteps.map((s) => s.label).join(" → ")}. No handover selection needed.
                 </p>
               </div>
             )}
