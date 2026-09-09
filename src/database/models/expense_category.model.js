@@ -25,6 +25,9 @@ export default (sequelize, DataTypes) => {
         validate: { notEmpty: true },
       },
       description: { type: DataTypes.TEXT, allowNull: true },
+      // 'FIXED' = approval driven by the expense_flow_steps ladder table;
+      // 'HANDOVER' = classic role_handover_rules handover chain.
+      flow_mode: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'HANDOVER' },
       first_receiver_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       final_approver_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       status: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'ACTIVE' },
@@ -42,6 +45,7 @@ export default (sequelize, DataTypes) => {
 
   ExpenseCategory.associate = (models) => {
     ExpenseCategory.hasMany(models.Expense, { foreignKey: 'category_id', as: 'expenses' });
+    ExpenseCategory.hasMany(models.ExpenseFlowStep, { foreignKey: 'category_id', as: 'flowSteps' });
     ExpenseCategory.belongsTo(models.Role, { foreignKey: 'first_receiver_role_id', as: 'firstReceiverRole' });
     ExpenseCategory.belongsTo(models.Role, { foreignKey: 'final_approver_role_id', as: 'finalApproverRole' });
   };

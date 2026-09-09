@@ -23,20 +23,25 @@ const {
 // must be able to see the result in All Expenses.
 export const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR'];
 
-// Ordered approval chain for procurement-category expenses, driven by
-// expenses.flow_position (1-based). The flow ignores any to_role_id a client
-// sends and moves deterministically to the next step on each approve. The final
-// step (CFO, position 6) closes the expense as APPROVED routed to PAYMENT_MGR
-// (who processes the payment) — gated on every PO line item being fully received.
-// 1 CFO → 2 ADMIN_MGR → 3 FINANCE_MGR → 4 CFO → 5 PAYMENT_MGR → 6 CFO (final) → PAYMENT_MGR
-export const PROCUREMENT_EXPENSE_FLOW = [
-  { position: 1, roleCode: 'CFO' },
-  { position: 2, roleCode: 'ADMIN_MGR' },
-  { position: 3, roleCode: 'FINANCE_MGR' },
-  { position: 4, roleCode: 'CFO' },
-  { position: 5, roleCode: 'PAYMENT_MGR' },
-  { position: 6, roleCode: 'CFO', final: true },
-];
+// Active approval ladder for a category, read from the expense_flow_steps table
+// (DB-driven — editing a chain is a data change, no code deploy). Only
+// categories with flow_mode='FIXED' use this; HANDOVER categories keep the
+// role_handover_rules engine. Fetches the handler roles so callers can resolve
+// them without a second query.
+const getActiveFlowSteps = async (categoryId) => {
+  const steps = await db.ExpenseFlowStep.findAll({
+    where: { category_id: categoryId, status: 'ACTIVE' },
+    order: [['step_position', 'ASC']],
+    include: [{ model: db.Role, as: 'role' }],
+  });
+  return steps.map((s) => ({
+    position: s.step_position,
+    roleId: s.role_id,
+    roleCode: s.role?.code,
+    roleName: s.role?.name,
+    final: Boolean(s.is_final),
+  }));
+};
 
 // Roles allowed to view the "all expenses" list (everyone else uses /expenses/my)
 // Also used for /expenses/assigned (expenses pending approval for the user's role)
@@ -752,10 +757,14 @@ const logExpenseHandover = async ({ expenseId, fromRoleId, toRoleId, employmentI
 };
 
 // Shared: create a SUBMITTED PROCUREMENT-category expense + its initial SUBMIT
-// handover (requester → first receiver). Used by PO auto-creation.
-// Runs inside the caller's transaction (atomic with it).
+// handover (actor → first receiver). Used by PO auto-creation.
+// Runs inside the caller's transaction (atomic with it). The actor (the caller
+// who generated the PO/expense — usually ADMIN_MGR) is credited on the handover,
+// NOT the expense owner, so the trail reads "ADMIN_MGR → CFO" and never routes
+// through the requester.
 const createProcurementExpenseRecord = async ({
   title, companyId, requestedByEmploymentId, grandTotal, estimatedGrandTotal, t,
+  actorRoleId, actorEmploymentId,
 }) => {
   const category = await ExpenseCategory.findOne({ where: { module: 'procurement' } });
   if (!category) throw ApiError.notFound('PROCUREMENT expense category not found');
@@ -787,12 +796,13 @@ const createProcurementExpenseRecord = async ({
     { transaction: t },
   );
 
-  // Initial SUBMIT handover: requester → first receiver.
+  // Initial SUBMIT handover: the actor (admin) → first receiver (CFO, ladder step 1).
+  // Falls back to the requester only when no actor context is supplied.
   await logExpenseHandover({
     expenseId: expense.id,
-    fromRoleId: requesterRoleId,
+    fromRoleId: actorRoleId ?? requesterRoleId,
     toRoleId: category.first_receiver_role_id,
-    employmentId: requestedByEmploymentId,
+    employmentId: actorEmploymentId ?? requestedByEmploymentId,
     actionType: 'SUBMIT',
     remarks: null,
     t,
@@ -804,11 +814,13 @@ const createProcurementExpenseRecord = async ({
 // Create the expense that backs a procurement PO. Called inside createPo's
 // transaction so the PO + expense commit atomically.
 // The PO is updated with expense_id after the expense is created (in procurement service).
-export const createProcurementExpense = async ({ po, pr, t }) =>
+export const createProcurementExpense = async ({ po, pr, t, actorRoleId, actorEmploymentId }) =>
   createProcurementExpenseRecord({
     title: po.title,
     companyId: po.company_id,
     requestedByEmploymentId: po.requested_by_employment_id,
+    actorRoleId,
+    actorEmploymentId,
     // Amounts here are AES ciphertext: pr.grand_total is read from the DB, and
     // po.grand_total was already encrypted in-memory by the PO model's beforeCreate
     // hook. Decrypt both once so the expense hook encrypts exactly once.
@@ -843,7 +855,16 @@ export const submit = async (uuid, user, remarks) => {
 
   const actorRole = await findRoleByCode(user.roleCode);
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
-  const firstReceiver = category?.first_receiver_role_id ?? null;
+  // FIXED-mode categories start their ladder at step 1 (first flow step);
+  // HANDOVER categories keep the category's first receiver.
+  let firstReceiver = category?.first_receiver_role_id ?? null;
+  if (category?.flow_mode === 'FIXED') {
+    const steps = await getActiveFlowSteps(expense.category_id);
+    if (steps.length === 0) {
+      throw ApiError.conflict('No approval flow is configured for this expense category');
+    }
+    firstReceiver = steps[0].roleId;
+  }
 
   return sequelize.transaction(async (t) => {
     await expense.update(
@@ -852,8 +873,8 @@ export const submit = async (uuid, user, remarks) => {
         current_role_id: firstReceiver,
         current_employment_id: null,
         submitted_at: new Date(),
-        // Procurement resubmits restart the ordered flow at step 1 (CFO).
-        ...(category?.module === 'procurement' ? { flow_position: 1 } : {}),
+        // FIXED-flow resubmits restart the ordered ladder at step 1.
+        ...(category?.flow_mode === 'FIXED' ? { flow_position: 1 } : {}),
       },
       { transaction: t },
     );
@@ -880,13 +901,24 @@ const allProcurementItemsReceived = async (expenseId) => {
   return items.every((it) => Number(it.received_quantity) >= Number(it.quantity));
 };
 
-// Ordered approval for procurement expenses. Ignores to_role_id — the next role is
-// read from PROCUREMENT_EXPENSE_FLOW by flow_position, so a client can't skip a step.
-// The final CFO step (position 6) closes as APPROVED routed to PAYMENT_MGR, but only
-// after every PO line item has been received.
-const approveProcurementFlow = async (expense, user, remarks, actorRole, actorEmployment) => {
-  const step = PROCUREMENT_EXPENSE_FLOW.find((s) => s.position === (expense.flow_position || 1))
-    ?? PROCUREMENT_EXPENSE_FLOW[PROCUREMENT_EXPENSE_FLOW.length - 1];
+// True when the expense has a header-level vendor invoice uploaded
+// (expense_documents row with module_name = 'INVOICE', module_record_id null).
+const hasProcurementInvoice = async (expenseId) => {
+  const count = await db.ExpenseDocument.count({ where: { expense_id: expenseId, module_name: 'INVOICE' } });
+  return count > 0;
+};
+
+// Ordered approval for FIXED-flow categories (currently procurement, whose ladder
+// lives in expense_flow_steps). Ignores to_role_id — the next role is read from
+// the step ladder by flow_position, so a client can't skip a step. The final step
+// closes as APPROVED routed to PAYMENT_MGR, but only after every PO line item has
+// been received. A stanza resolves the step for stale flow_position in-flight.
+const approveFixedFlow = async (expense, user, remarks, actorRole, actorEmployment) => {
+  const steps = await getActiveFlowSteps(expense.category_id);
+  if (steps.length === 0) {
+    throw ApiError.conflict('No approval flow is configured for this expense category');
+  }
+  const step = steps.find((s) => s.position === (expense.flow_position || 1)) ?? steps[steps.length - 1];
   const handlerRole = await findRoleByCode(step.roleCode);
 
   if (user.roleCode !== 'SUPER_ADMIN' && expense.current_role_id !== handlerRole?.id) {
@@ -924,7 +956,20 @@ const approveProcurementFlow = async (expense, user, remarks, actorRole, actorEm
         employmentId: actorEmployment?.id, actionType: 'APPROVE', remarks, t,
       });
     } else {
-      const nextStep = PROCUREMENT_EXPENSE_FLOW.find((s) => s.position === step.position + 1);
+      // Fulfilment gate when leaving the procurement-admin step (to FINANCE_MGR):
+      // the vendor invoice must be uploaded AND every PO item marked received.
+      if (step.roleCode === 'ADMIN_MGR') {
+        if (!(await hasProcurementInvoice(expense.id))) {
+          throw ApiError.badRequest('Upload the vendor invoice before approving to the Finance manager');
+        }
+        if (!(await allProcurementItemsReceived(expense.id))) {
+          throw ApiError.badRequest('Mark all PO items as received before approving to the Finance manager');
+        }
+      }
+      const nextStep = steps.find((s) => s.position === step.position + 1);
+      if (!nextStep) {
+        throw ApiError.conflict('Approval flow is missing the next step after position ' + step.position);
+      }
       const nextRole = await findRoleByCode(nextStep.roleCode);
 
       await expense.update(
@@ -958,10 +1003,11 @@ export const approve = async (uuid, user, remarks, toRoleId = null) => {
   const category = await ExpenseCategory.findByPk(expense.category_id);
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
 
-  // Procurement expenses run a deterministic ordered flow (flow_position) that
-  // ignores to_role_id — approve advances to the next step in the chain.
-  if (category?.module === 'procurement') {
-    return approveProcurementFlow(expense, user, remarks, actorRole, actorEmployment);
+  // FIXED-mode categories (procurement) run a deterministic ordered flow
+  // (flow_position) driven by the expense_flow_steps table — approve advances to
+  // the next step in the chain and ignores to_role_id.
+  if (category?.flow_mode === 'FIXED') {
+    return approveFixedFlow(expense, user, remarks, actorRole, actorEmployment);
   }
 
   const finalApprover = category?.final_approver_role_id ?? null;

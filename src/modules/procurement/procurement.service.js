@@ -852,6 +852,7 @@ export const createPo = async (uuid, user) => {
   if (existingPo) throw ApiError.badRequest('A purchase order has already been created for this PR');
 
   const actorEmployment = await getActiveEmploymentByUser(user.userId);
+  const actorRole = await findRoleByCode(user.roleCode);
   const documentNumber = await generateDocumentNumber('PO');
 
   return sequelize.transaction(async (t) => {
@@ -914,7 +915,13 @@ export const createPo = async (uuid, user) => {
     });
     // Create the expense linked to this PO — same transaction, atomic.
     // The expense is the parent; we set expense_id on the PO after creating it.
-    const expense = await expenseService.createProcurementExpense({ po, pr, t });
+    const expense = await expenseService.createProcurementExpense({
+      po, pr, t,
+      // Credit the admin who generated the PO/expense on the SUBMIT handover so the
+      // expense trail reads "ADMIN_MGR → CFO", not through the requester.
+      actorRoleId: actorRole?.id ?? ROLE_IDS.ADMIN_MGR,
+      actorEmploymentId: actorEmployment?.id ?? null,
+    });
     await po.update({ expense_id: expense.id }, { transaction: t });
     return procurementRepository.findByUuid(po.uuid, t);
   });

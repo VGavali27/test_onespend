@@ -14,6 +14,7 @@ const {
   ReimbursementItem,
   ExpenseDocument,
   ExpenseHandover,
+  ExpenseFlowStep,
   Role,
   UserEmployment,
   User,
@@ -25,6 +26,9 @@ const listInclude = [
   { model: ExpenseCategory, as: 'category', include: [
     { model: Role, as: 'firstReceiverRole' },
     { model: Role, as: 'finalApproverRole' },
+    // Ladder steps for FIXED-mode categories (procurement). required:false so a
+    // HANDOVER category with no steps keeps its full category row in the result.
+    { model: ExpenseFlowStep, as: 'flowSteps', required: false, where: { status: 'ACTIVE' }, order: [['step_position', 'ASC']], include: [{ model: Role, as: 'role' }] },
   ]},
   { model: Company, as: 'company' },
   { model: Role, as: 'currentRole' },
