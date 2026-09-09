@@ -14,7 +14,8 @@ const columnHelper = createColumnHelper();
 
 // payment_type direction: disbursements flow company → user/vendor;
 // the rest (ADVANCE_REFUND / REFUND_RECEIVED) are refunds user → company.
-const DISBURSEMENT_TYPES = ['PARTIAL', 'FULL', 'ADDITIONAL'];
+// ADVANCE is a synthetic row added by the backend for reimbursement advances.
+const DISBURSEMENT_TYPES = ['PARTIAL', 'FULL', 'ADDITIONAL', 'ADVANCE'];
 
 const PAYMENT_METHOD_OPTIONS = ['CASH', 'BANK_TRANSFER', 'UPI', 'CHEQUE'];
 const PAYMENT_TYPE_OPTIONS = ['PARTIAL', 'FULL', 'ADDITIONAL', 'ADVANCE_REFUND', 'REFUND_RECEIVED'];
