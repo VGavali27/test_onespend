@@ -13,7 +13,7 @@ import { approveExpense, rejectExpense, submitExpense, getHandoverRoles } from '
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
 import { useAuth } from '@/context/AuthContext';
 
-const STATUS_OPTIONS = ['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID'];
+const STATUS_OPTIONS = ['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID', 'COMPLETED'];
 const columnHelper = createColumnHelper();
 
 // Shared expense list built on the standard DataTablePage (server-side pagination,
