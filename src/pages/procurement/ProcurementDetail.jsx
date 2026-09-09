@@ -252,7 +252,16 @@ export default function ProcurementDetail() {
       else if (key === 'approve') await approveProcurement(uuid, actionRemarks);
       else if (key === 'reject') await rejectProcurement(uuid, actionRemarks);
       else if (key === 'create-pr') await createPurchaseRequest(uuid);
-      else if (key === 'create-po') await createPurchaseOrder(uuid);
+      else if (key === 'create-po') {
+        const poResp = await createPurchaseOrder(uuid);
+        toast.success('Action completed');
+        setConfirmAction(null);
+        setRemarks('');
+        const link = poResp?.data?.data?.expenses?.[0]?.uuid;
+        if (link) { navigate(`/expenses/${link}`); return; }
+        load();
+        return;
+      }
       else if (key === 'received') await markReceived(uuid);
       else if (key === 'pay') await markPaid(uuid, actionRemarks);
       toast.success('Action completed');

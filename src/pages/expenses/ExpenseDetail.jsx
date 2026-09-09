@@ -1624,6 +1624,8 @@ function PaymentStatusBadge({ status }) {
 // with uploaded proofs.
 function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, loading, onRecord }) {
   const status = expense.status;
+  // Advances apply only to reimbursement expenses — hide the stat for travel/procurement.
+  const hasAdvance = Boolean(expense?.reimbursement);
   const receivable =
     summary?.amount_due != null
       ? Number(summary.amount_due)
@@ -1660,9 +1662,9 @@ function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, 
       {/* Computed summary — the pending/refund math comes straight from the backend */}
       <div className="px-4 sm:px-6 py-5">
         {summary ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className={`grid grid-cols-2 gap-4 mb-6 ${hasAdvance ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
             <PaymentStat label="Final amount" value={formatCurrency(Number(summary.final_amount))} />
-            <PaymentStat label="Advance amount" value={formatCurrency(Number(summary.advance_amount))} />
+            {hasAdvance && <PaymentStat label="Advance amount" value={formatCurrency(Number(summary.advance_amount))} />}
             <PaymentStat label="Paid amount" value={formatCurrency(Number(summary.paid_amount))} />
             <PaymentStat
               label={summary.is_over_advance ? "User owes (refund)" : "Pending payment"}
@@ -1671,9 +1673,9 @@ function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, 
             />
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div className={`grid grid-cols-2 gap-4 mb-6 ${hasAdvance ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
             <PaymentStat label="Final amount" value={formatCurrency(expense.final_amount)} />
-            <PaymentStat label="Advance amount" value={formatCurrency(expense.advance_amount)} />
+            {hasAdvance && <PaymentStat label="Advance amount" value={formatCurrency(expense.advance_amount)} />}
             <PaymentStat label="Paid amount" value={formatCurrency(expense.paid_amount)} />
             <PaymentStat label="Pending payment" value={formatCurrency(receivable)} emphasis={receivable > 0} />
           </div>

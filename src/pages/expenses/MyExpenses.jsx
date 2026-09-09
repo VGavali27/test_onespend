@@ -120,7 +120,16 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     columnHelper.accessor('estimated_amount', {
       header: 'Amount',
       enableSorting: false, // stored encrypted in the DB — can't sort numerically server-side
-      cell: (info) => formatCurrency(info.getValue()),
+      cell: (info) => {
+        const r = info.row.original;
+        const amount =
+          Number(r.paid_amount) > 0
+            ? r.paid_amount
+            : Number(r.final_amount) > 0
+              ? r.final_amount
+              : r.estimated_amount;
+        return formatCurrency(amount);
+      },
     }),
     columnHelper.accessor('status', {
       header: 'Status',
