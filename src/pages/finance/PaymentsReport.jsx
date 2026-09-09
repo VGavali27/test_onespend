@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
 import { BarChart3, Download, X, Paperclip, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import DataTablePage from '@/components/ui/DataTablePage';
-import StatusBadge from '@/components/ui/StatusBadge';
 import DatePicker from '@/components/ui/DatePicker';
 import { useToast } from '@/components/ui/Toast';
 import { getPaymentReport, getPaymentReportSummary, exportPaymentsReport } from '@/services/reportsService';
@@ -129,103 +128,107 @@ export default function PaymentsReport() {
   };
 
   const columns = [
-    columnHelper.accessor('payment_date', {
-      header: 'Payment Date',
-      cell: (info) => formatDate(info.getValue()),
-    }),
     columnHelper.accessor('expense', {
       header: 'Expense',
+      enableSorting: false,
       cell: ({ row }) => {
         const e = row.original.expense;
         if (!e) return <span className="text-slate-400">—</span>;
         return (
-          <Link to={`/expenses/${e.uuid}`} className="block min-w-0">
-            <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 truncate hover:text-indigo-600">
-              {e.title}
-            </p>
-            <p className="text-[12px] text-slate-400">{e.expense_number}</p>
-          </Link>
+          <div className="min-w-0 space-y-0.5">
+            <Link to={`/expenses/${e.uuid}`} className="block min-w-0">
+              <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200 truncate hover:text-indigo-600">
+                {e.title}
+              </p>
+            </Link>
+            <div className="flex items-center gap-2">
+              {e.module ? <ModulePill label={e.module} /> : null}
+              <p className="text-[12px] text-slate-400 truncate">{e.expense_number}</p>
+            </div>
+          </div>
         );
-      },
-    }),
-    columnHelper.accessor('expense.module', {
-      header: 'Module',
-      enableSorting: false,
-      cell: (info) => {
-        const v = info.getValue();
-        return v ? <ModulePill label={v} /> : <span className="text-slate-400">—</span>;
       },
     }),
     columnHelper.accessor('company', {
-      header: 'Company',
+      header: 'Company / Vendor',
       enableSorting: false,
       cell: (info) => {
-        const c = info.getValue();
-        return c ? (
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 truncate">{c.name}</p>
-            {c.gst_number ? <p className="text-[12px] text-slate-400 truncate">GST: {c.gst_number}</p> : null}
+        const r = info.row.original;
+        const c = r.company;
+        const v = r.vendor;
+        if (!c && !v) return <span className="text-slate-400">—</span>;
+        return (
+          <div className="min-w-0 space-y-1">
+            {c && (
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 truncate">{c.name}</p>
+                {c.gst_number ? <p className="text-[12px] text-slate-400 truncate">GST: {c.gst_number}</p> : null}
+              </div>
+            )}
+            {v && (
+              <div className="min-w-0 pt-1 border-t border-dashed border-slate-200 dark:border-gray-700">
+                <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 truncate">{v.name}</p>
+                {v.gst_number ? <p className="text-[12px] text-slate-400 truncate">GST: {v.gst_number}</p> : null}
+              </div>
+            )}
           </div>
-        ) : (
-          <span className="text-slate-400">—</span>
         );
       },
     }),
-    columnHelper.accessor('vendor', {
-      header: 'Vendor',
-      enableSorting: false,
+    columnHelper.accessor('payment_date', {
+      header: 'Payment',
       cell: (info) => {
-        const v = info.getValue();
-        return v ? (
-          <div className="min-w-0">
-            <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300 truncate">{v.name}</p>
-            {v.gst_number ? <p className="text-[12px] text-slate-400 truncate">GST: {v.gst_number}</p> : null}
+        const r = info.row.original;
+        return (
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-[13px] text-slate-700 dark:text-slate-300 tabular-nums">{formatDate(r.payment_date)}</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <PaymentTypePill type={r.payment_type} />
+              {r.payment_method ? (
+                <span className="text-[11px] text-slate-500">{formatType(r.payment_method)}</span>
+              ) : null}
+            </div>
           </div>
-        ) : (
-          <span className="text-slate-400">—</span>
         );
       },
-    }),
-    columnHelper.accessor('payment_method', {
-      header: 'Method',
-      enableSorting: false,
-      cell: (info) => (info.getValue() ? formatType(info.getValue()) : '—'),
-    }),
-    columnHelper.accessor('payment_type', {
-      header: 'Type',
-      enableSorting: false,
-      cell: (info) => <PaymentTypePill type={info.getValue()} />,
     }),
     columnHelper.accessor('amount', {
       header: 'Amount',
-      cell: (info) => (
-        <span className="text-[13px] font-semibold text-slate-900 dark:text-white tabular-nums">
-          {formatCurrency(info.getValue())}
-        </span>
-      ),
+      cell: (info) => {
+        const r = info.row.original;
+        return (
+          <div className="space-y-0.5">
+            <p className="text-[13px] font-semibold text-slate-900 dark:text-white tabular-nums">
+              {formatCurrency(r.amount)}
+            </p>
+            {Number(r.proof_count) > 0 && (
+              <p className="inline-flex items-center gap-1 text-[11px] text-slate-400 tabular-nums">
+                <Paperclip className="h-3 w-3" />
+                {r.proof_count} proof{r.proof_count === 1 ? '' : 's'}
+              </p>
+            )}
+          </div>
+        );
+      },
     }),
-    columnHelper.accessor('proof_count', {
-      header: 'Proofs',
-      enableSorting: false,
+    columnHelper.accessor('reference_number', {
+      header: 'Reference',
       cell: (info) =>
-        Number(info.getValue()) > 0 ? (
-          <span className="inline-flex items-center gap-1 text-[12px] text-slate-500">
-            <Paperclip className="h-3.5 w-3.5" />
-            {info.getValue()}
-          </span>
+        info.getValue() ? (
+          <span className="text-[13px] text-slate-600 dark:text-slate-300">{info.getValue()}</span>
         ) : (
           <span className="text-slate-400">—</span>
         ),
     }),
-    columnHelper.accessor('reference_number', {
-      header: 'Reference',
-      enableSorting: false,
-      cell: (info) => (info.getValue() ? info.getValue() : <span className="text-slate-400">—</span>),
-    }),
     columnHelper.accessor('processed_by', {
       header: 'Processed by',
       enableSorting: false,
-      cell: (info) => (info.getValue() ? info.getValue() : <span className="text-slate-400">—</span>),
+      cell: (info) =>
+        info.getValue() ? (
+          <span className="text-[13px] text-slate-600 dark:text-slate-300">{info.getValue()}</span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
     }),
   ];
 
