@@ -4,7 +4,7 @@
  * Adds the 'procurement' module to the Expense Categories master so a
  * converted procurement expense has a category to land on.
  * First receiver = CFO, final approver = CFO (the ordered approval flow
- * CFO → ADMIN_MGR → FINANCE_MGR → CFO → PAYMENT_MGR → CFO → APPROVED is driven
+ * CFO → ADMIN_MGR → FINANCE_MGR → CFO → PAYMENT_MGR → CFO (final) → payments is driven
  * by expenses.flow_position, so first/final approver are both the CFO).
  */
 export async function up({ context }) {

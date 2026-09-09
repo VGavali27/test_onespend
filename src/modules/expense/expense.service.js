@@ -26,17 +26,16 @@ export const EXPENSE_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR'];
 // Ordered approval chain for procurement-category expenses, driven by
 // expenses.flow_position (1-based). The flow ignores any to_role_id a client
 // sends and moves deterministically to the next step on each approve. The final
-// step (CFO, position 7) closes the expense as APPROVED routed to PAYMENT_MGR —
-// gated on every PO line item being fully received.
-// 1 CFO → 2 ADMIN_MGR → 3 FINANCE_MGR → 4 CFO → 5 PAYMENT_MGR → 6 CFO → 7 CFO (final)
+// step (CFO, position 6) closes the expense as APPROVED routed to PAYMENT_MGR
+// (who processes the payment) — gated on every PO line item being fully received.
+// 1 CFO → 2 ADMIN_MGR → 3 FINANCE_MGR → 4 CFO → 5 PAYMENT_MGR → 6 CFO (final) → PAYMENT_MGR
 export const PROCUREMENT_EXPENSE_FLOW = [
   { position: 1, roleCode: 'CFO' },
   { position: 2, roleCode: 'ADMIN_MGR' },
   { position: 3, roleCode: 'FINANCE_MGR' },
   { position: 4, roleCode: 'CFO' },
   { position: 5, roleCode: 'PAYMENT_MGR' },
-  { position: 6, roleCode: 'CFO' },
-  { position: 7, roleCode: 'CFO', final: true },
+  { position: 6, roleCode: 'CFO', final: true },
 ];
 
 // Roles allowed to view the "all expenses" list (everyone else uses /expenses/my)
@@ -883,10 +882,11 @@ const allProcurementItemsReceived = async (expenseId) => {
 
 // Ordered approval for procurement expenses. Ignores to_role_id — the next role is
 // read from PROCUREMENT_EXPENSE_FLOW by flow_position, so a client can't skip a step.
-// The final CFO step (position 7) closes as APPROVED routed to PAYMENT_MGR, but only
+// The final CFO step (position 6) closes as APPROVED routed to PAYMENT_MGR, but only
 // after every PO line item has been received.
 const approveProcurementFlow = async (expense, user, remarks, actorRole, actorEmployment) => {
-  const step = PROCUREMENT_EXPENSE_FLOW.find((s) => s.position === (expense.flow_position || 1));
+  const step = PROCUREMENT_EXPENSE_FLOW.find((s) => s.position === (expense.flow_position || 1))
+    ?? PROCUREMENT_EXPENSE_FLOW[PROCUREMENT_EXPENSE_FLOW.length - 1];
   const handlerRole = await findRoleByCode(step.roleCode);
 
   if (user.roleCode !== 'SUPER_ADMIN' && expense.current_role_id !== handlerRole?.id) {
