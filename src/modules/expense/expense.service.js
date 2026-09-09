@@ -1303,26 +1303,14 @@ export const recordPayment = async (uuid, user, paymentData) => {
     const newPaid = Math.max(0, companyToUser - userRefund);
 
     const isSettled = newPaymentStatus === 'SETTLED' || (newPaymentStatus === 'PAID' && advanceAmount === 0);
-    // On settlement, route the expense back to a handler. Procurement-linked expenses go
-    // to ADMIN_MGR (consistent with where they route on approval); others go to the requester.
-    const requesterRole = expense.requestedByEmployment?.user?.role_id ?? null;
-    let settledHandler = requesterRole;
-    if (expense.category?.module === 'procurement') {
-      const adminMgr = await findRoleByCode('ADMIN_MGR');
-      settledHandler = adminMgr?.id ?? requesterRole;
-    }
-
+    // On settlement every expense type closes as COMPLETED (no handler) — a
+    // fully paid/settled expense is done, same terminal word for all modules.
     await expense.update(
       {
         paid_amount: String(newPaid),
         payment_status: newPaymentStatus,
-        // Keep the approval status (APPROVED) untouched — only the payment_status
-        // reflects payment. When fully settled/paid, route the expense to its handler.
-        // Procurement expenses close as COMPLETED (no handler) — fully paid = done.
         ...(isSettled
-          ? expense.category?.module === 'procurement'
-            ? { status: 'COMPLETED', current_role_id: null, current_employment_id: null }
-            : { current_role_id: settledHandler, current_employment_id: null }
+          ? { status: 'COMPLETED', current_role_id: null, current_employment_id: null }
           : {}),
       },
       { transaction: t },
