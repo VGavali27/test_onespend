@@ -187,6 +187,7 @@ export const getPaymentSummary = async (user, query = {}) => {
   const byModule = new Map();
   const byCompany = new Map();
   const byMonth = new Map();
+  const expenseMap = new Map();
   const monthKey = (d) => (d ? d.toISOString().slice(0, 7) : 'unknown');
 
   for (const r of rows) {
@@ -197,6 +198,24 @@ export const getPaymentSummary = async (user, query = {}) => {
     } else {
       totalDisbursed += r.amount;
       disbursementCount += 1;
+    }
+
+    if (r.expense) {
+      const key = r.expense.uuid;
+      const entry = expenseMap.get(key) || {
+        expense_uuid: key,
+        expense_number: r.expense.expense_number,
+        title: r.expense.title,
+        module: r.expense.module ?? 'unknown',
+        category_name: r.expense.category_name,
+        company_name: r.company?.name ?? null,
+        advance: Number(r.expense.advance_amount) || 0,
+        disbursed: 0,
+        refunded: 0,
+      };
+      if (isRefund) entry.refunded += r.amount;
+      else entry.disbursed += r.amount;
+      expenseMap.set(key, entry);
     }
 
     const mod = r.expense?.module ?? 'unknown';
@@ -254,6 +273,11 @@ export const getPaymentSummary = async (user, query = {}) => {
     by_module: [...byModule.values()],
     by_company: [...byCompany.values()],
     by_month: [...byMonth.values()],
+    // One line per expense — the CA-level net view. Clubbed across the expense's
+    // recorded payments + its synthetic advance row, so the 800/1000/200 case
+    // reads advance 800 · paid 200 · net 1000 and the 900/600/300 case reads
+    // advance 900 · refunded 300 · net 600.
+    by_expense: [...expenseMap.values()].map((x) => ({ ...x, net: x.disbursed - x.refunded })),
     outstanding,
   };
 };
