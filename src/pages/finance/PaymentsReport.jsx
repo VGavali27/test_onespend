@@ -393,6 +393,8 @@ function ReportSummary({ summary }) {
 
       <OutstandingCard outstanding={outstanding} />
 
+      <ExpenseNetPanel rows={summary.by_expense ?? []} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <BreakoutPanel title="By module" rows={(summary.by_module ?? []).map((r) => ({ label: r.module, count: r.count, disbursed: r.disbursed, refunds: r.refunds }))} />
         <BreakoutPanel title="By month" rows={(summary.by_month ?? []).map((r) => ({ label: r.month, count: r.count, disbursed: r.disbursed, refunds: r.refunds }))} />
@@ -453,6 +455,71 @@ function BreakoutPanel({ title, rows }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Per-expense net view — clubbed across each expense's payments + advance so a
+// CA sees one line per expense (e.g. advance 800 + paid 200 = net 1000).
+function ExpenseNetPanel({ rows }) {
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+      <h3 className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Per-expense net</h3>
+      <p className="text-[12px] text-slate-400 mb-3">
+        Advance + payments − refunds for each expense (advance counts as company money paid out).
+      </p>
+      {rows.length === 0 ? (
+        <p className="text-[13px] text-slate-400">No data</p>
+      ) : (
+        <div className="overflow-x-auto -mx-1 px-1">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                <th className="py-1.5 pr-3 font-semibold">Expense</th>
+                <th className="py-1.5 px-3 font-semibold text-right whitespace-nowrap">Advance</th>
+                <th className="py-1.5 px-3 font-semibold text-right whitespace-nowrap">Paid out</th>
+                <th className="py-1.5 px-3 font-semibold text-right whitespace-nowrap">Refunded</th>
+                <th className="py-1.5 pl-3 font-semibold text-right whitespace-nowrap">Net out</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+              {rows.map((r) => {
+                const net = Number(r.net) || 0;
+                return (
+                  <tr key={r.expense_uuid} className="align-top">
+                    <td className="py-2 pr-3 min-w-0">
+                      <Link to={`/expenses/${r.expense_uuid}`} className="block hover:text-indigo-600">
+                        <p className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[24rem]">{r.title || r.expense_number}</p>
+                      </Link>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {r.module ? <ModulePill label={r.module} /> : null}
+                        <p className="text-[12px] text-slate-400 truncate">{r.expense_number}</p>
+                      </div>
+                      {r.company_name ? <p className="text-[12px] text-slate-400 truncate">{r.company_name}</p> : null}
+                    </td>
+                    <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {formatCurrency(r.advance)}
+                    </td>
+                    <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {formatCurrency(r.disbursed)}
+                    </td>
+                    <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      {formatCurrency(r.refunded)}
+                    </td>
+                    <td
+                      className={`py-2 pl-3 text-right tabular-nums font-semibold whitespace-nowrap ${
+                        net < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'
+                      }`}
+                    >
+                      {formatCurrency(net)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
