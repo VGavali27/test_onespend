@@ -151,6 +151,10 @@ const rolePermissions = [
   [112, 151], [112, 152], [112, 153], [112, 155],
   [112, 156], [112, 158], [112, 159], [112, 164],
   [112, 165], [112, 166],
+
+  // Payments report (180) — finance & CA visibility: SUPER_ADMIN/CFO/PAYMENT/FINANCE
+  [100, 180], [101, 180], [102, 180], [103, 180],
+  [104, 180], [105, 180],
 ];
 
 export async function up({ context }) {
