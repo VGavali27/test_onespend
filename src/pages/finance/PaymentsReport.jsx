@@ -487,6 +487,7 @@ function ExpenseNetPanel({ rows }) {
             <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
               {rows.map((r) => {
                 const net = Number(r.net) || 0;
+                const dateCell = (d) => (d ? <p className="text-[11px] text-slate-400 font-normal tabular-nums">{formatDate(d)}</p> : null);
                 return (
                   <tr key={r.expense_uuid} className="align-top">
                     <td className="py-2 pr-3 min-w-0">
@@ -501,12 +502,15 @@ function ExpenseNetPanel({ rows }) {
                     </td>
                     <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       {formatCurrency(r.advance)}
+                      {dateCell(r.advance_date)}
                     </td>
                     <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       {formatCurrency(r.disbursed)}
+                      {dateCell(r.disbursed_date)}
                     </td>
                     <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       {formatCurrency(r.refunded)}
+                      {dateCell(r.refund_date)}
                     </td>
                     <td
                       className={`py-2 pl-3 text-right tabular-nums font-semibold whitespace-nowrap ${
@@ -514,6 +518,7 @@ function ExpenseNetPanel({ rows }) {
                       }`}
                     >
                       {formatCurrency(net)}
+                      {dateCell(r.last_date)}
                     </td>
                   </tr>
                 );
