@@ -1,4 +1,4 @@
-import { encryptAmounts } from '../../utils/encryption.js';
+import { encrypt, encryptAmounts } from '../../utils/encryption.js';
 
 export default (sequelize, DataTypes) => {
   const ExpensePayment = sequelize.define(
@@ -37,8 +37,14 @@ export default (sequelize, DataTypes) => {
       paranoid: true,
       underscored: true,
       hooks: {
-        beforeCreate: (instance) => { encryptAmounts(instance.dataValues); },
-        beforeUpdate: (instance) => { encryptAmounts(instance.dataValues); },
+        beforeCreate: (instance) => {
+          if (instance.dataValues.amount != null) instance.dataValues.amount = encrypt(String(instance.dataValues.amount));
+          encryptAmounts(instance.dataValues);
+        },
+        beforeUpdate: (instance) => {
+          if (instance.dataValues.amount != null) instance.dataValues.amount = encrypt(String(instance.dataValues.amount));
+          encryptAmounts(instance.dataValues);
+        },
       },
     },
   );

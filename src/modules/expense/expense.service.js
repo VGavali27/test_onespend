@@ -1289,15 +1289,12 @@ export const recordPayment = async (uuid, user, paymentData) => {
     const finalAmount = Number(decrypt(String(expense.final_amount || '0')));
     const advanceAmount = Number(decrypt(String(expense.advance_amount || '0')));
 
-    const [existingPayments] = await db.ExpensePayment.findAndCountAll({
+    const existingPayments = await db.ExpensePayment.findAndCountAll({
       where: { expense_id: expense.id },
       transaction: t,
     });
     decryptResults(existingPayments.rows);
-    const allPayments = [
-      ...existingPayments.rows.map((p) => ({ amount: p.amount, payment_type: p.payment_type })),
-      { amount, payment_type: payment_type || 'PARTIAL' },
-    ];
+    const allPayments = existingPayments.rows.map((p) => ({ amount: p.amount, payment_type: p.payment_type }));
     const newPaymentStatus = computePaymentStatus(allPayments, finalAmount, advanceAmount);
 
     // paid_amount = net company disbursement via recorded payments (company→user

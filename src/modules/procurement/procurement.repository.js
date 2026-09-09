@@ -202,6 +202,13 @@ export const findAll = async (where = {}, params = {}) => {
   // active — a filtered view shows every document of that type for auditability.
   const visibleRows = requestedType ? collected : projectLatestPerChain(collected);
 
+  // A chain whose PO already spawned an expense (procurement_orders.expense_id set)
+  // is no longer an active request — drop it from the collapsed All / My lists.
+  // Type-filtered views keep it for auditability.
+  const listRows = requestedType
+    ? visibleRows
+    : visibleRows.filter((r) => !(r.request_type === 'PO' && r.expense_id != null));
+
   // Merge + sort + paginate in JS (acceptable at this scale; amounts are excluded from sort)
   visibleRows.sort((a, b) => {
     const av = a[sortBy] ?? a.createdAt;
@@ -211,8 +218,8 @@ export const findAll = async (where = {}, params = {}) => {
     return sortOrder === 'ASC' ? cmp : -cmp;
   });
 
-  const total = visibleRows.length;
-  const rows = visibleRows.slice((page - 1) * limit, page * limit);
+  const total = listRows.length;
+  const rows = listRows.slice((page - 1) * limit, page * limit);
   return { rows, total };
 };
 

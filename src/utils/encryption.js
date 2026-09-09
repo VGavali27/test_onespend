@@ -70,7 +70,7 @@ export function decryptAmounts(obj) {
   if (!obj || typeof obj !== 'object') return obj;
 
   for (const key of Object.keys(obj)) {
-    if ((key.endsWith('_amount') || key === 'exchange_rate') && obj[key] !== null && obj[key] !== undefined) {
+    if ((key.endsWith('_amount') || key === 'amount' || key === 'exchange_rate') && obj[key] !== null && obj[key] !== undefined) {
       const decrypted = decrypt(obj[key]);
       obj[key] = decrypted !== null ? parseFloat(decrypted) : null;
     }
