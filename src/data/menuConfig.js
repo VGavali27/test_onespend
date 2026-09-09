@@ -72,6 +72,15 @@ export const menuConfig = [
     ],
   },
   {
+    id: 'finance',
+    label: 'Finance',
+    icon: Landmark,
+    permission: 'payments:reports',
+    children: [
+      { id: 'payments-report', label: 'Payments Report', icon: BarChart3, to: '/reports/payments', permission: 'payments:reports' },
+    ],
+  },
+  {
     id: 'settings',
     label: 'Settings',
     icon: Settings,

@@ -72,6 +72,8 @@ const CreateCategory = lazy(() => import('@/pages/finance/categories/CreateCateg
 const EditCategory = lazy(() => import('@/pages/finance/categories/EditCategory'));
 const ViewCategory = lazy(() => import('@/pages/finance/categories/ViewCategory'));
 
+const PaymentsReport = lazy(() => import('@/pages/finance/PaymentsReport'));
+
 // Shown briefly while a lazily-loaded page chunk downloads
 function PageLoader() {
   return (
@@ -158,6 +160,8 @@ export default function AppRoutes() {
           <Route path="master/categories/new" element={<PermissionGuard permission="expense_categories:create"><CreateCategory /></PermissionGuard>} />
           <Route path="master/categories/:uuid/edit" element={<PermissionGuard permission="expense_categories:update"><EditCategory /></PermissionGuard>} />
           <Route path="master/categories/:uuid" element={<PermissionGuard permission="expense_categories:read"><ViewCategory /></PermissionGuard>} />
+
+          <Route path="reports/payments" element={<PermissionGuard permission="payments:reports"><PaymentsReport /></PermissionGuard>} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
