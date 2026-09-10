@@ -25,7 +25,7 @@ export const syncVendorDocuments = async (vendorUuid, documents = [], initialDoc
   }
   for (const doc of documents) {
     if (doc instanceof File) {
-      const { data } = await uploadImage(doc, 'vendor');
+      const { data } = await uploadImage(doc, 'vendors/documents');
       const url = data?.data?.url;
       await vendorDocumentApi.add({
         vendor_uuid: vendorUuid,

@@ -339,7 +339,7 @@ export default function ExpenseDetail() {
     if (documentType === "PO_PDF") setPoPdfUploading(true);
     else setInvoiceUploading(true);
     try {
-      const { data: up } = await uploadImage(file, "expenses");
+      const { data: up } = await uploadImage(file, "expenses/documents");
       const url = up?.data?.url || up?.url;
       if (!url) throw new Error("Upload failed — no file URL returned");
       await addExpenseDocument(id, {
@@ -1786,7 +1786,7 @@ function RecordPaymentModal({ expense, summary, onClose, onSaved }) {
     if (!file) return;
     setUploading(true);
     try {
-      const { data } = await uploadImage(file, "expense-payment");
+      const { data } = await uploadImage(file, "expenses/proofs");
       setProofs((prev) => [
         ...prev,
         {

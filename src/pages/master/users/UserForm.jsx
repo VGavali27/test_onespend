@@ -151,6 +151,7 @@ export default function UserForm({
             <div className="flex-shrink-0 sm:w-36 flex justify-center sm:block">
               <ImageUpload
                 value={profileImage}
+                folder="users/profile"
                 onChange={(v) => setValue('profile_image', v, { shouldValidate: true, shouldDirty: true })}
                 onRemove={() => setValue('profile_image', '', { shouldValidate: true })}
                 label="Profile photo"

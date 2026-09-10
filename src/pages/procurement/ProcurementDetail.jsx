@@ -175,7 +175,7 @@ export default function ProcurementDetail() {
       }
       // Attach the vendor's quotation document (uploaded from the builder form)
       if (qFormFile && quotationUuid) {
-        const { data } = await uploadImage(qFormFile, 'procurement');
+        const { data } = await uploadImage(qFormFile, 'procurement/quotations');
         const url = data?.data?.url;
         await procurementDocumentApi.add(uuid, {
           quotation_uuid: quotationUuid,
@@ -947,7 +947,7 @@ function QuotationsSection({
     if (!entry?.file) { toast.error('Choose a file first.'); return; }
     setQDoc((prev) => ({ ...prev, [quotationUuid]: { ...entry, uploading: true } }));
     try {
-      const { data } = await uploadImage(entry.file, 'procurement');
+      const { data } = await uploadImage(entry.file, 'procurement/quotations');
       const url = data?.data?.url;
       await procurementDocumentApi.add(doc.uuid, {
         quotation_uuid: quotationUuid,

@@ -58,7 +58,7 @@ const prepareAttachments = async (attachments = []) => {
   const out = [];
   for (const a of attachments) {
     if (a instanceof File) {
-      const { data } = await uploadImage(a);
+      const { data } = await uploadImage(a, 'expenses/attachments');
       out.push({
         url: data?.data?.url,
         original_file_name: a.name,

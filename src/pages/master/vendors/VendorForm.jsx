@@ -131,6 +131,7 @@ export default function VendorForm({
             <div className="flex-shrink-0 sm:w-36 flex justify-center sm:block">
               <ImageUpload
                 value={logo}
+                folder="vendors/logo"
                 onChange={(v) => setValue('logo_img', v)}
                 onRemove={() => setValue('logo_img', '')}
                 label="Logo"
