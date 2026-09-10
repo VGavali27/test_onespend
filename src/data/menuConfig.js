@@ -78,6 +78,7 @@ export const menuConfig = [
     permission: 'payments:reports',
     children: [
       { id: 'payments-report', label: 'Payments Report', icon: BarChart3, to: '/reports/payments', permission: 'payments:reports' },
+      { id: 'expense-net', label: 'Expense Net Summary', icon: ReceiptText, to: '/reports/expense-net', permission: 'payments:reports' },
     ],
   },
   {

@@ -204,6 +204,15 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
         searchPlaceholder="Search by title, number or company..."
         hasFilters={hasFilters}
         onClearFilters={clearFilters}
+        headerActions={
+          <Link
+            to="/expenses/new"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Create Expense
+          </Link>
+        }
         actions={
           <>
             <select
@@ -259,13 +268,16 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
               )}
             </div>
 
-            <Link
-              to="/expenses/new"
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Create Expense
-            </Link>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Clear filters
+              </button>
+            )}
           </>
         }
       />

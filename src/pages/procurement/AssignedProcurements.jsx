@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { formatDate, formatCurrency } from '@/utils/format';
 import { Link } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
-import { ShoppingCart, Loader2, Eye, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, Loader2, Eye, CheckCircle2, X } from 'lucide-react';
 import DataTablePage from '@/components/ui/DataTablePage';
 import { getAssignedProcurements } from '@/services/procurementService';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -33,6 +33,12 @@ function TypeBadge({ type }) {
 export default function AssignedProcurements() {
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  const hasFilters = typeFilter !== '' || statusFilter !== '';
+  const clearFilters = () => {
+    setTypeFilter('');
+    setStatusFilter('');
+  };
 
   const columns = [
     columnHelper.accessor('document_number', {
@@ -119,10 +125,22 @@ export default function AssignedProcurements() {
       countLabel="document"
       emptyMessage="No procurement documents pending your approval"
       searchPlaceholder="Search by number, title or vendor..."
+      hasFilters={hasFilters}
+      onClearFilters={clearFilters}
       actions={
         <>
           {filterSelect(typeFilter, setTypeFilter, ['PI', 'PR', 'PO'], 'All types')}
           {filterSelect(statusFilter, setStatusFilter, ['SUBMITTED', 'APPROVED', 'CREATED', 'RECEIVED', 'FINANCE_APPROVED', 'QUOTATION_APPROVED'], 'All statuses')}
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+            >
+              <X className="h-4 w-4" />
+              Clear filters
+            </button>
+          )}
         </>
       }
     />

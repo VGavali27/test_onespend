@@ -249,6 +249,17 @@ export default function PaymentsReport() {
         searchPlaceholder="Search title, expense number or reference..."
         hasFilters={hasFilters}
         onClearFilters={clearFilters}
+        belowFilters={<ReportStatCards summary={s} />}
+        headerActions={
+          <button
+            type="button"
+            onClick={downloadCsv}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </button>
+        }
         actions={
           <>
             <select value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)} className={selectClass}>
@@ -328,14 +339,16 @@ export default function PaymentsReport() {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={downloadCsv}
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </button>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Clear filters
+              </button>
+            )}
           </>
         }
       />
@@ -345,9 +358,9 @@ export default function PaymentsReport() {
   );
 }
 
-// ── Summary section: totals + breakout panels ──
-function ReportSummary({ summary }) {
-  const { total_disbursed = 0, total_refunds = 0, net_paid = 0, payment_count = 0, outstanding } = summary;
+// ── Summary stat cards, rendered between the filters and the table ──
+function ReportStatCards({ summary }) {
+  const { total_disbursed = 0, total_refunds = 0, net_paid = 0, payment_count = 0 } = summary;
 
   const statCards = [
     { label: 'Total disbursed', value: formatCurrency(total_disbursed), tone: 'indigo', icon: ArrowUpRight },
@@ -357,43 +370,46 @@ function ReportSummary({ summary }) {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((card) => {
-          const Icon = card.icon;
-          const toneClass =
-            card.tone === 'indigo'
-              ? 'bg-indigo-600 text-white shadow-indigo-600/25'
-              : card.tone === 'emerald'
-                ? 'bg-emerald-500 text-white shadow-emerald-500/25'
-                : 'bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700';
-          return (
-            <div key={card.label} className={`rounded-xl p-4 flex items-center justify-between shadow-sm ${toneClass}`}>
-              <div>
-                <p className={`text-[12px] font-medium ${card.tone === 'slate' ? 'text-slate-400 dark:text-slate-500' : 'text-white/80'}`}>
-                  {card.label}
-                </p>
-                <p className={`mt-1 text-xl font-bold tabular-nums ${card.tone === 'slate' ? 'text-slate-900 dark:text-white' : 'text-white'}`}>
-                  {card.value}
-                </p>
-              </div>
-              <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  card.tone === 'slate'
-                    ? 'bg-slate-100 dark:bg-gray-800 text-slate-500'
-                    : 'bg-white/15 text-white'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-              </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {statCards.map((card) => {
+        const Icon = card.icon;
+        const toneClass =
+          card.tone === 'indigo'
+            ? 'bg-indigo-600 text-white shadow-indigo-600/25'
+            : card.tone === 'emerald'
+              ? 'bg-emerald-500 text-white shadow-emerald-500/25'
+              : 'bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700';
+        return (
+          <div key={card.label} className={`rounded-xl p-4 flex items-center justify-between shadow-sm ${toneClass}`}>
+            <div>
+              <p className={`text-[12px] font-medium ${card.tone === 'slate' ? 'text-slate-400 dark:text-slate-500' : 'text-white/80'}`}>
+                {card.label}
+              </p>
+              <p className={`mt-1 text-xl font-bold tabular-nums ${card.tone === 'slate' ? 'text-slate-900 dark:text-white' : 'text-white'}`}>
+                {card.value}
+              </p>
             </div>
-          );
-        })}
-      </div>
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                card.tone === 'slate'
+                  ? 'bg-slate-100 dark:bg-gray-800 text-slate-500'
+                  : 'bg-white/15 text-white'
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-      <OutstandingCard outstanding={outstanding} />
-
-      <ExpenseNetPanel rows={summary.by_expense ?? []} />
+// ── Summary section: Outstanding + breakout panels (rendered below the table) ──
+function ReportSummary({ summary }) {
+  return (
+    <div className="space-y-6">
+      <OutstandingCard outstanding={summary.outstanding} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <BreakoutPanel title="By module" rows={(summary.by_module ?? []).map((r) => ({ label: r.module, count: r.count, disbursed: r.disbursed, refunds: r.refunds }))} />
@@ -455,76 +471,6 @@ function BreakoutPanel({ title, rows }) {
               </div>
             </div>
           ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Per-expense net view — clubbed across each expense's payments + advance so a
-// CA sees one line per expense (e.g. advance 800 + paid 200 = net 1000).
-function ExpenseNetPanel({ rows }) {
-  return (
-    <div className="rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
-      <h3 className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Per-expense net</h3>
-      <p className="text-[12px] text-slate-400 mb-3">
-        Advance + payments − refunds for each expense (advance counts as company money paid out).
-      </p>
-      {rows.length === 0 ? (
-        <p className="text-[13px] text-slate-400">No data</p>
-      ) : (
-        <div className="overflow-x-auto -mx-1 px-1">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                <th className="py-1.5 pr-3 font-semibold">Expense</th>
-                <th className="py-1.5 px-3 font-semibold text-right whitespace-nowrap">Advance</th>
-                <th className="py-1.5 px-3 font-semibold text-right whitespace-nowrap">Paid out</th>
-                <th className="py-1.5 px-3 font-semibold text-right whitespace-nowrap">Refunded</th>
-                <th className="py-1.5 pl-3 font-semibold text-right whitespace-nowrap">Net out</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-              {rows.map((r) => {
-                const net = Number(r.net) || 0;
-                const dateCell = (d) => (d ? <p className="text-[11px] text-slate-400 font-normal tabular-nums">{formatDate(d)}</p> : null);
-                return (
-                  <tr key={r.expense_uuid} className="align-top">
-                    <td className="py-2 pr-3 min-w-0">
-                      <Link to={`/expenses/${r.expense_uuid}`} className="block hover:text-indigo-600">
-                        <p className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[24rem]">{r.title || r.expense_number}</p>
-                      </Link>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {r.module ? <ModulePill label={r.module} /> : null}
-                        <p className="text-[12px] text-slate-400 truncate">{r.expense_number}</p>
-                      </div>
-                      {r.company_name ? <p className="text-[12px] text-slate-400 truncate">{r.company_name}</p> : null}
-                    </td>
-                    <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {formatCurrency(r.advance)}
-                      {dateCell(r.advance_date)}
-                    </td>
-                    <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {formatCurrency(r.disbursed)}
-                      {dateCell(r.disbursed_date)}
-                    </td>
-                    <td className="py-2 px-3 text-right tabular-nums text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {formatCurrency(r.refunded)}
-                      {dateCell(r.refund_date)}
-                    </td>
-                    <td
-                      className={`py-2 pl-3 text-right tabular-nums font-semibold whitespace-nowrap ${
-                        net < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-white'
-                      }`}
-                    >
-                      {formatCurrency(net)}
-                      {dateCell(r.last_date)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
       )}
     </div>

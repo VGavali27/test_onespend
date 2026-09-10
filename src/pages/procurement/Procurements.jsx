@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { formatDate, formatCurrency } from '@/utils/format';
 import { Link, useSearchParams } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
-import { ShoppingCart, Plus, Loader2, Eye, Inbox, FileText } from 'lucide-react';
+import { ShoppingCart, Plus, Loader2, Eye, Inbox, FileText, X } from 'lucide-react';
 import DataTablePage from '@/components/ui/DataTablePage';
 import { procurementApiWithScope } from '@/services/procurementService';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -49,6 +49,12 @@ export default function Procurements() {
   });
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  const hasFilters = typeFilter !== '' || statusFilter !== '';
+  const clearFilters = () => {
+    setTypeFilter('');
+    setStatusFilter('');
+  };
 
   // Sync activeTab with URL scope param
   useEffect(() => {
@@ -157,17 +163,31 @@ export default function Procurements() {
         countLabel="document"
         emptyMessage="No procurement documents yet"
         searchPlaceholder="Search by number, title or vendor..."
+        hasFilters={hasFilters}
+        onClearFilters={clearFilters}
+        headerActions={
+          <Link
+            to="/procurement/new"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            New PI
+          </Link>
+        }
         actions={
           <>
             {filterSelect(typeFilter, setTypeFilter, TYPES, 'All types')}
             {filterSelect(statusFilter, setStatusFilter, STATUSES, 'All statuses')}
-            <Link
-              to="/procurement/new"
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              New PI
-            </Link>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Clear filters
+              </button>
+            )}
           </>
         }
         tabs={
