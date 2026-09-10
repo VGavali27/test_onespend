@@ -39,7 +39,7 @@ export default function ViewUser() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <DetailHeader icon={UserRound} title="User Details" onBack={() => navigate('/master/users')} editTo={`/master/users/${uuid}/edit`} />
+      <DetailHeader icon={UserRound} title="User Details" onBack={() => navigate('/master/users')} editTo={`/master/users/${uuid}/edit`} editPermission="users:update" />
 
       {loading ? (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-6">
@@ -76,7 +76,8 @@ export default function ViewUser() {
               <InfoRow label="Last name" value={profile.last_name || '—'} />
               <InfoRow label="Email" value={profile.email || '—'} />
               <InfoRow label="Mobile" value={profile.mobile || '—'} />
-              <InfoRow label="Member since" value={formatDate(profile.created_at)} />
+              <InfoRow label="Member since" value={formatDate(profile.createdAt ?? profile.created_at)} />
+              <InfoRow label="Last updated" value={formatDate(profile.updatedAt ?? profile.updated_at)} />
             </InfoCard>
 
             <InfoCard icon={Building2} title="Role & Department">

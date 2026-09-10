@@ -4,38 +4,87 @@ import { Wallet, LogOut, Menu, X, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { menuConfig } from '@/data/menuConfig';
 
-const hasAccess = (roles, userRole) => {
-  if (!userRole) return false;
-  if (roles.includes('*') || roles.includes(userRole)) return true;
-  return false;
+const hasPermission = (permission, userPermissions) => {
+  if (!permission || permission === '*') return true;
+  if (!userPermissions) return false;
+  return userPermissions.includes(permission);
 };
 
 // The parent whose children contain the current path (used to open it on load)
 const activeParentId = (menus, pathname) =>
   menus.find((m) => m.children?.some((c) => pathname.startsWith(c.to)))?.id ?? null;
 
+// How much of a leaf's `to` matches the current path (-1 = no match). A leaf matches
+// when the path IS its `to`, or descends beneath it (to + '/').
+// Also considers query parameters if present in the menu item's `to`.
+const matchLen = (to, pathname, search) => {
+  // Split the menu item's `to` into path and query parts
+  const [toPath, toQuery] = to.split('?');
+
+  // First check path match
+  const pathMatch = pathname === toPath ? toPath.length + 1 : pathname.startsWith(`${toPath}/`) ? toPath.length : -1;
+
+  if (pathMatch === -1) return -1;
+
+  // If the menu item has query params, also check they match
+  if (toQuery) {
+    const currentParams = new URLSearchParams(search);
+    const toParams = new URLSearchParams(toQuery);
+    // Check if all query params in menu item are present and matching in current URL
+    for (const [key, value] of toParams.entries()) {
+      if (currentParams.get(key) !== value) {
+        return -1; // Query param doesn't match
+      }
+    }
+    // Query params match, add extra priority for exact match
+    return pathMatch + toQuery.length + 1;
+  }
+
+  return pathMatch;
+};
+
+// The single leaf to highlight — the most-specific prefix match, so e.g. on
+// /procurement/new only "Create New" is active, not "All Requests" (/procurement).
+// Passes both pathname and search (query string) for query-aware matching.
+const activeLeafId = (menus, pathname, search) => {
+  let best = null;
+  let bestLen = -1;
+  const walk = (items) => {
+    for (const item of items) {
+      if (item.children) walk(item.children);
+      else if (item.to) {
+        const len = matchLen(item.to, pathname, search);
+        if (len > bestLen) {
+          bestLen = len;
+          best = item.id;
+        }
+      }
+    }
+  };
+  walk(menus);
+  return best;
+};
+
 // Single leaf nav link. `nested` = rendered inside a submenu → tighter padding + smaller icon.
-function LeafItem({ item, onNavigate, nested = false }) {
+function LeafItem({ item, onNavigate, nested = false, active = false }) {
   const Icon = item.icon;
   return (
     <NavLink to={item.to} onClick={onNavigate} className="block">
-      {({ isActive }) => (
-        <span
-          className={`flex items-center gap-2.5 ${nested ? 'px-2.5 py-1.5' : 'px-3 py-2'} rounded-lg text-[13px] font-medium transition-colors ${
-            isActive
-              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800'
+      <span
+        className={`flex items-center gap-2.5 ${nested ? 'px-2.5 py-1.5' : 'px-3 py-2'} rounded-lg text-[13px] font-medium transition-colors ${
+          active
+            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400'
+            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-800'
+        }`}
+      >
+        <Icon
+          className={`${nested ? 'h-3.5 w-3.5' : 'h-4.5 w-4.5'} flex-shrink-0 ${
+            nested ? 'text-slate-400 dark:text-slate-500' : ''
           }`}
-        >
-          <Icon
-            className={`${nested ? 'h-3.5 w-3.5' : 'h-4.5 w-4.5'} flex-shrink-0 ${
-              nested ? 'text-slate-400 dark:text-slate-500' : ''
-            }`}
-          />
-          <span className="truncate">{item.label}</span>
-          {isActive && <span className="ml-auto w-1 h-4 bg-indigo-500 rounded-full" />}
-        </span>
-      )}
+        />
+        <span className="truncate">{item.label}</span>
+        {active && <span className="ml-auto w-1 h-4 bg-indigo-500 rounded-full" />}
+      </span>
     </NavLink>
   );
 }
@@ -55,8 +104,11 @@ function Submenu({ open, children }) {
 }
 
 // Parent item with collapsible submenu. Accordion: only one submenu is open at a time.
-function ParentItem({ item, onNavigate, open, toggleMenu }) {
+function ParentItem({ item, onNavigate, open, toggleMenu, activeId, userPermissions }) {
   const Icon = item.icon;
+  // Filter children by permission
+  const visibleChildren = item.children.filter((child) => hasPermission(child.permission, userPermissions));
+
   return (
     <div>
       <button
@@ -73,8 +125,8 @@ function ParentItem({ item, onNavigate, open, toggleMenu }) {
       </button>
 
       <Submenu open={open}>
-        {item.children.map((child) => (
-          <LeafItem key={child.id} item={child} nested onNavigate={onNavigate} />
+        {visibleChildren.map((child) => (
+          <LeafItem key={child.id} item={child} nested onNavigate={onNavigate} active={activeId === child.id} />
         ))}
       </Submenu>
     </div>
@@ -89,19 +141,22 @@ export default function Sidebar() {
   // Clicking a parent toggles it, so even the active section can be closed.
   const [openSection, setOpenSection] = useState(null);
 
-  const activeId = useMemo(() => activeParentId(menuConfig, location.pathname), [location.pathname]);
+  const visibleMenus = menuConfig.filter((item) => hasPermission(item.permission, user?.permissions));
+
+  // The section to keep open (based on which child matches the current path)
+  const parentId = useMemo(() => activeParentId(menuConfig, location.pathname), [location.pathname]);
+  // The single leaf to highlight (most-specific prefix match, including query params)
+  const leafActive = useMemo(() => activeLeafId(visibleMenus, location.pathname, location.search), [visibleMenus, location.pathname, location.search]);
 
   // Open the section of the current page when it changes. A manual close is kept
   // until the user navigates to a different section.
   useEffect(() => {
-    setOpenSection((prev) => (activeId && prev !== activeId ? activeId : prev));
-  }, [activeId]);
+    setOpenSection((prev) => (parentId && prev !== parentId ? parentId : prev));
+  }, [parentId]);
 
   const toggleMenu = (id) => {
     setOpenSection((prev) => (prev === id ? null : id));
   };
-
-  const visibleMenus = menuConfig.filter((item) => hasAccess(item.roles, user?.role));
 
   return (
     <>
@@ -150,9 +205,11 @@ export default function Sidebar() {
                 onNavigate={() => setMobileOpen(false)}
                 open={openSection === item.id}
                 toggleMenu={toggleMenu}
+                activeId={leafActive}
+                userPermissions={user?.permissions}
               />
             ) : (
-              <LeafItem key={item.id} item={item} onNavigate={() => setMobileOpen(false)} />
+              <LeafItem key={item.id} item={item} onNavigate={() => setMobileOpen(false)} active={leafActive === item.id} />
             ),
           )}
         </nav>

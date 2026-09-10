@@ -127,6 +127,7 @@ export default function CompanyForm({
               <ImageUpload
                 shape="square"
                 icon={Building2}
+                folder="companies/logo"
                 value={logoImage}
                 onChange={(v) => setValue('logo_img', v, { shouldValidate: true })}
                 onRemove={() => setValue('logo_img', '', { shouldValidate: true })}

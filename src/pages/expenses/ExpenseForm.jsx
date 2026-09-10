@@ -11,7 +11,7 @@ import { DateField } from '@/components/ui/DatePicker';
 import { nullIfEmpty } from '@/utils/format';
 import { applyServerErrorsDetailed } from '@/utils/formErrors';
 import { useToast } from '@/components/ui/Toast';
-import { categoryApi } from '@/services/financeService';
+import { getCategoryOptions } from '@/services/financeService';
 import { getMyProfile } from '@/services/masterService';
 import { uploadImage } from '@/services/uploadService';
 
@@ -58,7 +58,7 @@ const prepareAttachments = async (attachments = []) => {
   const out = [];
   for (const a of attachments) {
     if (a instanceof File) {
-      const { data } = await uploadImage(a);
+      const { data } = await uploadImage(a, 'expenses/attachments');
       out.push({
         url: data?.data?.url,
         original_file_name: a.name,
@@ -121,6 +121,7 @@ export default function ExpenseForm({
   });
 
   const category = watch('category');
+  const travelType = watch('travel.travel_type');
   const selectedCategory = categories.find((c) => c.uuid === category);
   const isTravel = selectedCategory?.module === 'travel';
   const isReimbursement = selectedCategory?.module === 'reimbursement';
@@ -134,8 +135,10 @@ export default function ExpenseForm({
   useEffect(() => {
     const load = async () => {
       try {
-        const [cats, prof] = await Promise.all([categoryApi.list(), getMyProfile()]);
-        setCategories(cats.data?.data ?? []);
+        const [cats, prof] = await Promise.all([getCategoryOptions(), getMyProfile()]);
+        // Filter out procurement module categories from the dropdown
+        const allCategories = cats.data?.data ?? [];
+        setCategories(allCategories.filter((c) => c.module !== 'procurement'));
         // Company dropdown is scoped to the companies the logged-in user is employed in
         const seen = new Set();
         const companies = [];
@@ -374,6 +377,7 @@ export default function ExpenseForm({
               ))}
             </ArraySection>
 
+            {travelType === 'INTERNATIONAL' && (
             <ArraySection icon={Coins} title="Forex" addLabel="Add forex" onAdd={() => forex.append({ ...emptyForex })}>
               {forex.fields.map((f, i) => (
                 <ArrayRow key={f.id} title={`Forex ${i + 1}`} onRemove={() => forex.remove(i)} cols="sm:grid-cols-2 xl:grid-cols-4"
@@ -393,6 +397,7 @@ export default function ExpenseForm({
                 </ArrayRow>
               ))}
             </ArraySection>
+            )}
 
             <ArraySection icon={Bus} title="Local Transport" addLabel="Add transport" onAdd={() => localTransports.append({ ...emptyLocalTransport })}>
               {localTransports.fields.map((f, i) => (

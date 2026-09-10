@@ -5,11 +5,22 @@ import { roleHandoverRuleApi, getRoleOptions } from '@/services/accessService';
 import StatusBadge from '@/components/ui/StatusBadge';
 import PageHeader from '@/components/ui/PageHeader';
 import { inputClass } from '@/components/ui/form';
+import { useAuth } from '@/context/AuthContext';
 
 export default function RoleHandoverRules() {
-  const [roles, setRoles] = useState([]); // every role from the roles table
-  const [rules, setRules] = useState([]); // all handover rules
-  const [module, setModule] = useState(''); // no "all modules" — defaults to the first available module
+  const { hasPermission } = useAuth();
+
+  if (!hasPermission('role_handover_rules:read_all')) {
+    return <div className="min-h-[60vh] flex items-center justify-center">Access Denied</div>;
+  }
+
+  const canCreate = hasPermission('role_handover_rules:create');
+  const canUpdate = hasPermission('role_handover_rules:update');
+  const canDelete = hasPermission('role_handover_rules:delete');
+
+  const [roles, setRoles] = useState([]);
+  const [rules, setRules] = useState([]);
+  const [module, setModule] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -58,20 +69,24 @@ export default function RoleHandoverRules() {
         subtitle="Which roles can hand over approvals to which roles"
         actions={
           <>
-            <Link
-              to={`/access/role-handover-rules/edit?module=${encodeURIComponent(module)}`}
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              <Settings2 className="h-4 w-4" />
-              Configure Rules
-            </Link>
-            <Link
-              to="/access/role-handover-rules/edit"
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Rule
-            </Link>
+            {canUpdate && (
+              <Link
+                to={`/access/role-handover-rules/edit?module=${encodeURIComponent(module)}`}
+                className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Settings2 className="h-4 w-4" />
+                Configure Rules
+              </Link>
+            )}
+            {canCreate && (
+              <Link
+                to="/access/role-handover-rules/edit"
+                className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Rule
+              </Link>
+            )}
           </>
         }
       />

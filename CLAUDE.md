@@ -26,7 +26,7 @@ src/
 ├── components/
 │   ├── layout/
 │   │   ├── AppLayout.jsx          # Layout wrapper (sidebar + navbar + outlet)
-│   │   ├── Sidebar.jsx            # Collapsible role-based nav (accordion + preview-open, submenu icons, guide line)
+│   │   ├── Sidebar.jsx            # Collapsible permission-based nav (accordion, submenu icons, guide line, query-aware active leaf)
 │   │   └── Navbar.jsx             # Top bar — search, theme, notifications, profile menu
 │   ├── ui/                        # Reusable UI components
 │   │   ├── DataTable.jsx          # Generic TanStack table (self-managed fetchFn mode)
@@ -39,13 +39,15 @@ src/
 │   │   ├── ErrorState.jsx         # Full-card load-error state with retry
 │   │   ├── Toast.jsx              # ToastProvider + useToast — success/error toasts (mounted in App.jsx)
 │   │   ├── detail.jsx             # Read-only view primitives: InfoCard, InfoRow, Detail, DetailHeader (back + edit)
-│   │   └── form.jsx               # Form primitives: inputClass/For, FormSection, FormField
-│   └── ProtectedRoute.jsx         # Auth guard — redirects to /login if unauthenticated
+│   │   ├── form.jsx               # Form primitives: inputClass/For, FormSection, FormField
+│   │   ├── SearchableSelect.jsx   # Searchable combobox (Select2-style) for picking from lists
+│   │   └── PermissionGuard.jsx    # Route-level permission guard (checks user.permissions array)
+│   └── ProtectedRoute.jsx         # Auth guard — redirects to /login if unauthenticated; optional permission check
 ├── context/
-│   ├── AuthContext.jsx            # Auth state, login/logout, JWT management
+│   ├── AuthContext.jsx            # Auth state, login/logout, JWT management, hasPermission(perm) helper
 │   └── ThemeContext.jsx           # Dark/light theme + font family/size preferences
 ├── data/
-│   └── menuConfig.js              # Role-based menu config; submenu items carry their own icon
+│   └── menuConfig.js              # Permission-based menu config; items have `permission` key; '*' = all authenticated
 ├── pages/
 │   ├── auth/
 │   │   └── Login.jsx              # Split-panel login (real API)
@@ -56,17 +58,21 @@ src/
 │   │   │   └── Users.jsx, CreateUser.jsx, EditUser.jsx, UserForm.jsx, ViewUser.jsx
 │   │   ├── companies/             # Companies: list / add / edit / view
 │   │   │   └── Companies.jsx, CreateCompany.jsx, EditCompany.jsx, CompanyForm.jsx, ViewCompany.jsx
-│   │   └── departments/           # Departments: list / add / edit / view
-│   │       └── Departments.jsx, CreateDepartment.jsx, EditDepartment.jsx, DepartmentForm.jsx, ViewDepartment.jsx
+│   │   ├── departments/           # Departments: list / add / edit / view
+│   │   │   └── Departments.jsx, CreateDepartment.jsx, EditDepartment.jsx, DepartmentForm.jsx, ViewDepartment.jsx
+│   │   ├── vendors/               # Vendors: list / add / edit / view (contacts, addresses, bank accounts, documents, categories)
+│   │   │   └── Vendors.jsx, CreateVendor.jsx, EditVendor.jsx, VendorForm.jsx, ViewVendor.jsx
+│   │   └── vendorCategories/      # Vendor Categories: list / add / edit / view
+│   │       └── VendorCategories.jsx, CreateVendorCategory.jsx, EditVendorCategory.jsx, VendorCategoryForm.jsx, ViewVendorCategory.jsx
 │   ├── access/                    # Access Control
 │   │   ├── roles/                 # Roles: list / add / edit / view
 │   │   ├── permissions/           # Permissions: list / add / edit / view
-│   │   ├── rolePermissions/       # RolePermissions: assign permissions to a role
-│   │   └── roleHandoverRules/     # RoleHandoverRules: list + Role-Permissions-style editor (add/remove via sync)
+│   │   ├── rolePermissions/       # RolePermissions: assign permissions to a role (sync)
+│   │   └── roleHandoverRules/     # RoleHandoverRules: list + Role-Permissions-style editor (sync)
 │   ├── profile/
 │   │   └── Profile.jsx            # My Profile page (navbar menu → GET /users/me)
 │   ├── expenses/                  # MyExpenses (own), AllExpenses (scoped list), CreateExpense (real API create), ExpenseDetail (real API view)
-│   ├── travel/                    # (future) TravelRequests...
+│   ├── procurement/               # Procurement: list (tabs: All/My), Create PI, Edit PI, Detail (actions, quotations, timeline, docs)
 │   ├── finance/
 │   │   └── categories/            # Expense Categories: list / add / edit / view (routed + menu under Master Data → /master/categories)
 │   └── settings/
@@ -79,6 +85,9 @@ src/
 │   ├── masterService.js           # /companies, /departments, /users, /user-employments, /users/me
 │   ├── accessService.js           # /roles, /permissions, /role-permissions, /role-handover-rules (+sync), /roles/options
 │   ├── financeService.js          # /expense-categories
+│   ├── vendorService.js           # /vendors, /vendors/options, /vendor-documents, /vendor-categories (+/options)
+│   ├── procurementService.js      # /procurement (CRUD + workflow actions + quotations + documents)
+│   ├── dashboardService.js        # /dashboard
 │   └── uploadService.js           # POST /uploads (image upload)
 ├── validations/                   # Shared Zod schemas — one file per form/domain
 │   ├── userFormSchema.js          # User create/edit form schema + EMPLOYMENT_TYPES
@@ -86,12 +95,14 @@ src/
 │   ├── companySchema.js           # Company create/edit form schema (full detail)
 │   ├── departmentSchema.js        # Department create/edit form schema
 │   ├── expenseCategorySchema.js   # Expense category create/edit form schema
+│   ├── vendorCategorySchema.js    # Vendor category create/edit form schema
 │   ├── roleSchema.js              # Role create/edit form schema
 │   ├── permissionSchema.js        # Permission create/edit form schema
 │   └── expenseSchema.js           # Expense create form — category/company + Travel (segments, accommodations, forex, transports, misc) + Reimbursement line items; amounts as strings (backend encrypts)
+│   └── procurementSchema.js       # Procurement create/edit form schema (qty + unit price only)
 └── utils/
     ├── assets.js                  # resolveAssetUrl(path) — backend asset path → absolute URL
-    ├── format.js                  # formatDate, nullIfEmpty, formatType
+    ├── format.js                  # formatDate, nullIfEmpty, formatType, formatCurrency
     ├── user.js                    # getFullName, getInitials
     ├── table.js                   # sortRows (client-side sort for DataTable)
     └── formErrors.js              # applyServerErrors — map 422 errors onto RHF fields
@@ -101,12 +112,13 @@ src/
 - **Path alias:** Always use `@/` for imports (maps to `src/`), never relative `../../`
 - **Functional components only** — no classes
 - **Feature-based pages** — add new pages inside the relevant folder (`pages/{feature}/`)
-- **Role-based menu:** sidebar renders from `data/menuConfig.js`, filtered by `user.role`
+- **Permission-based menu & routes:** sidebar renders from `data/menuConfig.js`, filtered by `user.permissions`; routes wrapped in `<PermissionGuard permission="...">` (keys match backend `permission_key` like `companies:read_all`, `expenses:approvals`, `procurement:po`)
 - **All buttons/links** show pointer cursor (global CSS rule)
 - **All API calls go through `src/services/`** — one file per domain; components never call axios directly
 - **Reusable listings:** use `DataTable` (self-managed `fetchFn` mode) or `DataTablePage` for any listing page
-- **Dropdown option fetches** use the lightweight `/options` endpoints (`getRoleOptions`, `getCompanyOptions`, `getDepartmentOptions`), not the full list APIs
+- **Dropdown option fetches** use the lightweight `/options` endpoints (`getRoleOptions`, `getCompanyOptions`, `getDepartmentOptions`, `getVendorOptions`, `getVendorCategoryOptions`), not the full list APIs
 - **Forms:** all forms use React Hook Form + Zod — schemas live in `src/validations/`, components use `useForm` + `zodResolver`, dynamic rows use `useFieldArray`, and server-side 422 errors are mapped back onto fields via `setError`. Don't hand-roll form state or validation.
+- **Permission checks:** `AuthContext` provides `hasPermission(perm)` checking `user.permissions` array (populated from backend `/auth/login` response). `PermissionGuard` and `ProtectedRoute` both support permission prop.
 
 ## Design System (Indigo/Slate)
 - **Primary:** `#6366f1` (indigo-500)
@@ -119,28 +131,36 @@ src/
 - **Dark mode:** toggle via Navbar or Settings, persists in localStorage
 
 ## Routing
-All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazily code-split** via `React.lazy`; the route tree is wrapped in one `Suspense` with a spinner fallback.
+All routes are defined in `src/routes/index.jsx` (not App.jsx). Pages are **lazily code-split** via `React.lazy`; the route tree is wrapped in one `Suspense` with a spinner fallback. Routes are protected by `PermissionGuard` (checks `user.permissions`) and `ProtectedRoute` (auth + optional permission).
 ```
 /login                    → Public
 /                         → Protected (redirects to /login if unauthenticated)
-/dashboard                → Dashboard
-/master/companies         → Companies list / new / :uuid (view) / :uuid/edit
-/master/departments       → Departments list / new / :uuid (view) / :uuid/edit
-/master/users             → Users list / new / :uuid (view) / :uuid/edit
-/master/categories        → Expense Categories list / new / :uuid (view) / :uuid/edit
-/access/roles             → Roles list / new / :uuid (view) / :uuid/edit
-/access/permissions       → Permissions list / new / :uuid (view) / :uuid/edit
-/access/role-permissions  → Role Permissions (assignment)
-/access/role-handover-rules          → Role Handover Rules list
-/access/role-handover-rules/edit     → Configure a from role's handover rules
-/expenses/my              → My Expenses (own — GET /expenses/my)
-/expenses/all             → All Expenses (scoped — GET /expenses; SUPER_ADMIN/CFO see all, other manager roles only their employed companies)
-/expenses/new             → Create Expense (real API)
-/expenses/:uuid/edit      → Edit a DRAFT expense (creator only; PUT replaces line items)
-/expenses/:id             → Expense Detail (real API view)
+/dashboard                → Dashboard (permission: '*')
+/expenses/my              → My Expenses (own — GET /expenses/my) — permission: expenses:read
+/expenses/all             → All Expenses (scoped — GET /expenses; SUPER_ADMIN/CFO see all, other manager roles only their employed companies) — permission: expenses:read_all
+/expenses/assigned        → Approvals (pending user's role approval — GET /expenses/assigned; company-scoped) — permission: expenses:approvals
+/expenses/payments        → Payment Requests (pending payment at the user's role — GET /expenses/my-payments) — permission: expenses:read
+/expenses/new             → Create Expense (real API) — permission: expenses:create
+/expenses/:uuid/edit      → Edit a DRAFT expense (creator only; PUT replaces line items) — permission: expenses:update
+/expenses/:id             → Expense Detail (real API view) — permission: expenses:read
+/master/companies         → Companies list / new / :uuid (view) / :uuid/edit — permissions: companies:read_all / companies:create / companies:read / companies:update
+/master/vendors           → Vendors list / new / :uuid (view) / :uuid/edit — permissions: vendors:read_all / vendors:create / vendors:read / vendors:update
+/master/vendor-categories → Vendor Categories list / new / :uuid (view) / :uuid/edit — permissions: vendor_categories:read_all / vendor_categories:create / vendor_categories:read / vendor_categories:update
+/master/departments       → Departments list / new / :uuid (view) / :uuid/edit — permissions: departments:read_all / departments:create / departments:read / departments:update
+/master/users             → Users list / new / :uuid (view) / :uuid/edit — permissions: users:read_all / users:create / users:read / users:update
+/master/categories        → Expense Categories list / new / :uuid (view) / :uuid/edit — permissions: expense_categories:read_all / expense_categories:create / expense_categories:read / expense_categories:update
+/access/roles             → Roles list / new / :uuid (view) / :uuid/edit — permissions: roles:read_all / roles:create / roles:read / roles:update
+/access/permissions       → Permissions list / new / :uuid (view) / :uuid/edit — permissions: permissions:read_all / permissions:create / permissions:read / permissions:update
+/access/role-permissions  → Role Permissions (assignment) — permission: role_permissions:read_all
+/access/role-handover-rules          → Role Handover Rules list — permission: role_handover_rules:read_all
+/access/role-handover-rules/edit     → Configure a from-role's handover rules — permission: role_handover_rules:update
+/procurement              → All Procurement Requests (PI/PR/PO, type+status filters) — permission: procurement:read_all
+/procurement/new          → Create PI (only roles with procurement:create) — permission: procurement:create
+/procurement/:uuid        → Procurement Detail (actions, quotations, timeline, docs) — permission: procurement:read
+/procurement/:uuid/edit   → Edit a draft PI (admin "Edit Line Items" for a PR in quote-gathering is a modal on the detail page, not this route) — permission: procurement:update
 /profile                  → My Profile
 /settings                 → Settings
-/travel, /finance, ...    → Mapped to pages (to be built)
+/system/logs              → Application Logs (read server error + request logs for a day; date dropdown from GET /system/logs/meta, panels from GET /system/logs?date=) — permission: system_logs:view (SUPER_ADMIN only)
 ```
 
 ## Scripts
@@ -152,7 +172,7 @@ npm run preview    # Preview production build
 
 ## Environment (.env)
 ```
-VITE_API_URL=http://localhost:3000/api/v1   # Backend base URL
+VITE_API_URL=http://localhost:3015/api/v1   # Backend base URL
 VITE_APP_NAME=FinTrack
 VITE_APP_ENV=development
 ```
@@ -161,11 +181,12 @@ VITE_APP_ENV=development
 ### Built
 - [x] Enterprise design system (Indigo/Slate theme, dark/light mode)
 - [x] **Real login API** — `POST /auth/login` via `authService`, JWT stored, AuthContext wiring (fixed a recursion bug)
+- [x] **Demo credentials on login** — the login page shows all 13 seeded demo users (Super Admin, CFO, Payment/Finance/Admin/Travel managers + juniors, HOD, Employee Mgr, Employee) in a **3-column grid spanning the full right partition**, each button auto-fills the email + password (`Admin@123`). **All users use password "Admin@123"** (seeded via bcrypt hash).
 - [x] Dashboard (stats cards, spending charts, activity feed)
-- [x] Collapsible role-based sidebar with submenus — active section stays open, other sections collapse once you navigate to a page; submenu items have their own icons + a guide line
+- [x] Collapsible **permission-based** sidebar with submenus — active section stays open, other sections collapse once you navigate to a page; submenu items have their own icons + a guide line; active leaf matches query params (e.g., `/procurement?scope=mine` highlights "My Requests" tab)
 - [x] Navbar with search, notifications, profile dropdown
 - [x] Settings page (font family, font size, theme)
-- [x] Protected routes + auth guard
+- [x] Protected routes + auth guard (`ProtectedRoute` + `PermissionGuard` with permission keys matching backend `permission_key`)
 - [x] Feature-based page structure + `@/` alias
 - [x] **Services layer** — shared axios client (JWT + 401 redirect) + per-module service files + `crud()` helper
 - [x] **Users module** (`src/pages/master/users/`)
@@ -174,19 +195,181 @@ VITE_APP_ENV=development
   - [x] View User — read-only detail (personal / role-dept / employments) with Edit button
 - [x] **Companies module** (`src/pages/master/companies/`) — list (client-side paginated `DataTable`, logo thumbnail), full-detail add/edit form (identity/contact/address/tax + status + **logo upload**), group dropdown via `/groups/options`, delete confirm, **View Company** with Edit button
 - [x] **Departments module** (`src/pages/master/departments/`) — list, add/edit form (name/code/status/description), delete confirm, **View Department** with Edit button
+- [x] **Vendors module** (`src/pages/master/vendors/`) — list (logo thumbnail, **category chips column**), add/edit form with **nested contacts / addresses / bank accounts** (`useFieldArray`) + **vendor category checkbox grid** (sends `vendor_category_uuids`; edit maps existing `categories` back), logo upload, **View Vendor** with a **documents** section (upload via `/uploads` + `vendorDocumentApi`, list + delete) and a **Categories** card
+- [x] **Vendor Categories module** (`src/pages/master/vendorCategories/`) — list/add/edit/view, delete confirm (routed + menu under **Master Data** → `/master/vendor-categories`); category options feed the vendor form's assignment grid
 - [x] **Expense Categories module** (`src/pages/finance/categories/`) — list/add/edit/view; first-receiver & final-approver role dropdowns; delete confirm (routed + menu under **Master Data** → `/master/categories`)
 - [x] **Access Control** (`src/pages/access/`) — Roles + Permissions list/add/edit/view, and **Role Permissions** page (role selector → grouped permission checklist → `sync` API); status field on both forms
 - [x] **Role Handover Rules** (`src/pages/access/roleHandoverRules/`) — list shows all roles with rule status (or blank) + a Role-Permissions-style **editor** (module + from-role selector → To-role checklist → `sync` API that activates/deactivates rules)
 - [x] **React Hook Form + Zod** — `Login`, UserForm, CompanyForm, DepartmentForm, RoleForm, PermissionForm, ExpenseForm (Travel + Reimbursement dynamic rows via `useFieldArray`); schemas in `src/validations/`
-- [x] **Expenses UI** (`src/pages/expenses/`) — **Create Expense** wired to the real API (`POST /expenses`; category + company dropdowns — company scoped to the logged-in user's employments via `GET /users/me`); per-item **attachments** (files uploaded via `POST /uploads` on submit, kept per sub-part on edit, shown in the detail view); amounts not sent (backend computes); **validation is module-aware** (Travel XOR Reimbursement required fields, dates required, end ≥ start) and submit shows a **success/error toast** via `useToast()`. **My Expenses** (`GET /expenses/my` — only expenses the user created) and **All Expenses** (`GET /expenses` — role+company scoped: SUPER_ADMIN/CFO see everything, other expense-manager roles see only companies they're actively employed in) are **server-side paginated** via the shared `DataTablePage` (`page/limit/search/status/category/sort` on the backend, `ApiResponse.paginated`); All Expenses shows a clickable **Submitted by** (→ user-details modal) and approver-style actions. **Detail** (`GET /expenses/:uuid`, visibility-checked, payload normalized via `normalizeExpense`) renders all travel sections **tables on desktop / cards on mobile**, each showing its own **attachments**. **DRAFT expenses can be edited** (`/expenses/:uuid/edit` → `EditExpense` reuses `ExpenseForm`; creator-only, `PUT /expenses/:uuid` replaces line items + attachments and recomputes the amount; Edit shown only for the owner's DRAFT). `MyExpenses` is a parameterized list component reused by `AllExpenses`. Themed `DatePicker` (react-datepicker) used for date/datetime fields.
+- [x] **Expenses UI** (`src/pages/expenses/`) — **Create Expense** wired to the real API (`POST /expenses`; category + company dropdowns — company scoped to the logged-in user's employments via `GET /users/me`); per-item **attachments** (files uploaded via `POST /uploads` on submit, kept per sub-part on edit, shown in the detail view); amounts not sent (backend computes); **validation is module-aware** (Travel XOR Reimbursement required fields, dates required, end ≥ start) and submit shows a **success/error toast** via `useToast()`. **My Expenses** (`GET /expenses/my` — only expenses the user created), **All Expenses** (`GET /expenses` — role+company scoped: SUPER_ADMIN/CFO see everything, other expense-manager roles see only companies they're actively employed in), and **Approvals** (`GET /expenses/assigned` — expenses pending the logged-in user's role approval, company-scoped) are **server-side paginated** via the shared `DataTablePage` (`page/limit/search/status/category/sort` on the backend, `ApiResponse.paginated`); All Expenses shows a clickable **Submitted by** (→ user-details modal) and approver-style actions. **Detail** (`GET /expenses/:uuid`, visibility-checked, payload normalized via `normalizeExpense`) renders all travel sections **tables on desktop / cards on mobile**, each showing its own **attachments**. **DRAFT expenses can be edited** (`/expenses/:uuid/edit` → `EditExpense` reuses `ExpenseForm`; creator-only, `PUT /expenses/:uuid` replaces line items + attachments and recomputes the amount; Edit shown only for the owner's DRAFT). `MyExpenses` is a parameterized list component reused by `AllExpenses` and `Approvals`. Themed `DatePicker` (react-datepicker) used for date/datetime fields. **Expense approval actions** — the **Expense Detail** page shows **Approve / Reject** buttons (with a confirm modal + optional remark) for a `SUBMITTED` expense **when the logged-in role is the current handler (or SUPER_ADMIN)**; **Approve opens a handover role dropdown** (fetched from `GET /expenses/:uuid/handover-roles` — valid targets from `role_handover_rules` for the category's module) to select who to forward to; defaults to final approver if no selection. They call `expenseService.submit/approve/rejectExpense`, then reload. The current handler role is surfaced from `currentRole` (normalized in `normalizeExpense`). **PO-created expenses** (auto-created when a procurement PO is created) appear in the expenses list as SUBMITTED and flow through the expense approval chain — the expense detail's handover trail shows the SUBMIT → APPROVE(→CFO) → APPROVE(→APPROVED) journey. For **procurement-linked expenses** (PO-created or converted) the Expense Detail shows a **collapsed "Procurement history"** card (`ProcurementHistorySection`, gated by `normalizeExpense.isProcurement`) with a **Show/Hide** button and a **smooth height animation** (`grid-template-rows` transition — the payload can be large, so it opens gently). On first expand it **lazy-loads** the chain via `getExpenseProcurementChain` (`GET /expenses/:uuid/procurement-chain`) and renders `ProcurementHistory` — a **responsive stage table** (desktop table / mobile cards, like the PR price-history card) with columns **Stage | Document | Grand total | View** for PI → PR → each quotation → PO, plus the **chain's approval logs** below it (e.g. SUBMIT → APPROVE → CREATE_PR → ADD_QUOTATION → SUBMIT_QUOTATIONS → SELECT_QUOTATION → CONVERT_TO_EXPENSE). Each row's **View** links to that document's procurement detail page (`/procurement/:uuid`; quotations have no standalone route).
+- [x] **Procurement module** (`src/pages/procurement/`) — full PI → PR → PO flow wired to the real API (`/procurement*`). **Procurements list** — server-side `DataTablePage` (`page/limit/search/type/status/sort`), type/status filter dropdowns, draft-PI edit/delete, per-status color pills (the backend now projects the all-types view to the **latest document per chain**). **DRAFT PI visibility fixed** — DRAFT PIs are visible **only to their creator** in "All Requests" list (backend `procurement.repository.js:buildWhere()` combines draft exclusion filter with status filters using `Op.and`). **Create/Edit PI** — `ProcurementForm` (RHF+Zod, `procurementSchema`), company dropdown scoped to the user's employments (`GET /users/me`), dynamic line items (qty + unit price only — no vendor at PI stage). **ProcurementDetail** — status pill + **workflow action bar** (submit / approve / reject / create-PR / create-PO / mark-received / process-payment, shown by role+status; **creating a PR redirects to the all-requests list** `/procurement`; **no convert-to-expense action** — expense is now created only when PO is created), **Edit Line Items** (admin modal to adjust PI/PR qty & unit price → `PUT /:uuid/items`; hidden once quotations are **submitted to the requester** — status `QUOTATION_SELECTION`), **quotation builder** (hidden behind an **"Add quotation"** button — admin fills vendor, **valid-until via the themed `DatePicker`** (same picker as the other forms), **comments**, and an editable **line-items table** pre-filled from the PR's items with per-item name/qty/unit price/`tax_rate` and a live grand total; totals are server-computed on save), **blind selection** for the requester (vendor masked but **line items + prices visible**; `submit-quotations` opens selection, `select-quotation` picks one), **selected-quotation highlight** (emerald card + ✓ badge, with the other quotations collapsed behind a **"Show N other quotations"** toggle), **price-history card** (PI → PR → quotations → PO totals with a **View link** per stage), line-items table, handover **timeline**, and **quotation documents** (per-quotation upload/delete, shown only in **edit mode** — the existing "QUOTATION" type label was removed). The whole detail page is **responsive: tables on desktop / stacked cards on mobile** (`hidden md:block` + `md:hidden`), with `table-fixed` percentage columns and `break-words` so no horizontal scrollbars. Follows the intended flow: anyone who can **create a PI can submit it** (permission-based, not handover-gated); the PR goes straight to quotation-gathering with **no separate PR approval**; admin edits PR items before sending to the requester to choose a quotation blindly. On a **PO** (or a PR that was **converted to an expense**) the detail page shows a **"Linked Expense" link** (Wallet icon, from `doc.expenses[0]`) → `/expenses/:uuid`, so the expense that the PO auto-created or the admin converted is reachable directly from the procurement record.
 - [x] **My Profile page** (navbar) — avatar, personal info, role/department, all employments
-- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`
+- [x] Reusable components: `DataTable`, `DataTablePage`, `Modal`, `ImageUpload` (circle/square), `DatePicker`, `StatusBadge`, `Toast` (`useToast().success/error`), `detail.jsx`, `form.jsx`, `PageHeader`, `ErrorState`, `SearchableSelect`, `PermissionGuard`
 - [x] Sidebar submenus — single-open accordion (active section can be collapsed), smooth CSS height collapse (no JS timers)
+- [x] **Permission-based routing** — all routes wrapped in `<PermissionGuard permission="...">` using backend permission keys (e.g., `expenses:read_all`, `companies:create`, `procurement:po`); sidebar menu items filtered by same permissions from `menuConfig.js`
+
+### Today's Updates (2026-08-21) — Final Approver Closes Expense as APPROVED
+- **ExpenseDetail.jsx**: Added detection of whether the current user is the category's final approver (`expense.category.finalApproverRole.code === expense.currentRole.code`). If so, the approve modal shows an info banner ("You are the final approver — this expense will be closed as APPROVED") instead of the handover role dropdown. The expense is always closed as APPROVED regardless of any handover selection (backend enforces this).
+- **expenseService.js**: Updated `normalizeExpense` to include `category.finalApproverRole` (id, name, code) in the normalized payload so the frontend can determine if the current handler is the final approver.
+
+### Today's Updates (2026-08-20) — Selected Quotation Display & Procurement Chain
+- **ExpenseDetail.jsx**: Updated `normalizeExpense` usage and procurement history rendering. The expense detail now receives the selected quotation (with line items) from the backend's procurement chain response and displays it in the procurement history section.
+- **ProcurementDetail.jsx**: Major refactor of quotation display:
+  - **Selected quotation now prominently displayed above procurement history** — always visible in an emerald-bordered card with vendor, validity, totals, line items (table on desktop, cards on mobile), and attached documents.
+  - **Quotations section now shows only OTHER quotations** — the selected quotation is removed from the list here (was previously highlighted first then others collapsed).
+  - **Price history card** now filters out the selected quotation from the comparison table (since it's displayed separately above).
+  - **Submit quotations button** now only enables when there are OTHER quotations (non-selected) to submit for requester selection.
+- **expenseService.js**: Updated `normalizeExpense` to check for `procurementOrder` (the new include from backend) instead of the old `procurement_pr_id`/`procurement_po_id` fields to determine if an expense is procurement-linked.
+
+### Today's Updates (2026-08-18)
+- **Expense approval handover flow**: New **Approvals** page (`/expenses/assigned`) listing expenses pending the logged-in user's role approval (company-scoped; reuses `MyExpenses` component with `actionMode='assigned'`). Added to sidebar menu under **Expenses**.
+- **Expense Detail approval actions**: On SUBMITTED expenses, current handler (or SUPER_ADMIN) sees **Approve / Reject** buttons. **Approve opens a handover role dropdown** (fetches valid targets from `GET /expenses/:uuid/handover-roles` — based on `role_handover_rules` for the expense's category module: travel/reimbursement/procurement). Selected role is sent as `to_role_id` on approve.
+- **Assigned Expenses list inline actions**: Approve/Reject buttons directly in the list with same handover role dropdown.
+- **Expense category filter**: In `ExpenseForm.jsx`, procurement module categories are now filtered out of the category dropdown (`c.module !== 'procurement'`). Procurement expenses are created automatically from PO/PR, not manually.
+- **QUOTATION_APPROVED no longer approvable**: In `ProcurementDetail.jsx`, removed `QUOTATION_APPROVED` from `APPROVABLE_STATUSES`. At this stage the PR has a selected quotation and the next action is "Create PO" (not approve). Only `SUBMITTED`, `RECEIVED`, and `FINANCE_APPROVED` remain approvable.
+
+### Today's Updates (2026-09-02) — Payment Handover Feature
+- **Payment is now a role-handover workflow**: When the final approver closes a `SUBMITTED` expense as `APPROVED` (backend), it routes to the **original requester** (`current_role_id = requester's role`). The requester sees the APPROVED expense in "My Expenses" (view only) and can **Record Payment** (if they have `expenses:pay`) and/or **Handover for Payment** — both buttons show together when the requester has `expenses:pay`, otherwise only the handover button.
+- **`PaymentSection` (ExpenseDetail)**: "Record Payment" is now shown only when the logged-in user is the **current handler** of the APPROVED/PAID expense (`user.role === expense.currentRole.code`) AND has `expenses:pay` AND the expense is not yet `SETTLED`/`PAID`. Previously the button appeared for any `expenses:pay` holder regardless of who was the handler.
+- **PaymentHandoverModal** (ExpenseDetail): a modal with a role dropdown (fetched from `GET /expenses/:uuid/payment-handover-roles` — valid `module='payment'` handover targets for the current handler) + optional remarks. Submits via `POST /expenses/:uuid/handover-payment` (`{ to_role_id, remarks }`), then reloads the expense. Only reachable while the user is the current handler of a non-settled APPROVED/PAID expense.
+- **New `PaymentRequests` page** (`/expenses/payments`, `PaymentRequests.jsx`): reuses the `MyExpenses` component with `fetchList={getMyPaymentRequests}` and `actionMode='payments'` (new subtitle "Expenses awaiting payment processing" + empty state "No payment requests pending"). Shows the expenses handed over to the logged-in role — `GET /expenses/my-payments` returns rows where `current_role_id = user's role`, `status IN ('APPROVED','PAID')`, `payment_status NOT IN ('SETTLED','PAID')`. Reserved only for payment/finance roles (the requester who holds the expense sees it via My Expenses, not here).
+- **Sidebar**: added **"Payment Requests"** under Expenses → `/expenses/payments` (icon `Banknote`, permission `expenses:read`).
+- **`expenseService.js`**: added `handoverForPayment(uuid, payload)`, `getPaymentHandoverRoles(uuid)`, and `getMyPaymentRequests(params, config)`.
+- **Pending amount fix (backend-driven, no frontend change)**: The "Pending payment" figure in **both** the detail `PaymentSection` card and the **RecordPaymentModal** comes from `getPaymentSummary.amount_due`. The modal **defaults its amount input to `amount_due`** and **clamps any entry to it** (`Amount cannot exceed the due balance`). Because the backend previously returned `amount_due` without subtracting recorded payments (partial payment on a 5000 travel expense still showed 5000 pending), this readout was stale even though the `paid_amount` card was correct. The fix landed in the backend `getPaymentSummary`; the frontend already refreshes via `refreshPayments()` (re-fetches `getPayments` + `getPaymentSummary`) in the modal's `onSaved`. After the backend fix, the due/pending figure and the modal's max default down to the true remaining balance.
+
+### Today's Updates (2026-09-03) — Role-based Dashboard
+- **`Dashboard.jsx`**: The dashboard is now **persona-driven** by the logged-in role (frontend-only, `PERSONA` map; the backend already returns `metrics.isGlobal/isManager`). New personas: **employee** (`EMPLOYEE`), **approver** (`HOD`/`EMP_MGR`/`TRAVEL_MGR`/`FINANCE_MGR`/`FINANCE_JR`), **payment** (`PAYMENT_MGR`/`PAYMENT_JR`), **procurement** (`ADMIN_MGR`/`ADMIN_JR`), and **global** (`SUPER_ADMIN`/`CFO`). Each persona drives a **role-aware welcome subtitle** and a **persona-specific primary quick-action**:
+  - employee → "Submit Expense" (`/expenses/new`)
+  - approver/global → "My Approvals" (`/expenses/assigned`)
+  - payment → "Payment Requests" (`/expenses/payments`)
+  - procurement → "Procurement" (`/procurement`)
+  Secondary actions (All Expenses, Procurement, Payment Requests, New Expense for employees) appear per the existing `APPROVER_ROLES`/`PROCUREMENT_ROLES`/`PAYMENT_ROLES`/`GLOBAL_ROLES` gates. This surfaces the new **Payment Requests** page for payment/finance roles.
+- **Bug fixed: quick-action role gates used `user?.roleCode`**, which the login payload never provides (the API returns `user.role`). This made `isManager`/`isGlobal`/`isProcurement` always `false`, so secondary actions never rendered for anyone. Changed all three to `user?.role` (consistent with the rest of the app). Also removed a leftover `console.log('Dashboard API response:', res)` debug line.
+- **Quick actions layout**: the quick-action buttons now render in a **responsive 4-per-row grid** (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` — 1 col mobile, 2 on tablet, 4 on desktop), matching the stat-card row layout, so "New Expense / My Approvals / All Expenses / Procurement / Payment Requests" line up like a menu.
+- **Backend is UI-free**: confirmed the API returns only data — `GET /dashboard` returns `{ charts, recentActivity, metrics, roleContext }` and no frontend presentation (labels, icons, `className`, HTML) is emitted. All presentation stays in `Dashboard.jsx`.
+
+### Today's Updates (2026-09-03) — Application Logs Viewer (SUPER_ADMIN)
+- **New page** `src/pages/system/Logs.jsx` (`/system/logs`, wrapped in `<PermissionGuard permission="system_logs:view">`): a **date picker** (themed `DatePicker`, `maxDate` = today) for choosing any day, plus a **tabbed** reader with two tabs — **API Logs** (`GET /system/logs/api?date=`) and **Error Logs** (`GET /system/logs/error?date=`). Only the **active tab** fetches its own dedicated endpoint (red panel for errors with error/warn badges; emerald panel for api traffic with http badge). Entries render as `[LEVEL] timestamp message` in monospace with `whitespace-pre-wrap` multi-line stacks; a **Refresh** button re-fetches the date + active tab.
+- **Per-tab independent counts**: each tab's header shows **its own** entry count — counts are stored separately per tab (`entriesByTab = { api: [], error: [] }`), so switching tabs never changes the other tab's badge number. Only the active tab fetches (lazy per-tab loading on tab switch).
+- **Auto-scroll to latest (end of file)**: the log scroll container (`scrollRef`) is **automatically scrolled to the bottom** whenever new entries load or the tab changes (`scrollRef.current.scrollTop = scrollRef.current.scrollHeight`), landing on the most recent record. A **"Latest"** floating button (`ArrowDownToLine`) at the bottom-right also jumps to the last entry on demand.
+- **New service** `src/services/logsService.js`: `getLogDates(config)` → `GET /system/logs/meta`; `getApiLogs({ date }, config)` → `GET /system/logs/api`; `getErrorLogs({ date }, config)` → `GET /system/logs/error`. Payload lives at **one** `.data` level (`res.data`), matching the backend `{ date, type, entries }` shape.
+- **Sidebar**: new **System** section (icon `Settings`, permission `system_logs:view`) with a single **Application Logs** child (`/system/logs`, `ScrollText` icon, permission `system_logs:view`). The existing **Settings** link is retained. Only SUPER_ADMIN sees the section (the new permission grants it to SUPER_ADMIN only).
+- Routes are backend data-only: the API returns plain objects — all presentation (tabs, level badges, panel accents, icons, scroll) lives in `Logs.jsx`.
+
+### Today's Updates (2026-08-17)
+- **Procurement tabs**: Added three tabs to Procurement list — "All Requests", "My Requests", and reserved "Role-based" (commented out for future).
+- **Sidebar highlighting fixed**: "My Requests" tab now properly highlights when URL contains `?scope=mine`.
+- **Quotation builder uses latest PR items**: When admin clicks "Add quotation", form resets and pre-fills from current `doc.items` (PR line items). Edits to PR line items reflect immediately in new quotations.
+- **Quantity as integer (DB + UI)**: `procurement_items.quantity` changed from `DECIMAL(18,2)` to `INTEGER` in migration `20260806000003`. Added `.int()` validation in schema. Form inputs use `step="1"` for quantity, `step="0.01"` for unit price.
+- **Currency always shows .00**: Updated `formatCurrency()` in `format.js` to use `minimumFractionDigits: 2, maximumFractionDigits: 2`.
+- **Create PO from QUOTATION_APPROVED**: "Create PO" button now appears when PR status = `QUOTATION_APPROVED` (was checking for `APPROVED`).
+- **Quotation selection → ADMIN_MGR**: After requester selects quotation, PR handler is now ADMIN_MGR (not CFO) so admin can create PO.
+
+### Today's Updates (2026-09-07) — Tabbed Expense Detail (Overview / Procurement Stages / Approvals / Payments)
+- **`ExpenseDetail.jsx`** — the single-scrolling detail page became a **tabbed layout**: `Overview | [PI | PR | Quotations | PO] | Approvals | Payments`.
+  - **Tab gating** (`tabs`, `:304-321`): the 4 procurement stage tabs are injected **only when `expense.isProcurement`** (`Boolean(e.procurementOrder)`); the **Quotations** tab shows a live `(n)` quotation-count badge. The strip uses `flex-wrap` so it reflows to rows on narrow screens instead of forcing a horizontal scrollbar.
+  - **Eager loading replaces the old lazy-on-expand** (`loadExpense`, `:88-141`): on mount it fires `GET /expenses/:uuid?decrypt=true` plus, **in parallel**, `GET /expenses/:uuid/procurement-chain` (when `isProcurement`) and `GET /expenses/:uuid/payments` + `/payment-summary` (when status is `APPROVED`/`PAID`). Failures degrade gracefully (`null`/`[]`, never fail the page); `refreshPayments()` re-fires the payment pair after recording a payment.
+  - **Overview tab** = the previous single-page content (info context cards, travel breakdown, reimbursement breakdown, documents).
+  - **Approvals tab** (`:941-1028`) — status-aware actions + a **merged chronological `ApprovalTrail`**: procurement-chain handovers tagged `sourceLabel: "Procurement chain"` + the expense's own `expense.handovers` tagged `"Expense"`, both filtered by `h.at` and sorted by timestamp. Actions: `DRAFT` + canEdit → **Submit expense**; `REJECTED` + canEdit → **Edit expense + Resubmit for approval** (resubmit hits the same `/submit` — the backend `submit` accepts DRAFT or REJECTED); `SUBMITTED` + (current handler or SUPER_ADMIN) → **Approve / Reject** (Approve opens the handover-role dropdown unless the handler is the final approver, which shows the closer banner). `runAction` gained a `'resubmit'` key → `resubmitExpense()`.
+  - **Payments tab** (`:1031-1098`) — for `APPROVED`/`PAID` shows `PaymentSection` plus Record Payment / Handover for Payment, gated to the **current handler** of a non-`SETTLED`/`PAID` expense (Record Payment also requires `expenses:pay`); otherwise an explicit empty state ("Payments only begin after this expense is approved").
+- **`expenseService.js`** — `getExpenseProcurementChain(uuid)` → `GET /expenses/:uuid/procurement-chain`; `resubmitExpense(uuid, remarks)` uses the same `/submit` endpoint.
+- **`StatusBadge.jsx`** — pill styles for the payment statuses (`PARTIAL_PAID`, `ADVANCE_REFUND_DUE`, `ADDITIONAL_PAYMENT_DUE`, `SETTLED`) and procurement statuses (`PR_CREATED`, `QUOTATION_SELECTION`, `QUOTATION_APPROVED`, `RECEIVED`, `FINANCE_APPROVED`, `SELECTED`).
+- **`ProcurementDetail.jsx`** — same tab pattern: `overview | [pi | pr | quotes | po (as present in chain)] | approvals`, built from the `price_history` chain (`:332-342`). A stage that vanishes after a reload falls back to **Overview** via a computed `active` (`tabs.some(...) ? activeTab : 'overview'` — no setState during render). On a PR, `hostQuotations` → the full admin/select-quotation experience; on other hosts → read-only quotation list. The **Approvals tab** renders the chain-wide merged handover timeline (backend already merges + dedupes via `findChainHandovers`); each line shows action type, from→to roles, `formatCurrency(amount_at_step)`, actor, timestamp, remarks.
+- **Quotation documents on the expense detail**: the Quotations tab's `QuotationCard` now shows each quotation's **uploaded documents** (`quotation.documents` → "Attached documents" links, mirroring `ProcurementDetail`). The backend chain (`findChainByPrId` + `buildProcurementChain`) now embeds each quotation's `procurement_documents` (`{ uuid, original_file_name, file_path }`), **masked to `[]` for the requester** (blind-vendor rule — a scanned quotation would reveal the supplier).
+- **Purchase Order PDF** — reusable `components/ui/PurchaseOrderPdf.jsx` (exports `PurchaseOrderPdfOverlay`, props `{ po, open, onClose }`): a full-screen A4-styled preview (company letterhead incl. address/GST/PAN, PO number/date/status, Vendor (bill-to) block, Ordered-By/Ship-To with requester + delivery date, line-items table, Subtotal/Tax/Grand Total, **amount in words** via `formatAmountInWords()` in `format.js` — Indian numbering lakh/crore + Rupees/Paise, notes/terms box, and dual signature areas). The toolbar's **Print / Save as PDF** calls `window.print()`; print CSS in `index.css` hides the app UI (`visibility` trick) and prints only the open sheet (`#po-print-sheet` / `#pr-print-sheet`) on A4 with 12mm margins. Wired into the **procurement detail's PO tab** only ("View / Print PO as PDF"). Admin sends the result directly to the vendor.
+- **Purchase Request PDF** — reusable `components/ui/PurchaseRequestPdf.jsx` (exports `PurchaseRequestPdfOverlay`, props `{ pr, open, onClose }`). Because a PR predates vendor selection, it uses a **two-step flow**: first a **vendor picker** (searchable dropdown from `GET /vendors/options`; on pick it fetches the **full vendor record** via `GET /vendors/:uuid` so code/GSTIN/platform/payment terms all make it onto the sheet), then an A4 sheet mirroring the PO layout (letterhead, PR number/date/status, Vendor block, Requested-By with requester + requested delivery, line items, Subtotal/Tax/Grand Total + **amount in words**, notes/terms, dual signatures). Toolbar: **Change vendor** / **Print / Save as PDF** / close. Wired into the **procurement detail's PR tab** ("View / Print PR as PDF") so the team can save the PDF and send it straight to the chosen vendor. Same print CSS as the PO sheet.
+- **PDFs live in procurement only** — once a PO is converted to an expense, the procurement PDF is no longer needed, so **no PDF button/overlay exists on the expense detail** for PO (the requirement is: generate during the procurement process only).
+- **Resolved a pending item**: the "Resubmit rejected expenses" entry (below) is now built — Edit + Resubmit live on the Approvals tab.
+
+### Today's Updates (2026-09-08) — PR PDF Permission Gate
+- **`ProcurementDetail.jsx`** — the **"View / Print PR as PDF"** button (PR tab) is now **gated by `hasPermission('procurement:print_pr')`** (new backend permission id 179, granted to SUPER_ADMIN / ADMIN_MGR / ADMIN_JR). `useAuth()` now destructures `hasPermission` (`const { user, hasPermission } = useAuth()`); the button renders only for `chain.pr` holders of that permission.
+- **Note**: `user.permissions` is populated at **login** — an existing session must log out/in to pick up the new permission.
+
+### Today's Updates (2026-09-08) — Procurement Approvals Page (Assigned)
+- **`AssignedProcurements.jsx`** — new page (`src/pages/procurement/AssignedProcurements.jsx`) rendering a `DataTablePage` with the same columns as the main `Procurements` list (type/status filters, no tabs). Backed by `GET /procurement/assigned` via `getAssignedProcurements()`.
+- **Route** — added `/procurement/assigned` in `src/routes/index.jsx` guarded by `PermissionGuard permission="procurement:approve"`.
+- **Menu item** — added "Approvals" to the procurement children in `src/data/menuConfig.js`, shown only to roles holding `procurement:approve`.
+- **`procurementService.js`** — added `getAssignedProcurements({ page, type, status })`.
+
+### Today's Updates (2026-09-08) — Real Notification Bell (derived feed, no table)
+- **`src/services/notificationService.js`** — `getNotificationCount()` → `GET /notifications/count`, `getNotifications(params)` → `GET /notifications`.
+- **`src/context/NotificationContext.jsx`** — wraps the app **inside** `AuthProvider`; exposes `{ count, feed, loading, refresh }`. Polls `GET /notifications/count` + `GET /notifications` every **2.5 min** (`POLL_INTERVAL = 150000`, tuned so the bell stays fresh without spamming api.log), on window **focus**, and on login; clears on logout. Wired into `App.jsx`.
+- **`Navbar.jsx`** — the placeholder bell (hardcoded array) is replaced with real data:
+  - The static red dot is now a live **count badge** (indigo badge `0`-hidden, `99+` cap) from `count.total`.
+  - Dropdown renders the merged **feed** (expense/procurement/payment icons via `KIND_ICON`, ref + status + ₹amount, relative `timeAgo`), an empty state ("You're all caught up"), a "pending" counter, and a **View all** link → `/expenses/assigned`.
+  - Clicking an item **marks it read (session-only)** via a module-scoped-read set and navigates to its `link`.
+- **Read state is session-local** (deliberate — the derived feed has no per-user `is_read` table): items stay highlighted until viewed this session/tab, then persist only for the session.
+
+### Today's Updates (2026-09-08) — Notification Fetch Resilience Fix
+- **`NotificationContext.jsx`** previously fetched count + feed in a single `Promise.all`. A failure on either (e.g. the backend `GET /notifications` 500 — see backend note) rejected the whole call, so `setCount`/`setFeed` never ran and the badge stayed at `0`. Now uses `Promise.allSettled` and updates each independently, so a feed error can never hide the count badge (and vice versa). Failures are non-fatal (existing data preserved).
+
+### Today's Updates (2026-09-08) — Procurement Expense Fulfilment UI
+The procurement expense detail now covers the whole procurement leg: a **fixed 6-step approval ladder** (no handover dropdown — CFO → Admin → Finance → CFO → Payment Mgr → Final CFO → payment manager, corrected from 7 steps 2026-09-09), the procurement admin's fulfilment tasks (sign + upload the PO PDF, mark received quantities, attach the vendor invoice), and the settled end-state. Backend behind it: two new migrations, a two-step expense service flow, and three new endpoints (see backend 2026-09-08 note).
+
+- **`ExpenseDetail.jsx`**:
+  - **PO tab** (`activeTab === "po"`): keeps the PO doc card, then adds a **PO Document** panel — a **View / Print PO PDF** button that opens the shared `PurchaseOrderPdfOverlay` (fed by the enriched chain PO node: `company`, `vendor_record`, requester, items `item_name`/`unit_price`/`tax_rate`/`total_with_tax`, decrypted totals; vendor masked for the requester), an **Upload signed PO PDF** control (ADMIN_MGR/SUPER_ADMIN only; `POST /uploads` → `POST /expenses/:uuid/documents` with `document_type: 'PO_PDF'`) and a list of uploaded PO PDFs with delete. A `ReceivedItemsEditor` (ADMIN_MGR only while `SUBMITTED`) lets the admin type delivered quantities per ordered line item (`POST /expenses/:uuid/items-received`), with an emerald "All items received" marker; `received_quantity`/`quantity` columns read from the chain PO items (backend clamps to 0..ordered).
+  - **Invoice tab** (`activeTab === "invoice"`, only when `expense.isProcurement`, live count badge next to Quotations): lists `expense.documents` where `module_name === "INVOICE"` with **Upload invoice** (`document_type: 'INVOICE'`) + per-file delete; uploads/delete hidden once `COMPLETED`.
+  - **Approvals tab**: procurement **REJECTED** + admin + not-owner shows a **Restart approval flow** button (routes to ADMIN_MGR, resets the ladder via the same `/submit`). The Approve modal for procurement shows a **contextual banner** (`PROC_EXPENSE_FLOW_STEPS`: CFO → Admin → Finance → CFO → Payment Mgr → CFO final) instead of the handover dropdown — "Next step: X (ROLE)" or the final-approval text (final CFO routes it to the payment manager); `handleApproveClick` skips handover-role loading for procurement.
+  - **Payments tab**: the `APPROVED || PAID` gate now includes **`COMPLETED`** (settled procurement expenses show their final payment state), and `loadExpense` preloads payments + summary for COMPLETED too. Payment buttons stay correctly hidden (no current handler on a COMPLETED expense).
+- **`expenseService.js`** — new `updateItemsReceived(uuid, items)`, `addExpenseDocument(uuid, payload)`, `deleteExpenseDocument(uuid, documentUuid)`; `normalizeExpense` now emits `documents` as `{ uuid, name, url, module_name }` (was `{ name }`) and adds `flow_position` (null for non-procurement / once closed).
+- **`StatusBadge.jsx`** — added the **`COMPLETED`** expense-status pill.
+- **`ProcurementDetail.jsx`** — **Edit Line Items** is now hidden once any quotation exists on the PR (`(doc.quotations || []).length === 0` required), matching the new backend freeze; the obsolete **Mark Received** action is removed (delivered quantities live on the expense).
+- **Bug fix — re-rendered `expense.documents` null crash**: `ExpenseDetail.jsx` computed `poPdfDocs`/`invoiceDocs` at component top-level as `(expense.documents || [])` — but `expense` starts as `null` and the loading/error guards sit *below* those consts, so **every** detail open threw `Cannot read properties of null (reading 'documents')` at render time (not just procurement expenses). Fixed to `(expense?.documents || [])`. Lesson: any top-level const deref of nullable state must use optional chaining — render-order guards don't protect pre-guard code.
+- **`ApprovalTrail` (ExpenseDetail)** — new action marker for **`ITEMS_RECEIVED`**: `ACTION_ICONS.ITEMS_RECEIVED = PackageCheck` and an amber timeline dot. The demo trail entry shows the actor's name (`action_by`), the label "Items received" and the remarks line `Items received: <item> ×received/ordered, …` from the new backend handover log.
+
+### Today's Updates (2026-09-10) — Ladder Steps Come From the Backend
+The approval-ladder is now **server-driven per category** (backend reads `expense_flow_steps`). The frontend no longer has a hardcoded flow.
+
+- **`expenseService.js`** — `normalizeExpense.category` now also emits `module`, `flow_mode`, and **`flow_steps`**: `(e.category.flowSteps || []).map(s => ({ position: s.step_position, role: s.role?.code, role_name: s.role?.name, label: s.step_label, final: Boolean(s.is_final) }))` (empty for HANDOVER categories like travel/reimbursement).
+- **`ExpenseDetail.jsx`** — deleted the `PROC_EXPENSE_FLOW_STEPS` constant (was the mirrored 6-step array). `flowSteps = (expense?.category?.flow_steps || []).slice()`, then `flowStep`/`nextFlowStep` are found against it. The Approve modal's contextual subtitle is now **auto-generated from the labels** (`This expense follows a fixed N-step chain — <labels joined by →> …`) — change a step in the DB and the banner/next-step text updates with no deploy. When the current step is the **procurement admin** step, an amber hint reads "Requirement before advancing: every PO item marked as received and the vendor invoice uploaded" (the backend now rejects the admin→finance approve unless both are true).
+- **ApprovalTrail is newest-first** — the merged, timestamp-sorted trail (procurement-chain handovers + expense handovers) sorts **newest at the top** (`(a, b) => new Date(b.at) - new Date(a.at)`); the subtitle reads "newest first". Only equal-timestamp entries (e.g. an auto-created PO's CREATE_PO and SUBMIT within the same transaction, both logged in one createPo call) keep their natural array order.
+
+### Today's Updates (2026-09-10) — Advance Stat, List Amount Priority, and Create-PO Redirect
+- **`MyExpenses.jsx`** — `STATUS_OPTIONS` now includes `COMPLETED` (the uniform terminal state backend now applies to fully paid/settled expenses of every module, matching the procurement behaviour).
+- **Advance amount stat hidden for travel/procurement** — the Payments summary grid in `ExpenseDetail.jsx` (`PaymentSection`) now renders the "Advance amount" stat only when the expense has a `reimbursement` record (`hasAdvance = expense?.reimbursement`, since advances apply to reimbursement only). Travel/procurement cards drop the "₹0.00" tile and the grid reflows to 3 columns (`sm:grid-cols-3`) instead of 4.
+- **List amount shows paid → final → estimated** — `MyExpenses.jsx` (the parameterized list reused by All Expenses / Approvals / Payment Requests) always displayed `estimated_amount`, which for procurement expenses was the PR estimate. The cell now shows `paid_amount` when `> 0`, else `final_amount` when `> 0` (the post-PO total), else `estimated_amount` — so a settled procurement expense shows its paid figure, an un-paid one shows the PO total, and a submitted/draft expense shows its submitted amount.
+- **Create PO now opens the linked expense** — `ProcurementDetail.jsx`'s `create-po` branch reads the response's `data.data.expenses[0].uuid` (the auto-created expense returned by the backend PO detail) and `navigate(`/expenses/${uuid}`)` straight into the expense detail instead of reloading the procurement page. Falls back to the old `load()` behaviour if the response ever lacks the expense.
+
+### Today's Updates (2026-09-09) — Payments Report (Finance / CA)
+- **New `PaymentsReport` page** (`/reports/payments`, `src/pages/finance/PaymentsReport.jsx`): the standalone **Finance → Payments Report** ledger for finance & CA — every expense payment across the caller's company scope (SUPER_ADMIN/CFO global; PAYMENT/FINANCE roles see their active companies). Built on `DataTablePage` with **server-side filters** (date range, module, company, payment method, payment type, expense status, payment status) plus debounced search and sorting (`payment_date`, `reference_number`, `payment_method`, `payment_type`). Columns: payment date, expense (→ its detail), module pill, company + GST, vendor + GST, method, **type pill** (disbursements PARTIAL/FULL/ADDITIONAL indigo vs refunds ADVANCE_REFUND/REFUND_RECEIVED amber), amount, **proof-count** (paperclip from the per-payment literal subquery), reference, processed-by. Rows link to `/expenses/:uuid`.
+- **Summary cards + breakout panels** below the table, following the same filters (`getPaymentReportSummary`): Total disbursed / Refunds received / Net paid / Payments recorded stat cards, an **Outstanding** card (count of approved expenses awaiting payment + `amount_due` = final − advance − paid), and By module / By month / By company breakdown panels.
+- **Export CSV** — header button streams the full filtered result as a BOM-prefixed CSV (`exportPaymentsReport`, blob download) with payment/expense/vendor columns, for handing to the CA.
+- **New service** `src/services/reportsService.js`: `getPaymentReport(params, config)` → `GET /reports/payments` (paginated); `getPaymentReportSummary(params, config)` → `GET /reports/payments/summary`; `exportPaymentsReport(params, config)` → `GET /reports/payments/export` (blob). All gated by backend permission **`payments:reports`**.
+- **Sidebar + route**: new top-level **Finance** group → "Payments Report" (`Landmark`/`BarChart3`, permission `payments:reports`); lazy route `/reports/payments` wrapped in `<PermissionGuard permission="payments:reports">`. Note: `user.permissions` is populated at login — existing sessions must log out/in to see the menu item.
+- **Condensed report table (fewer columns, wider fit)**: the PaymentsReport ledger originally had 11 columns (date/expense/module/company/vendor/method/type/amount/proofs/reference/processed-by), which forced horizontal scrolling. Columns are now merged into **6** without dropping data — the module pill + expense number moved under the title in the Expense cell; Company and Vendor (each with GST) share one "Company / Vendor" cell separated by a dashed divider; the Payment cell stacks the date with a payment-type pill + method; proof count sits under Amount; sortable columns retained their accessor ids (`payment_date`, `reference_number`) so header sorting still maps to the backend whitelist.
+- **Responsive page header fix (`DataTablePage.jsx`)**: the shared header previously kept the title block and the action/filter row on one `lg:flex-row`, so the PaymentsReport bar (8 filter controls + dates + Export) overflowed off-screen on wide-but-not-huge displays. The header now wraps (`lg:flex-wrap`, actions `sm:flex-wrap`, title `shrink-0`) — the filter row drops to its own full-width line and the controls wrap between lines instead of overflowing. No visual change for pages with a small action set.
+- **Bug fixed (syntax)**: the backend permissions-seeder edit for id 180 originally dropped the `up()` closing brace (syntax error); restored `});` + `}` before `down()`.
+- **ADVANCE rows render as disbursements** — `DISBURSEMENT_TYPES` in `PaymentsReport.jsx` (`['PARTIAL','FULL','ADDITIONAL','ADVANCE']`) now includes `'ADVANCE'` (synthetic backend rows for reimbursement advances), so the type pill colors them indigo like other disbursements (the `!includes(type)` refund check drives it). No `paymentType` filter option was added — the backend can't filter a synthetic type.
+- **DatePicker time panel dark-theme fix (`src/index.css`)** — react-datepicker's bundled stylesheet hardcodes `.react-datepicker__time-container .react-datepicker__time { background: white }`, so in dark mode the time options stayed white while their text (theme `--color-text-primary` ≈ `#f1f5f9`) was also near-white → invisible. Fixed by driving the time container/box background from `var(--color-surface)` (white in light, `#0f172a` in dark), matching the date grid.
+- **Per-expense net panel** — `ExpenseNetPanel` in `PaymentsReport.jsx` renders `summary.by_expense` (backend groups each expense's payments + advance into one line: advance / paid out / refunded / net out) between the Outstanding card and the By-module/month/company breakouts. Rows link to `/expenses/:uuid`; net is negative (emerald) only if refunds exceed disbursements. Each amount cell shows the **latest transaction date** beneath it (`advance_date` / `disbursed_date` / `refund_date` / `last_date` from the backend — blank when there's no such transaction).
+
+### Today's Updates (2026-09-10) — Standalone Expense-Net page under Finance + shared list polish
+- **New page `src/pages/finance/ExpenseNetReport.jsx`** (`/reports/expense-net`, lazy route in `src/routes/index.jsx` wrapped in `<PermissionGuard permission="payments:reports">`, menu item "Expense Net Summary" under the Finance group in `menuConfig.js`): the per-expense net view is now its **own submenu instead of a panel inside Payments Report**. Built on `DataTablePage` with **server-side pagination** via `getExpenseNetSummary` (`GET /reports/payments/by-expense`); columns Expense / Advance / Paid out / Refunded / Net out; per-amount latest-transaction dates under each figure; filters (module, company, expense status, date range) + debounced search; **default sort newest activity first** (`last_date` DESC, null-safe on the backend). **Export CSV** button in the header (streams `GET /reports/payments/by-expense/export`), **Clear filters** button at the end of the filter toolbar. The old inline `ExpenseNetPanel` (+ its `ChevronLeft`/`ChevronRight` imports and `getExpenseNetSummary`) was removed from `PaymentsReport.jsx`.
+- **`DataTablePage.jsx` restructure** — the shared listing shell now has a **header row** (title + search + new `headerActions` slot for primary buttons like Export CSV) and a **separate full-width wrapping toolbar row** for the `actions`/filter controls. A new optional **`belowFilters`** slot renders content *between the filter toolbar and the table* (used for the Payments Report summary stat cards). The search field also gained an inline **`X` clear button** shown only when text is typed (`{searchInput && …}`) — applied to every DataTablePage automatically.
+- **Payments Report stat cards moved above the table** — `Total disbursed / Refunds received / Net paid out / Payments recorded` now render via `belowFilters` (directly under the filter bar, above the ledger, following the same filters); the Outstanding card + By-module/month/company breakout panels stay below the table (`ReportStatCards` extracted from `ReportSummary`).
+- **Clear filters buttons everywhere** — same indigo outline + `X` icon style at the **end of the filter toolbar** (shown only when `hasFilters`) added to: `PaymentsReport.jsx`, `ExpenseNetReport.jsx`, `Procurements.jsx` (covers `/procurement` + `/procurement?scope=mine`), `AssignedProcurements.jsx` (`/procurement/assigned`), and `MyExpenses.jsx` (the one shared component covering `/expenses/my`, `/all`, `/assigned`, `/payments`). Both primary buttons (**New PI** in Procurements, **Create Expense** in MyExpenses) moved up into `headerActions` next to search.
+- **Backend bug fixed (no frontend change needed)** — the `/expenses/*` category dropdown and company-name search were erroring with `Unknown column 'category.name'/'company.name'`: `expense.repository.js` now resolves the category name → id and passes `subQuery: false`; all expense list filters verified working.
+- **Uploads go to per-module folders** — every upload call site now passes a `folder` so files land under `backend/uploads/<module>/<type>/` instead of the root/legacy flat folders: `ImageUpload` gained a `folder` prop (users → `users/profile`, companies → `companies/logo`, vendors → `vendors/logo`); vendor docs → `vendors/documents` (`vendorService.js`, `ViewVendor.jsx`); expense line attachments → `expenses/attachments` (`ExpenseForm.jsx`); PO PDF / invoice → `expenses/documents` and payment proofs → `expenses/proofs` (`ExpenseDetail.jsx`); quotation docs → `procurement/quotations` (`ProcurementDetail.jsx`). Backend moved existing referenced files + rewrote DB URLs; unreferenced ones live in `uploads/_orphaned/`.
 
 ### Pending
 - [ ] Delete User (confirm dialog) — Users table delete icon is a placeholder (Companies/Departments have working deletes)
 - [ ] Employments list/create pages (`/master/employments`)
 - [ ] Expense attachments → real upload (`POST /uploads`) + `expense_documents` per line item
-- [ ] Travel pages
-- [ ] Finance pages (Categories, Payments, Reports)
+- [ ] Travel pages (folder exists but no implementation)
+- [ ] Finance pages (Reports — only Categories + expense Payment UI built; a standalone Finance/Payments module list for all payments across expenses is not yet built)
 - [ ] Company switcher (fetch employments on demand)
+
+### Pending Improvements (future backlog)
+> Cross-cutting hardening + finishing the Application Logs UX. Rough priority order.
+
+#### Application Logs (`/system/logs`)
+- [ ] **Fetch logs in pages/chunks** — `/system/logs/api` and `/system/logs/error` currently return the whole day's file. Add `?page`/`?limit` (or `tail=N` newest-first) so large days don't load everything at once, and so the "end of file" view stays snappy.
+- [ ] **Refresh count badges** — the tab badges show counts only for dates already fetched; consider lightweight count-only metadata from the backend so badges show even before opening a tab.
+- [ ] **Date edge-case UX** — a picked date with no log folder yields a 404 toast; surface it as a friendlier inline empty state instead.
+
+#### Finance / payments
+- [ ] **Standalone Finance/Payments module list** — a global "All Payments" list across expenses (filters, totals, payment-proof viewer) to round out the payment UI (backend Pending also tracks this).
+
+#### Reliability / DX
+- [ ] **API rate-limit error UX** — when the backend adds `express-rate-limit`, handle the 429 response gracefully (friendly toast + retry hint, especially on login) instead of a generic error.
+- [ ] **CI pipeline** — lint + typecheck + build on push for this repo.

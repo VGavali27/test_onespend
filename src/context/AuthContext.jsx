@@ -33,8 +33,14 @@ export function AuthProvider({ children }) {
     navigate('/login');
   };
 
+  // Check if user has a specific permission
+  const hasPermission = (permissionKey) => {
+    if (!user?.permissions) return false;
+    return user.permissions.includes(permissionKey);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

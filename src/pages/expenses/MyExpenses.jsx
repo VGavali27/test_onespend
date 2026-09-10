@@ -1,42 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Wallet, Plus, Eye, Pencil, Send, CheckCircle2, XCircle, ArrowRightLeft, Banknote } from 'lucide-react';
+import { Wallet, Plus, Eye, Loader2, Calendar, X } from 'lucide-react';
 import DataTablePage from '@/components/ui/DataTablePage';
 import StatusBadge from '@/components/ui/StatusBadge';
 import UserDetailsModal from '@/components/ui/UserDetailsModal';
+import DatePicker from '@/components/ui/DatePicker';
 import { useToast } from '@/components/ui/Toast';
 import { getMyExpenses } from '@/services/expenseService';
-import { categoryApi } from '@/services/financeService';
-import { formatCurrency, formatDateTime } from '@/utils/format';
+import { getCategoryOptions } from '@/services/financeService';
+import { approveExpense, rejectExpense, submitExpense, getHandoverRoles } from '@/services/expenseService';
+import { formatCurrency, formatDate, formatDateTime } from '@/utils/format';
+import { useAuth } from '@/context/AuthContext';
 
-const STATUS_OPTIONS = ['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID'];
+const STATUS_OPTIONS = ['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'PAID', 'COMPLETED'];
 const columnHelper = createColumnHelper();
 
 // Shared expense list built on the standard DataTablePage (server-side pagination,
 // sorting, debounced search, filters). Rendered by both /expenses/my (own expenses)
-// and /expenses/all (the role+company-scoped list) via the fetchList prop.
+// and /expenses/all (the role+company-scoped list) and /expenses/assigned (pending approval)
+// via the fetchList prop and actionMode.
 export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExpenses, actionMode = 'mine' }) {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [categories, setCategories] = useState([]);
   const [viewUser, setViewUser] = useState(null);
   const toast = useToast();
 
-  // Approve/handover/payment endpoints aren't built yet — show a notice until they are.
-  const placeholderAction = () => toast.error('This action is not implemented yet.');
+  // Check if date filter is active (both from and to must be set)
+  const isDateFilterActive = dateFrom && dateTo;
 
   useEffect(() => {
-    categoryApi
-      .list({ limit: 100 })
+    getCategoryOptions()
       .then(({ data }) => setCategories(data?.data ?? []))
       .catch(() => setCategories([]));
   }, []);
 
-  const hasFilters = statusFilter !== 'ALL' || categoryFilter !== 'ALL';
+  const hasFilters = statusFilter !== 'ALL' || categoryFilter !== 'ALL' || isDateFilterActive;
   const clearFilters = () => {
     setStatusFilter('ALL');
     setCategoryFilter('ALL');
+    setDateFrom('');
+    setDateTo('');
   };
 
   const fetchExpenses = async ({ page, limit, sortBy, sortOrder, search }, { signal }) => {
@@ -47,6 +54,9 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
         search,
         status: statusFilter === 'ALL' ? '' : statusFilter,
         category: categoryFilter === 'ALL' ? '' : categoryFilter,
+        dateFrom: isDateFilterActive ? dateFrom : '',
+        dateTo: isDateFilterActive ? dateTo : '',
+        dateField: 'submitted_at', // Always filter by submitted date
         sortBy,
         sortOrder,
       },
@@ -77,13 +87,14 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     }),
     // All Expenses: one column with the submitter's name (clickable → user modal) on top
     // and the company below. My Expenses just shows the company.
+    // Assigned: show submitter name + company
     columnHelper.accessor('company', {
-      header: actionMode === 'all' ? 'Submitted by' : 'Company',
+      header: actionMode === 'all' || actionMode === 'assigned' ? 'Submitted by' : 'Company',
       enableSorting: false,
       cell: ({ row }) => {
         const r = row.original;
         const companyName = r.company?.name || '—';
-        if (actionMode !== 'all') return companyName;
+        if (actionMode !== 'all' && actionMode !== 'assigned') return companyName;
         const emp = r.requestedByEmployment;
         const u = emp?.user;
         const name = u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : null;
@@ -109,12 +120,43 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
     columnHelper.accessor('estimated_amount', {
       header: 'Amount',
       enableSorting: false, // stored encrypted in the DB — can't sort numerically server-side
-      cell: (info) => formatCurrency(info.getValue()),
+      cell: (info) => {
+        const r = info.row.original;
+        const amount =
+          Number(r.paid_amount) > 0
+            ? r.paid_amount
+            : Number(r.final_amount) > 0
+              ? r.final_amount
+              : r.estimated_amount;
+        return formatCurrency(amount);
+      },
     }),
     columnHelper.accessor('status', {
       header: 'Status',
       enableSorting: false,
-      cell: (info) => <StatusBadge status={info.getValue()} />,
+      cell: (info) => {
+        const approval =
+          info.row.original.status === 'PAID'
+            ? 'APPROVED'
+            : info.row.original.status; // PAID is a payment state, never an approval status
+        return <StatusBadge status={approval} />;
+      },
+    }),
+    columnHelper.accessor('payment_status', {
+      header: 'Payment Status',
+      enableSorting: false,
+      cell: (info) => {
+        const row = info.row.original;
+        const approval =
+          row.status === 'PAID' ? 'APPROVED' : row.status;
+        const payment = row.payment_status;
+        // UNPAID is only meaningful once approved (awaiting payment); on a
+        // DRAFT/SUBMITTED row it would be noise. All other payment states
+        // (PAID/PARTIAL_PAID/SETTLED/...) always display.
+        const showPayment =
+          payment && (payment !== 'UNPAID' || approval === 'APPROVED');
+        return showPayment ? <StatusBadge status={payment} /> : <span className="text-slate-400">—</span>;
+      },
     }),
     columnHelper.accessor('submitted_at', {
       header: 'Submitted',
@@ -132,59 +174,45 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
           </Link>
         );
 
-        let actions;
-        if (actionMode === 'all') {
-          // Approver / senior view — approve, reject, handover, payment (placeholders)
-          actions = [
-            <button key="approve" type="button" title="Approve" onClick={placeholderAction} className={`${iconClass} hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20`}>
-              <CheckCircle2 className="h-4 w-4" />
-            </button>,
-            <button key="reject" type="button" title="Reject" onClick={placeholderAction} className={`${iconClass} hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20`}>
-              <XCircle className="h-4 w-4" />
-            </button>,
-            <button key="handover" type="button" title="Handover" onClick={placeholderAction} className={iconClass}>
-              <ArrowRightLeft className="h-4 w-4" />
-            </button>,
-            <button key="pay" type="button" title="Process payment" onClick={placeholderAction} className={`${iconClass} hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20`}>
-              <Banknote className="h-4 w-4" />
-            </button>,
-            viewLink,
-          ];
-        } else {
-          // Creator's own view — edit + submit while DRAFT
-          actions = [
-            r.canEdit && (
-              <Link key="edit" to={`/expenses/${r.uuid}/edit`} title="Edit expense" className={iconClass}>
-                <Pencil className="h-4 w-4" />
-              </Link>
-            ),
-            r.canEdit && (
-              <button key="submit" type="button" title="Submit expense" onClick={placeholderAction} className={`${iconClass} hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20`}>
-                <Send className="h-4 w-4" />
-              </button>
-            ),
-            viewLink,
-          ];
-        }
-        return <div className="flex items-center justify-end gap-0.5">{actions.filter(Boolean)}</div>;
+        // Single view action for all modes
+        const actions = [viewLink];
+        
+        return <div className="flex items-center justify-end gap-0.5">{actions}</div>;
       },
     }),
   ];
+
+  // Subtitle based on actionMode
+  const getSubtitle = () => {
+    if (actionMode === 'assigned') return 'Expenses pending your approval';
+    if (actionMode === 'payments') return 'Expenses awaiting payment processing';
+    if (title === 'All Expenses') return 'Expenses across your companies';
+    return 'Expenses you have created';
+  };
 
   return (
     <>
       <DataTablePage
         title={title}
-        subtitle={title === 'All Expenses' ? 'Expenses across your companies' : 'Expenses you have created'}
+        subtitle={getSubtitle()}
         icon={Wallet}
         columns={columns}
         fetchFn={fetchExpenses}
-        filterDeps={[statusFilter, categoryFilter]}
+        filterDeps={[statusFilter, categoryFilter, dateFrom, dateTo]}
         countLabel="expense"
-        emptyMessage="No expenses yet"
+        emptyMessage={actionMode === 'payments' ? 'No payment requests pending' : actionMode === 'assigned' ? 'No expenses pending your approval' : 'No expenses yet'}
         searchPlaceholder="Search by title, number or company..."
         hasFilters={hasFilters}
         onClearFilters={clearFilters}
+        headerActions={
+          <Link
+            to="/expenses/new"
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Create Expense
+          </Link>
+        }
         actions={
           <>
             <select
@@ -212,13 +240,44 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
               ))}
             </select>
 
-            <Link
-              to="/expenses/new"
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Create Expense
-            </Link>
+            <div className="flex items-center gap-2">
+              <div className="w-48">
+                <DatePicker
+                  value={dateFrom}
+                  onChange={setDateFrom}
+                  placeholder="From date"
+                />
+              </div>
+              <span className="text-slate-400 px-1">to</span>
+              <div className="w-48">
+                <DatePicker
+                  value={dateTo}
+                  onChange={setDateTo}
+                  placeholder="To date"
+                />
+              </div>
+              {isDateFilterActive && (
+                <button
+                  type="button"
+                  onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  title="Clear date range"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Clear filters
+              </button>
+            )}
           </>
         }
       />

@@ -8,15 +8,19 @@ import DataTablePage from '@/components/ui/DataTablePage';
 import { permissionApi } from '@/services/accessService';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
+import { useAuth } from '@/context/AuthContext';
 
 const columnHelper = createColumnHelper();
 
-
-
 export default function Permissions() {
+  const { hasPermission } = useAuth();
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+
+  const canCreate = hasPermission('permissions:create');
+  const canUpdate = hasPermission('permissions:update');
+  const canDelete = hasPermission('permissions:delete');
 
   const columns = [
     columnHelper.accessor('permission_key', {
@@ -39,6 +43,11 @@ export default function Permissions() {
       header: 'Created',
       cell: (info) => formatDate(info.getValue()),
     }),
+    columnHelper.accessor('updatedAt', {
+      header: 'Updated',
+      enableSorting: false,
+      cell: (info) => formatDate(info.getValue()),
+    }),
     columnHelper.display({
       id: 'actions',
       header: () => <span className="block text-right">Actions</span>,
@@ -47,17 +56,21 @@ export default function Permissions() {
           <Link to={`/access/permissions/${row.original.uuid}`} title="View permission" className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
             <Eye className="h-4 w-4" />
           </Link>
-          <Link to={`/access/permissions/${row.original.uuid}/edit`} title="Edit permission" className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
-            <Pencil className="h-4 w-4" />
-          </Link>
-          <button
-            type="button"
-            title="Delete permission"
-            onClick={() => setDeleteTarget(row.original)}
-            className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {canUpdate && (
+            <Link to={`/access/permissions/${row.original.uuid}/edit`} title="Edit permission" className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+              <Pencil className="h-4 w-4" />
+            </Link>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              title="Delete permission"
+              onClick={() => setDeleteTarget(row.original)}
+              className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       ),
     }),
@@ -104,10 +117,12 @@ export default function Permissions() {
         searchPlaceholder="Search permissions..."
         reloadKey={reloadKey}
         actions={
-          <Link to="/access/permissions/new" className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors">
-            <Plus className="h-4 w-4" />
-            Add Permission
-          </Link>
+          canCreate && (
+            <Link to="/access/permissions/new" className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors">
+              <Plus className="h-4 w-4" />
+              Add Permission
+            </Link>
+          )
         }
       />
 

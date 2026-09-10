@@ -42,6 +42,7 @@ export default function ViewCompany() {
         title={company?.name || 'Company'}
         onBack={() => navigate('/master/companies')}
         editTo={`/master/companies/${uuid}/edit`}
+        editPermission="companies:update"
       />
 
       {loading ? (
@@ -104,6 +105,7 @@ export default function ViewCompany() {
             <div className="lg:col-span-2">
               <InfoCard icon={Clock} title="Meta">
                 <InfoRow label="Created" value={formatDate(company.createdAt ?? company.created_at)} />
+                <InfoRow label="Last updated" value={formatDate(company.updatedAt ?? company.updated_at)} />
               </InfoCard>
             </div>
           </div>

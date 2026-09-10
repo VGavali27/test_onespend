@@ -8,14 +8,15 @@ import { resolveAssetUrl } from '@/utils/assets';
  * Defaults to a circular (headshot) style; pass `shape="square"` for a
  * company logo / thumbnail and an `icon` fallback (e.g. Building2).
  *
- *   <ImageUpload value={profileImage} onChange={setUrl} onRemove={clear} label="Profile image" />
- *   <ImageUpload shape="square" icon={Building2} value={logoImg} onChange={setLogo} onRemove={clear} label="Logo" />
+ *   <ImageUpload value={profileImage} folder="users/profile" onChange={setUrl} onRemove={clear} label="Profile image" />
+ *   <ImageUpload shape="square" folder="companies/logo" icon={Building2} value={logoImg} onChange={setLogo} onRemove={clear} label="Logo" />
  */
 export default function ImageUpload({
   value,
   onChange,
   onRemove,
   label,
+  folder,
   hint = 'PNG, JPG or WEBP up to 2MB',
   shape = 'circle',
   icon: Icon = UserRound,
@@ -38,7 +39,7 @@ export default function ImageUpload({
     }
     setUploading(true);
     try {
-      const { data } = await uploadImage(file);
+      const { data } = await uploadImage(file, folder);
       onChange?.(data?.data?.url);
     } catch (err) {
       setError(err?.response?.data?.message || 'Upload failed. Please try again.');

@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import PermissionGuard from '@/components/PermissionGuard';
 import AppLayout from '@/components/layout/AppLayout';
 
 // Pages are code-split (loaded on demand) so the initial bundle stays small.
@@ -10,6 +11,8 @@ const Dashboard = lazy(() => import('@/pages/dashboard/Dashboard'));
 
 const MyExpenses = lazy(() => import('@/pages/expenses/MyExpenses'));
 const AllExpenses = lazy(() => import('@/pages/expenses/AllExpenses'));
+const AssignedExpenses = lazy(() => import('@/pages/expenses/AssignedExpenses'));
+const PaymentRequests = lazy(() => import('@/pages/expenses/PaymentRequests'));
 const CreateExpense = lazy(() => import('@/pages/expenses/CreateExpense'));
 const EditExpense = lazy(() => import('@/pages/expenses/EditExpense'));
 const ExpenseDetail = lazy(() => import('@/pages/expenses/ExpenseDetail'));
@@ -23,6 +26,22 @@ const Companies = lazy(() => import('@/pages/master/companies/Companies'));
 const CreateCompany = lazy(() => import('@/pages/master/companies/CreateCompany'));
 const EditCompany = lazy(() => import('@/pages/master/companies/EditCompany'));
 const ViewCompany = lazy(() => import('@/pages/master/companies/ViewCompany'));
+
+const Vendors = lazy(() => import('@/pages/master/vendors/Vendors'));
+const CreateVendor = lazy(() => import('@/pages/master/vendors/CreateVendor'));
+const EditVendor = lazy(() => import('@/pages/master/vendors/EditVendor'));
+const ViewVendor = lazy(() => import('@/pages/master/vendors/ViewVendor'));
+
+const VendorCategories = lazy(() => import('@/pages/master/vendorCategories/VendorCategories'));
+const CreateVendorCategory = lazy(() => import('@/pages/master/vendorCategories/CreateVendorCategory'));
+const EditVendorCategory = lazy(() => import('@/pages/master/vendorCategories/EditVendorCategory'));
+const ViewVendorCategory = lazy(() => import('@/pages/master/vendorCategories/ViewVendorCategory'));
+
+const Procurements = lazy(() => import('@/pages/procurement/Procurements'));
+const AssignedProcurements = lazy(() => import('@/pages/procurement/AssignedProcurements'));
+const CreateProcurement = lazy(() => import('@/pages/procurement/CreateProcurement'));
+const EditProcurement = lazy(() => import('@/pages/procurement/EditProcurement'));
+const ProcurementDetail = lazy(() => import('@/pages/procurement/ProcurementDetail'));
 
 const Departments = lazy(() => import('@/pages/master/departments/Departments'));
 const CreateDepartment = lazy(() => import('@/pages/master/departments/CreateDepartment'));
@@ -46,11 +65,15 @@ const RoleHandoverRuleEdit = lazy(() => import('@/pages/access/roleHandoverRules
 
 const Profile = lazy(() => import('@/pages/profile/Profile'));
 const Settings = lazy(() => import('@/pages/settings/Settings'));
+const Logs = lazy(() => import('@/pages/system/Logs'));
 
 const Categories = lazy(() => import('@/pages/finance/categories/Categories'));
 const CreateCategory = lazy(() => import('@/pages/finance/categories/CreateCategory'));
 const EditCategory = lazy(() => import('@/pages/finance/categories/EditCategory'));
 const ViewCategory = lazy(() => import('@/pages/finance/categories/ViewCategory'));
+
+const PaymentsReport = lazy(() => import('@/pages/finance/PaymentsReport'));
+const ExpenseNetReport = lazy(() => import('@/pages/finance/ExpenseNetReport'));
 
 // Shown briefly while a lazily-loaded page chunk downloads
 function PageLoader() {
@@ -76,50 +99,71 @@ export default function AppRoutes() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="expenses/my" element={<MyExpenses />} />
-          <Route path="expenses/all" element={<AllExpenses />} />
-          <Route path="expenses/new" element={<CreateExpense />} />
-          <Route path="expenses/:uuid/edit" element={<EditExpense />} />
-          <Route path="expenses/:id" element={<ExpenseDetail />} />
+          <Route path="expenses/my" element={<PermissionGuard permission="expenses:read"><MyExpenses /></PermissionGuard>} />
+          <Route path="expenses/all" element={<PermissionGuard permission="expenses:read_all"><AllExpenses /></PermissionGuard>} />
+          <Route path="expenses/assigned" element={<PermissionGuard permission="expenses:approvals"><AssignedExpenses /></PermissionGuard>} />
+          <Route path="expenses/payments" element={<PermissionGuard permission="expenses:read"><PaymentRequests /></PermissionGuard>} />
+          <Route path="expenses/new" element={<PermissionGuard permission="expenses:create"><CreateExpense /></PermissionGuard>} />
+          <Route path="expenses/:uuid/edit" element={<PermissionGuard permission="expenses:update"><EditExpense /></PermissionGuard>} />
+          <Route path="expenses/:id" element={<PermissionGuard permission="expenses:read"><ExpenseDetail /></PermissionGuard>} />
 
-          <Route path="master/companies" element={<Companies />} />
-          <Route path="master/companies/new" element={<CreateCompany />} />
-          <Route path="master/companies/:uuid/edit" element={<EditCompany />} />
-          <Route path="master/companies/:uuid" element={<ViewCompany />} />
+          <Route path="master/companies" element={<PermissionGuard permission="companies:read_all"><Companies /></PermissionGuard>} />
+          <Route path="master/companies/new" element={<PermissionGuard permission="companies:create"><CreateCompany /></PermissionGuard>} />
+          <Route path="master/companies/:uuid/edit" element={<PermissionGuard permission="companies:update"><EditCompany /></PermissionGuard>} />
+          <Route path="master/companies/:uuid" element={<PermissionGuard permission="companies:read"><ViewCompany /></PermissionGuard>} />
 
-          <Route path="master/departments" element={<Departments />} />
-          <Route path="master/departments/new" element={<CreateDepartment />} />
-          <Route path="master/departments/:uuid/edit" element={<EditDepartment />} />
-          <Route path="master/departments/:uuid" element={<ViewDepartment />} />
+          <Route path="master/vendors" element={<PermissionGuard permission="vendors:read_all"><Vendors /></PermissionGuard>} />
+          <Route path="master/vendors/new" element={<PermissionGuard permission="vendors:create"><CreateVendor /></PermissionGuard>} />
+          <Route path="master/vendors/:uuid/edit" element={<PermissionGuard permission="vendors:update"><EditVendor /></PermissionGuard>} />
+          <Route path="master/vendors/:uuid" element={<PermissionGuard permission="vendors:read"><ViewVendor /></PermissionGuard>} />
 
-          <Route path="master/users" element={<Users />} />
-          <Route path="master/users/new" element={<CreateUser />} />
-          <Route path="master/users/:uuid/edit" element={<EditUser />} />
-          <Route path="master/users/:uuid" element={<ViewUser />} />
-          <Route path="master/employments" element={<Dashboard />} />
+          <Route path="master/vendor-categories" element={<PermissionGuard permission="vendor_categories:read_all"><VendorCategories /></PermissionGuard>} />
+          <Route path="master/vendor-categories/new" element={<PermissionGuard permission="vendor_categories:create"><CreateVendorCategory /></PermissionGuard>} />
+          <Route path="master/vendor-categories/:uuid/edit" element={<PermissionGuard permission="vendor_categories:update"><EditVendorCategory /></PermissionGuard>} />
+          <Route path="master/vendor-categories/:uuid" element={<PermissionGuard permission="vendor_categories:read"><ViewVendorCategory /></PermissionGuard>} />
 
-          <Route path="access/roles" element={<Roles />} />
-          <Route path="access/roles/new" element={<CreateRole />} />
-          <Route path="access/roles/:uuid/edit" element={<EditRole />} />
-          <Route path="access/roles/:uuid" element={<ViewRole />} />
+          <Route path="procurement/assigned" element={<PermissionGuard permission="procurement:approve"><AssignedProcurements /></PermissionGuard>} />
+          <Route path="procurement" element={<PermissionGuard permission="procurement:read_all"><Procurements /></PermissionGuard>} />
+          <Route path="procurement/new" element={<PermissionGuard permission="procurement:create"><CreateProcurement /></PermissionGuard>} />
+          <Route path="procurement/:uuid/edit" element={<PermissionGuard permission="procurement:update"><EditProcurement /></PermissionGuard>} />
+          <Route path="procurement/:uuid" element={<PermissionGuard permission="procurement:read"><ProcurementDetail /></PermissionGuard>} />
 
-          <Route path="access/permissions" element={<Permissions />} />
-          <Route path="access/permissions/new" element={<CreatePermission />} />
-          <Route path="access/permissions/:uuid/edit" element={<EditPermission />} />
-          <Route path="access/permissions/:uuid" element={<ViewPermission />} />
+          <Route path="master/departments" element={<PermissionGuard permission="departments:read_all"><Departments /></PermissionGuard>} />
+          <Route path="master/departments/new" element={<PermissionGuard permission="departments:create"><CreateDepartment /></PermissionGuard>} />
+          <Route path="master/departments/:uuid/edit" element={<PermissionGuard permission="departments:update"><EditDepartment /></PermissionGuard>} />
+          <Route path="master/departments/:uuid" element={<PermissionGuard permission="departments:read"><ViewDepartment /></PermissionGuard>} />
 
-          <Route path="access/role-permissions" element={<RolePermissions />} />
+          <Route path="master/users" element={<PermissionGuard permission="users:read_all"><Users /></PermissionGuard>} />
+          <Route path="master/users/new" element={<PermissionGuard permission="users:create"><CreateUser /></PermissionGuard>} />
+          <Route path="master/users/:uuid/edit" element={<PermissionGuard permission="users:update"><EditUser /></PermissionGuard>} />
+          <Route path="master/users/:uuid" element={<PermissionGuard permission="users:read"><ViewUser /></PermissionGuard>} />
 
-          <Route path="access/role-handover-rules" element={<RoleHandoverRules />} />
-          <Route path="access/role-handover-rules/edit" element={<RoleHandoverRuleEdit />} />
+          <Route path="access/roles" element={<PermissionGuard permission="roles:read_all"><Roles /></PermissionGuard>} />
+          <Route path="access/roles/new" element={<PermissionGuard permission="roles:create"><CreateRole /></PermissionGuard>} />
+          <Route path="access/roles/:uuid/edit" element={<PermissionGuard permission="roles:update"><EditRole /></PermissionGuard>} />
+          <Route path="access/roles/:uuid" element={<PermissionGuard permission="roles:read"><ViewRole /></PermissionGuard>} />
+
+          <Route path="access/permissions" element={<PermissionGuard permission="permissions:read_all"><Permissions /></PermissionGuard>} />
+          <Route path="access/permissions/new" element={<PermissionGuard permission="permissions:create"><CreatePermission /></PermissionGuard>} />
+          <Route path="access/permissions/:uuid/edit" element={<PermissionGuard permission="permissions:update"><EditPermission /></PermissionGuard>} />
+          <Route path="access/permissions/:uuid" element={<PermissionGuard permission="permissions:read"><ViewPermission /></PermissionGuard>} />
+
+          <Route path="access/role-permissions" element={<PermissionGuard permission="role_permissions:read_all"><RolePermissions /></PermissionGuard>} />
+
+          <Route path="access/role-handover-rules" element={<PermissionGuard permission="role_handover_rules:read_all"><RoleHandoverRules /></PermissionGuard>} />
+          <Route path="access/role-handover-rules/edit" element={<PermissionGuard permission="role_handover_rules:update"><RoleHandoverRuleEdit /></PermissionGuard>} />
 
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="system/logs" element={<PermissionGuard permission="system_logs:view"><Logs /></PermissionGuard>} />
 
-          <Route path="master/categories" element={<Categories />} />
-          <Route path="master/categories/new" element={<CreateCategory />} />
-          <Route path="master/categories/:uuid/edit" element={<EditCategory />} />
-          <Route path="master/categories/:uuid" element={<ViewCategory />} />
+          <Route path="master/categories" element={<PermissionGuard permission="expense_categories:read_all"><Categories /></PermissionGuard>} />
+          <Route path="master/categories/new" element={<PermissionGuard permission="expense_categories:create"><CreateCategory /></PermissionGuard>} />
+          <Route path="master/categories/:uuid/edit" element={<PermissionGuard permission="expense_categories:update"><EditCategory /></PermissionGuard>} />
+          <Route path="master/categories/:uuid" element={<PermissionGuard permission="expense_categories:read"><ViewCategory /></PermissionGuard>} />
+
+          <Route path="reports/payments" element={<PermissionGuard permission="payments:reports"><PaymentsReport /></PermissionGuard>} />
+          <Route path="reports/expense-net" element={<PermissionGuard permission="payments:reports"><ExpenseNetReport /></PermissionGuard>} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

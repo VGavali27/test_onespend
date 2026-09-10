@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Pencil } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 // Shared read-only detail primitives for "View" pages (extracted from the Profile page pattern).
 
@@ -21,9 +22,9 @@ export function InfoCard({ icon: Icon, title, children }) {
 // A label → value row inside an InfoCard.
 export function InfoRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-[13px] text-slate-400">{label}</span>
-      <span className="text-[13px] font-medium text-slate-700 dark:text-slate-200 text-right">{value}</span>
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-[13px] text-slate-400 flex-shrink-0">{label}</span>
+      <span className="text-[13px] font-medium text-slate-700 dark:text-slate-200 text-right min-w-0 break-words">{value}</span>
     </div>
   );
 }
@@ -39,7 +40,11 @@ export function Detail({ label, value }) {
 }
 
 // Shared record detail header with a back button + an Edit button.
-export function DetailHeader({ icon: Icon, title, onBack, editTo, editLabel = 'Edit' }) {
+// Edit button only renders if user has the required permission (editPermission).
+export function DetailHeader({ icon: Icon, title, onBack, editTo, editLabel = 'Edit', editPermission }) {
+  const { hasPermission } = useAuth();
+  const canEdit = editTo && (!editPermission || hasPermission(editPermission));
+
   return (
     <div className="flex flex-wrap items-center gap-3">
       {onBack && (
@@ -60,7 +65,7 @@ export function DetailHeader({ icon: Icon, title, onBack, editTo, editLabel = 'E
           <h1 className="text-xl font-bold text-slate-900 dark:text-white truncate">{title}</h1>
         </div>
       </div>
-      {editTo && (
+      {canEdit && (
         <Link
           to={editTo}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"

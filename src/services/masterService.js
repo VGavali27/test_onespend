@@ -17,6 +17,9 @@ export const getEmploymentsByUser = (userUuid) => api.get(`/user-employments/by-
 // ── Current user's full profile (role, department, employments) ──
 export const getMyProfile = () => api.get('/users/me');
 
+// ── Current user's permissions (with all permissions grouped by resource) ──
+export const getMyPermissions = () => api.get('/users/me/permissions');
+
 // ── Dropdown options (lightweight: uuid + name) ──
 export const getCompanyOptions = () => api.get('/companies/options');
 export const getDepartmentOptions = () => api.get('/departments/options');

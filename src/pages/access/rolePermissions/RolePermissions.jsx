@@ -2,8 +2,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { Shield, Loader2, Save, KeyRound } from 'lucide-react';
 import { roleApi, permissionApi, getPermissionsByRole, syncRolePermissions } from '@/services/accessService';
 import { inputClass } from '@/components/ui/form';
+import { useAuth } from '@/context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function RolePermissions() {
+  const { hasPermission } = useAuth();
+  const navigate = useNavigate();
+
+  // Permission check - redirect if no access
+  if (!hasPermission('role_permissions:read_all')) {
+    return <div className="min-h-[60vh] flex items-center justify-center">Access Denied</div>;
+  }
+
+  const canCreate = hasPermission('role_permissions:create');
+  const canUpdate = hasPermission('role_permissions:update');
+  const canDelete = hasPermission('role_permissions:delete');
+
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [selectedRoleUuid, setSelectedRoleUuid] = useState('');

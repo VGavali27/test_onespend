@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import DataTable from '@/components/ui/DataTable';
 
 /**
@@ -18,6 +18,7 @@ import DataTable from '@/components/ui/DataTable';
  *     countLabel="user"                  // auto "{total} users" pill
  *     emptyMessage="No users yet"
  *     actions={<status select + buttons />}
+ *     belowFilters={<stat cards />}      // optional content between filters and table
  *   />
  */
 export default function DataTablePage({
@@ -25,6 +26,7 @@ export default function DataTablePage({
   subtitle,
   icon: Icon,
   actions,
+  headerActions,
   columns,
   fetchFn,
   filterDeps = [],
@@ -37,6 +39,8 @@ export default function DataTablePage({
   onClearFilters,
   searchPlaceholder = 'Search...',
   emptyIcon,
+  tabs,
+  belowFilters,
 }) {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -57,9 +61,9 @@ export default function DataTablePage({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page header */}
+      {/* Page header: title + search + primary header actions on one row */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
             <Icon className="h-5 w-5" />
           </div>
@@ -68,7 +72,7 @@ export default function DataTablePage({
             <p className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">{subtitle}</p>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 min-w-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
@@ -76,12 +80,39 @@ export default function DataTablePage({
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-colors"
+              className={`w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-colors ${
+                searchInput ? 'pr-9' : ''
+              }`}
             />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors"
+                title="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          {actions}
+          {headerActions}
         </div>
       </div>
+
+      {/* Tabs (optional) */}
+      {tabs && (
+        <div className="w-full">{tabs}</div>
+      )}
+
+      {/* Filter / action toolbar — its own full-width row so many filters wrap cleanly */}
+      {actions && (
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
+          {actions}
+        </div>
+      )}
+
+      {/* Optional content between the filters and the table (summary stat cards, etc.) */}
+      {belowFilters}
 
       {/* Table */}
       <DataTable

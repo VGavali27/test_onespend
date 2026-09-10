@@ -9,6 +9,7 @@ import { companyApi } from '@/services/masterService';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
 import { resolveAssetUrl } from '@/utils/assets';
+import { useAuth } from '@/context/AuthContext';
 
 const columnHelper = createColumnHelper();
 
@@ -16,9 +17,14 @@ const columnHelper = createColumnHelper();
 // Client-side sort (the backend list returns all rows unsorted)
 
 export default function Companies() {
+  const { hasPermission } = useAuth();
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+
+  const canCreate = hasPermission('companies:create');
+  const canUpdate = hasPermission('companies:update');
+  const canDelete = hasPermission('companies:delete');
 
   const columns = [
     columnHelper.display({
@@ -67,6 +73,11 @@ export default function Companies() {
       header: 'Created',
       cell: (info) => formatDate(info.getValue()),
     }),
+    columnHelper.accessor('updatedAt', {
+      header: 'Updated',
+      enableSorting: false,
+      cell: (info) => formatDate(info.getValue()),
+    }),
     columnHelper.display({
       id: 'actions',
       header: () => <span className="block text-right">Actions</span>,
@@ -79,21 +90,25 @@ export default function Companies() {
           >
             <Eye className="h-4 w-4" />
           </Link>
-          <Link
-            to={`/master/companies/${row.original.uuid}/edit`}
-            title="Edit company"
-            className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-          >
-            <Pencil className="h-4 w-4" />
-          </Link>
-          <button
-            type="button"
-            title="Delete company"
-            onClick={() => setDeleteTarget(row.original)}
-            className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {canUpdate && (
+            <Link
+              to={`/master/companies/${row.original.uuid}/edit`}
+              title="Edit company"
+              className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+            >
+              <Pencil className="h-4 w-4" />
+            </Link>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              title="Delete company"
+              onClick={() => setDeleteTarget(row.original)}
+              className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       ),
     }),
@@ -140,13 +155,15 @@ export default function Companies() {
         searchPlaceholder="Search by name, code or email..."
         reloadKey={reloadKey}
         actions={
-          <Link
-            to="/master/companies/new"
-            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Company
-          </Link>
+          canCreate && (
+            <Link
+              to="/master/companies/new"
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add Company
+            </Link>
+          )
         }
       />
 

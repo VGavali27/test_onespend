@@ -5,13 +5,42 @@ import api from '@/services/api';
 // `config` (e.g. { signal }) is forwarded so the paginated DataTable can cancel stale requests
 export const getExpenses = (params, config) =>
   api.get('/expenses', { ...config, params: { decrypt: 'true', ...params } });
+// Expenses assigned to the logged-in user's role (pending their approval)
+export const getAssignedExpenses = (params, config) =>
+  api.get('/expenses/assigned', { ...config, params: { decrypt: 'true', ...params } });
 // Expenses created by the logged-in user
 export const getMyExpenses = (params, config) =>
   api.get('/expenses/my', { ...config, params: { decrypt: 'true', ...params } });
 export const getExpenseById = (uuid) => api.get(`/expenses/${uuid}`, { params: { decrypt: 'true' } });
+// Eagerly load the source procurement chain (PI → PR → quotations → PO + approval logs) —
+// called on mount for procurement-linked expenses so the detail's stage tabs (PI/PR/Quotes/PO)
+// and the Approvals tab's merged timeline are ready.
+export const getExpenseProcurementChain = (uuid) => api.get(`/expenses/${uuid}/procurement-chain`);
 export const createExpense = (payload) => api.post('/expenses', payload);
 export const updateExpense = (uuid, payload) => api.put(`/expenses/${uuid}`, payload);
 export const deleteExpense = (uuid) => api.delete(`/expenses/${uuid}`);
+// Expense approval workflow (PO-created expenses follow the expense role-handover chain)
+export const submitExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/submit`, { remarks });
+export const resubmitExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/submit`, { remarks });
+export const approveExpense = (uuid, remarks, toRoleId) => api.post(`/expenses/${uuid}/approve`, { remarks, to_role_id: toRoleId });
+export const rejectExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/reject`, { remarks });
+export const getHandoverRoles = (uuid) => api.get(`/expenses/${uuid}/handover-roles`);
+// Expense payments (unified for all expense types — only roles with expenses:pay can record)
+export const recordPayment = (uuid, payload) => api.post(`/expenses/${uuid}/payments`, payload);
+export const getPayments = (uuid) => api.get(`/expenses/${uuid}/payments`);
+export const getPaymentSummary = (uuid) => api.get(`/expenses/${uuid}/payment-summary`);
+// Payment handover
+export const handoverForPayment = (uuid, payload) => api.post(`/expenses/${uuid}/handover-payment`, payload);
+export const getPaymentHandoverRoles = (uuid) => api.get(`/expenses/${uuid}/payment-handover-roles`);
+// Payment requests list (expenses pending payment at the user's role)
+export const getMyPaymentRequests = (params, config) =>
+  api.get('/expenses/my-payments', { ...config, params: { decrypt: 'true', ...params } });
+
+// Procurement-expense fulfilment (admin): mark delivered quantities on the linked PO
+// line items, and attach header-level files (PO PDF / vendor invoice).
+export const updateItemsReceived = (uuid, items) => api.post(`/expenses/${uuid}/items-received`, { items });
+export const addExpenseDocument = (uuid, payload) => api.post(`/expenses/${uuid}/documents`, payload);
+export const deleteExpenseDocument = (uuid, documentUuid) => api.delete(`/expenses/${uuid}/documents/${documentUuid}`);
 
 // Expense documents & handovers — add here when the backend endpoints exist.
 
@@ -138,9 +167,33 @@ export const normalizeExpense = (e) => {
     submitted_at: e.submitted_at,
     estimated_amount: num(e.estimated_amount),
     final_amount: num(e.final_amount),
+    advance_amount: num(e.advance_amount),
     paid_amount: num(e.paid_amount),
-    category: e.category ? { name: e.category.name } : null,
+    payment_status: e.payment_status,
+    category: e.category
+      ? {
+          name: e.category.name,
+          module: e.category.module,
+          flow_mode: e.category.flow_mode || "HANDOVER",
+          finalApproverRole: e.category.finalApproverRole
+            ? { id: e.category.finalApproverRole.id, name: e.category.finalApproverRole.name, code: e.category.finalApproverRole.code }
+            : null,
+          // Approval ladder served by the backend from expense_flow_steps
+          // (empty for HANDOVER categories). Each is { position, role, role_name, label, final }.
+          flow_steps: (e.category.flowSteps || []).map((s) => ({
+            position: s.step_position,
+            role: s.role?.code,
+            role_name: s.role?.name,
+            label: s.step_label,
+            final: Boolean(s.is_final),
+          })),
+        }
+      : null,
     company: e.company ? { name: e.company.name } : null,
+    currentRole: e.currentRole ? { name: e.currentRole.name, code: e.currentRole.code } : null,
+    // Position in the FIXED-flow approval ladder (from expense_flow_steps) — null
+    // for travel/reimbursement expenses and once closed.
+    flow_position: e.flow_position ?? null,
     travel,
     reimbursement,
     handovers: (e.handovers || []).map((h) => ({
@@ -149,9 +202,18 @@ export const normalizeExpense = (e) => {
       from_role: h.fromRole?.name,
       to_role: h.toRole?.name,
       action_by: employmentName(h.actionBy),
-      at: h.created_at,
+      at: h.created_at ?? h.createdAt,
     })),
-    documents: (e.documents || []).map((d) => ({ name: d.original_file_name })),
+    // Is this expense tied to a procurement chain? (PO-created or converted) — gates the
+    // PI/PR/Quotations/PO stage tabs on the expense detail; the chain is eagerly loaded on mount.
+    // The expense is the parent; the linked PO has expense_id FK. Check for procurementOrder.
+    isProcurement: Boolean(e.procurementOrder),
+    documents: (e.documents || []).map((d) => ({
+      uuid: d.uuid,
+      name: d.original_file_name,
+      url: d.file_path,
+      module_name: d.module_name,
+    })),
   };
 };
 
