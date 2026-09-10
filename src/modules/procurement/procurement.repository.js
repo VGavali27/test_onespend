@@ -111,8 +111,9 @@ const HEADERS = [
 const { Op } = db.Sequelize;
 
 // Sortable columns. Amounts are excluded — they're AES-encrypted TEXT so the DB can't sort them.
-const ALLOWED_SORT_FIELDS = ['createdAt', 'document_number', 'title'];
-const DEFAULT_SORT = [['createdAt', 'DESC']];
+const ALLOWED_SORT_FIELDS = ['createdAt', 'updatedAt', 'document_number', 'title'];
+// Default list order: most recently updated first.
+const DEFAULT_SORT = [['updatedAt', 'DESC']];
 
 // Merge the scoping `where` with filters (status, search). Type is handled by
 // choosing which header table(s) to query.
@@ -171,7 +172,7 @@ const projectLatestPerChain = (rows = []) => {
 export const findAll = async (where = {}, params = {}) => {
   const page = Math.max(1, Number(params.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(params.limit) || 10));
-  const sortBy = params.sortBy || 'createdAt';
+  const sortBy = params.sortBy || 'updatedAt';
   const sortOrder = (params.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   const order = ALLOWED_SORT_FIELDS.includes(sortBy) ? [[sortBy, sortOrder]] : DEFAULT_SORT;
   const requestedType = (params.requestType || params.type || '').toUpperCase();
@@ -209,8 +210,11 @@ export const findAll = async (where = {}, params = {}) => {
     ? visibleRows
     : visibleRows.filter((r) => !(r.request_type === 'PO' && r.expense_id != null));
 
-  // Merge + sort + paginate in JS (acceptable at this scale; amounts are excluded from sort)
-  visibleRows.sort((a, b) => {
+  // Merge + sort + paginate in JS (acceptable at this scale; amounts are excluded from sort).
+  // Sort the rows actually returned (listRows) — previously visibleRows was sorted
+  // while listRows (a separate filtered copy in the all-types path) was sliced, so
+  // the all-types projection was never actually re-ordered by the sort key.
+  listRows.sort((a, b) => {
     const av = a[sortBy] ?? a.createdAt;
     const bv = b[sortBy] ?? b.createdAt;
     if (av === bv) return 0;

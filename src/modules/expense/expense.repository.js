@@ -89,8 +89,9 @@ const { Op } = db.Sequelize;
 
 // Sortable columns. NOTE: estimated_amount is excluded because amounts are stored
 // as AES-encrypted TEXT — the DB can't sort that column numerically.
-const ALLOWED_SORT_FIELDS = ['createdAt', 'title', 'submitted_at'];
-const DEFAULT_SORT = [['createdAt', 'DESC']];
+const ALLOWED_SORT_FIELDS = ['createdAt', 'updatedAt', 'title', 'submitted_at'];
+// Default list order: most recently updated first.
+const DEFAULT_SORT = [['updatedAt', 'DESC']];
 
 // Merge the scoping `where` with server-side filters (search, status, category, date ranges)
 const buildWhere = (where, params = {}) => {
@@ -127,7 +128,7 @@ const buildWhere = (where, params = {}) => {
 export const findAll = async (where = {}, params = {}) => {
   const page = Math.max(1, Number(params.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(params.limit) || 10));
-  const sortBy = params.sortBy || 'createdAt';
+  const sortBy = params.sortBy || 'updatedAt';
   const sortOrder = (params.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   const order = ALLOWED_SORT_FIELDS.includes(sortBy) ? [[sortBy, sortOrder]] : DEFAULT_SORT;
 

@@ -16,7 +16,8 @@ const storage = multer.diskStorage({
   // Store in uploads/<folder>/ when the request sends a `folder` field (e.g. 'vendor'),
   // otherwise in the uploads root. The client must append `folder` before `file` in FormData.
   destination: (req, _file, cb) => {
-    const folder = typeof req.body?.folder === 'string' && /^[a-z0-9_-]+$/i.test(req.body.folder) ? req.body.folder : '';
+    const raw = typeof req.body?.folder === 'string' ? req.body.folder.replace(/\\/g, '/') : '';
+    const folder = /^[a-z0-9_/-]+$/i.test(raw) ? raw : '';
     const dir = folder ? path.join(uploadsDir, folder) : uploadsDir;
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
