@@ -96,13 +96,12 @@ const DEFAULT_SORT = [['createdAt', 'DESC']];
 const buildWhere = (where, params = {}) => {
   const w = { ...where };
   const status = params.status || '';
-  const category = params.category || '';
   const search = (params.search || '').trim();
   const dateFrom = params.dateFrom || '';
   const dateTo = params.dateTo || '';
 
   if (status) w.status = status;
-  if (category) w['$category.name$'] = category; // company & category are in listInclude
+  if (params.category_id) w.category_id = params.category_id; // resolved to id in findAll
   if (search) {
     w[Op.or] = [
       { title: { [Op.like]: `%${search}%` } },
@@ -132,13 +131,31 @@ export const findAll = async (where = {}, params = {}) => {
   const sortOrder = (params.sortOrder || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   const order = ALLOWED_SORT_FIELDS.includes(sortBy) ? [[sortBy, sortOrder]] : DEFAULT_SORT;
 
+  // Resolve the category filter to its id before building the where clause.
+  // Filtering on the joined column ($category.name$) breaks under Sequelize
+  // subquery pagination because the category include carries nested models, so
+  // Sequelize keeps that join in the outer query while the where runs against
+  // the inner paging subquery → "Unknown column 'category.name'".
+  const queryParams = { ...params };
+  delete queryParams.category;
+  if (params.category) {
+    const cat = await ExpenseCategory.findOne({ where: { name: params.category }, attributes: ['id'] });
+    queryParams.category_id = cat ? cat.id : -1; // -1 → no matching category → empty list
+  }
+
   const { count, rows } = await Expense.findAndCountAll({
-    where: buildWhere(where, params),
+    where: buildWhere(where, queryParams),
     include: listInclude,
     order,
     limit,
     offset: (page - 1) * limit,
     distinct: true,
+    // listInclude is single-row only (belongsTo/hasOne) with no duplicate fan-out,
+    // so we can safely disable Sequelize's paging subquery. Without this,
+    // filters on joined columns ($company.name$, …) generate "Unknown column"
+    // SQL errors: the where runs inside the LIMIT subquery while the JOINs are
+    // emitted on the outer query.
+    subQuery: false,
   });
 
   return { rows, total: count };
