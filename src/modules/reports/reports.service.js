@@ -293,6 +293,150 @@ export const getPaymentSummary = async (user, query = {}) => {
   };
 };
 
+// Paginated per-expense net summary — one row per expense, grouped from the
+// merged payment + synthetic-advance rows. Amounts are encrypted so grouping
+// must happen in JS; the underlying query fetches all matching payment rows,
+// then groups + paginates the result.
+const EXPENSE_NET_SORTABLE = new Set(['expense_number', 'title', 'advance', 'disbursed', 'refunded', 'net', 'last_date']);
+
+export const getExpenseNetSummary = async (user, query = {}) => {
+  const where = await buildWhere(user, query);
+  const rows = (await reportsRepository.findAllPayments(where, [['payment_date', 'ASC'], ['id', 'ASC']]))
+    .map(mapPayment);
+  rows.push(...buildSyntheticAdvances(rows));
+
+  // Group by expense UUID
+  const expenseMap = new Map();
+  for (const r of rows) {
+    if (!r.expense) continue;
+    const key = r.expense.uuid;
+    const isRefund = !DISBURSEMENT_TYPES.has(r.payment_type);
+    const entry = expenseMap.get(key) || {
+      expense_uuid: key,
+      expense_number: r.expense.expense_number,
+      title: r.expense.title,
+      module: r.expense.module ?? 'unknown',
+      category_name: r.expense.category_name,
+      company_name: r.company?.name ?? null,
+      advance: Number(r.expense.advance_amount) || 0,
+      disbursed: 0,
+      refunded: 0,
+      advance_date: null,
+      disbursed_date: null,
+      refund_date: null,
+      last_date: null,
+    };
+    if (isRefund) {
+      entry.refunded += r.amount;
+      if (r.payment_date && (!entry.refund_date || r.payment_date > entry.refund_date)) entry.refund_date = r.payment_date;
+    } else {
+      entry.disbursed += r.amount;
+      if (r.payment_date && (!entry.disbursed_date || r.payment_date > entry.disbursed_date)) entry.disbursed_date = r.payment_date;
+    }
+    if (r.payment_type === 'ADVANCE') entry.advance_date = r.payment_date;
+    if (r.payment_date && (!entry.last_date || r.payment_date > entry.last_date)) entry.last_date = r.payment_date;
+    expenseMap.set(key, entry);
+  }
+
+  // Compute net for each entry
+  let grouped = [...expenseMap.values()].map((x) => ({ ...x, net: x.disbursed - x.refunded }));
+
+  // Sort
+  const sortDir = String(query.sortOrder || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+  const sortBy = EXPENSE_NET_SORTABLE.has(query.sortBy) ? query.sortBy : 'last_date';
+  grouped.sort((a, b) => {
+    const av = a[sortBy] ?? 0;
+    const bv = b[sortBy] ?? 0;
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    if (typeof av === 'string') return av.localeCompare(bv) * sortDir;
+    return (av - bv) * sortDir;
+  });
+
+  // Paginate
+  const page = Math.max(1, Number(query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+  const total = grouped.length;
+  const start = (page - 1) * limit;
+  const paged = grouped.slice(start, start + limit);
+
+  return { rows: paged, total, page, limit, totalPages: Math.ceil(total / limit) };
+};
+
+// Per-expense net summary as a downloadable CSV.
+export const exportExpenseNetCsv = async (user, query = {}) => {
+  const where = await buildWhere(user, query);
+  const rows = (await reportsRepository.findAllPayments(where, [['payment_date', 'ASC'], ['id', 'ASC']]))
+    .map(mapPayment);
+  rows.push(...buildSyntheticAdvances(rows));
+
+  const expenseMap = new Map();
+  for (const r of rows) {
+    if (!r.expense) continue;
+    const key = r.expense.uuid;
+    const isRefund = !DISBURSEMENT_TYPES.has(r.payment_type);
+    const entry = expenseMap.get(key) || {
+      expense_number: r.expense.expense_number,
+      title: r.expense.title,
+      module: r.expense.module ?? 'unknown',
+      category_name: r.expense.category_name,
+      company_name: r.company?.name ?? null,
+      advance: Number(r.expense.advance_amount) || 0,
+      disbursed: 0,
+      refunded: 0,
+      advance_date: null,
+      disbursed_date: null,
+      refund_date: null,
+      last_date: null,
+    };
+    if (isRefund) {
+      entry.refunded += r.amount;
+      if (r.payment_date && (!entry.refund_date || r.payment_date > entry.refund_date)) entry.refund_date = r.payment_date;
+    } else {
+      entry.disbursed += r.amount;
+      if (r.payment_date && (!entry.disbursed_date || r.payment_date > entry.disbursed_date)) entry.disbursed_date = r.payment_date;
+    }
+    if (r.payment_type === 'ADVANCE') entry.advance_date = r.payment_date;
+    if (r.payment_date && (!entry.last_date || r.payment_date > entry.last_date)) entry.last_date = r.payment_date;
+    expenseMap.set(key, entry);
+  }
+
+  const grouped = [...expenseMap.values()].map((x) => ({ ...x, net: x.disbursed - x.refunded }));
+
+  const header = [
+    'Expense No.', 'Title', 'Module', 'Category', 'Company',
+    'Advance', 'Advance Date', 'Paid Out', 'Paid Out Date',
+    'Refunded', 'Refunded Date', 'Net', 'Last Activity',
+  ];
+  const csvCell = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const toLine = (values) => values.map(csvCell).join(',');
+
+  const lines = grouped.map((r) =>
+    toLine([
+      r.expense_number,
+      r.title,
+      r.module,
+      r.category_name,
+      r.company_name,
+      r.advance.toFixed(2),
+      r.advance_date ? r.advance_date.toISOString() : '',
+      r.disbursed.toFixed(2),
+      r.disbursed_date ? r.disbursed_date.toISOString() : '',
+      r.refunded.toFixed(2),
+      r.refund_date ? r.refund_date.toISOString() : '',
+      r.net.toFixed(2),
+      r.last_date ? r.last_date.toISOString() : '',
+    ]),
+  );
+
+  return `\uFEFF${toLine(header)}\n${lines.join('\n')}`;
+};
+
 // Full filtered result as a CSV string (BOM-prefixed so Excel opens UTF-8 correctly).
 export const exportPaymentsCsv = async (user, query = {}) => {
   const where = await buildWhere(user, query);

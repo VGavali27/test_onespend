@@ -24,6 +24,32 @@ export const getPaymentSummary = async (req, res, next) => {
   }
 };
 
+// Paginated per-expense net summary — one row per expense, grouped from
+// merged payment + synthetic-advance rows. Same filters as the ledger.
+export const getExpenseNetSummary = async (req, res, next) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const { rows, total } = await reportsService.getExpenseNetSummary(req.user, req.query);
+    return ApiResponse.paginated(res, rows, { page, limit, total });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Per-expense net summary as a downloadable CSV.
+export const exportExpenseNet = async (req, res, next) => {
+  try {
+    const csv = await reportsService.exportExpenseNetCsv(req.user, req.query);
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="expense-net-${stamp}.csv"`);
+    return res.send(csv);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Full filtered result as a downloadable CSV.
 export const exportPayments = async (req, res, next) => {
   try {
