@@ -1349,7 +1349,10 @@ export const getPayments = async (uuid, user) => {
 
   const payments = await db.ExpensePayment.findAll({
     where: { expense_id: expense.id },
-    include: [{ model: db.ExpensePaymentProof, as: 'proofs' }],
+    include: [
+      { model: db.ExpensePaymentProof, as: 'proofs' },
+      { model: db.UserEmployment, as: 'processedByEmployment', include: [{ model: db.User, as: 'user' }] },
+    ],
     order: [['payment_date', 'ASC']],
   });
   decryptResults(payments);
@@ -1357,21 +1360,25 @@ export const getPayments = async (uuid, user) => {
     if (p.proofs) decryptResults(p.proofs);
   });
 
-  return payments.map(p => ({
-    uuid: p.uuid,
-    amount: Number(p.amount).toFixed(2),
-    payment_method: p.payment_method,
-    payment_date: p.payment_date,
-    payment_type: p.payment_type,
-    reference_number: p.reference_number,
-    remarks: p.remarks,
-    proofs: (p.proofs || []).map(pr => ({
-      uuid: pr.uuid,
-      file_path: pr.file_path,
-      file_name: pr.file_name,
-      file_type: pr.file_type,
-    })),
-  }));
+  return payments.map(p => {
+    const u = p.processedByEmployment?.user;
+    return {
+      uuid: p.uuid,
+      amount: Number(p.amount).toFixed(2),
+      payment_method: p.payment_method,
+      payment_date: p.payment_date,
+      payment_type: p.payment_type,
+      reference_number: p.reference_number,
+      remarks: p.remarks,
+      processed_by: u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : null,
+      proofs: (p.proofs || []).map(pr => ({
+        uuid: pr.uuid,
+        file_path: pr.file_path,
+        file_name: pr.file_name,
+        file_type: pr.file_type,
+      })),
+    };
+  });
 };
 
 // Get payment summary for an expense (computed values)
