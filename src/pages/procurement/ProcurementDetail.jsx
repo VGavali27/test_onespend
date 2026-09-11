@@ -253,13 +253,13 @@ export default function ProcurementDetail() {
       else if (key === 'reject') await rejectProcurement(uuid, actionRemarks);
       else if (key === 'create-pr') await createPurchaseRequest(uuid);
       else if (key === 'create-po') {
-        const poResp = await createPurchaseOrder(uuid);
+        await createPurchaseOrder(uuid);
         toast.success('Action completed');
         setConfirmAction(null);
         setRemarks('');
-        const link = poResp?.data?.data?.expenses?.[0]?.uuid;
-        if (link) { navigate(`/expenses/${link}`); return; }
-        load();
+        // The created expense follows the expense approval chain — the admin
+        // reviews it from the Approvals / expense-assigned list.
+        navigate('/expenses/assigned');
         return;
       }
       else if (key === 'received') await markReceived(uuid);

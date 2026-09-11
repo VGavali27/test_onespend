@@ -1582,18 +1582,24 @@ const PAYMENT_STATUS_META = {
   SETTLED: { label: "Settled", cls: "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-900/20 dark:text-emerald-300 dark:ring-emerald-400/20" },
 };
 
-// Payment TYPE is direction-aware: tells whether money flowed company→user (a
-// disbursement toward the expense) or user→company (a refund of an over-advanced
-// amount). Labels make that direction obvious on the payment history.
+// Payment TYPE is direction-aware: tells whether money flowed company→payee (a
+// disbursement toward the expense) or payee→company (a refund of an over-advanced
+// amount). The payee is the employee ("You") for travel/reimbursement, but the
+// selected vendor for procurement-linked expenses — labels make that obvious.
+const paymentPayee = (type, toVendor) =>
+  ["PARTIAL", "FULL", "ADDITIONAL"].includes(type)
+    ? `Company → ${toVendor ? "Vendor" : "You"}`
+    : "You → Company";
+
 const PAYMENT_TYPE_META = {
-  PARTIAL: { label: "Company → You", cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
-  FULL: { label: "Company → You", cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
-  ADDITIONAL: { label: "Company → You", cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
-  ADVANCE_REFUND: { label: "You → Company", cls: "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-400/20" },
-  REFUND_RECEIVED: { label: "You → Company", cls: "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-400/20" },
+  PARTIAL: { cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
+  FULL: { cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
+  ADDITIONAL: { cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-900/20 dark:text-indigo-300 dark:ring-indigo-400/20" },
+  ADVANCE_REFUND: { cls: "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-400/20" },
+  REFUND_RECEIVED: { cls: "bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-400/20" },
 };
 
-function PaymentTypeBadge({ type }) {
+function PaymentTypeBadge({ type, toVendor }) {
   const meta = PAYMENT_TYPE_META[type];
   if (!meta) {
     return (
@@ -1604,7 +1610,7 @@ function PaymentTypeBadge({ type }) {
   }
   return (
     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${meta.cls}`}>
-      {meta.label}
+      {paymentPayee(type, toVendor)}
     </span>
   );
 }
@@ -1703,7 +1709,7 @@ function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, 
                     <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
                       {formatCurrency(Number(p.amount))}
                     </span>
-                    <PaymentTypeBadge type={p.payment_type} />
+                    <PaymentTypeBadge type={p.payment_type} toVendor={expense?.isProcurement === true} />
                     {p.reference_number && (
                       <span className="text-[12px] text-slate-400 font-mono">
                         Ref: {p.reference_number}
@@ -1712,6 +1718,7 @@ function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, 
                   </div>
                   <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
                     {p.payment_method} · {formatDate(p.payment_date)}
+                    {p.processed_by && <span> · Processed by {p.processed_by}</span>}
                   </p>
                   {p.remarks && (
                     <p className="text-[12px] text-slate-400 mt-0.5">{p.remarks}</p>
@@ -1733,11 +1740,6 @@ function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, 
                       ))}
                     </div>
                   )}
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-[13px] font-semibold text-slate-800 dark:text-slate-200">
-                    {formatCurrency(Number(p.amount))}
-                  </p>
                 </div>
               </li>
             ))}
