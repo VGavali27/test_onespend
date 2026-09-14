@@ -1561,8 +1561,11 @@ export const getMyPaymentRequests = async (user, params = {}) => {
 // ── Procurement expense fulfilment (admin) ──
 
 // Record delivered quantities on the PO line items of a procurement expense.
-// `items` = [{ procurement_item_id, received_quantity }] — quantities clamp to
-// 0..quantity so a partial delivery can never exceed the ordered amount.
+// `items` = [{ procurement_item_id, received_quantity }] — `received_quantity` is
+// the amount being received NOW (an increment), not a cumulative total. It is
+// added to the item's existing `received_quantity`, and never allowed to exceed
+// the REMAINING quantity (ordered − already received). e.g. 10 ordered / 5 already
+// received → next entry capped at 5.
 export const updateItemsReceived = async (uuid, user, items) => {
   const expense = await expenseRepository.findByUuid(uuid);
   if (!expense) throw ApiError.notFound('Expense not found');
@@ -1590,12 +1593,20 @@ export const updateItemsReceived = async (uuid, user, items) => {
         transaction: t,
       });
       if (!item) continue;
-      const maxQty = Number(item.quantity) || 0;
-      const received = Math.min(Math.max(Number(row.received_quantity) || 0, 0), maxQty);
+      const ordered = Number(item.quantity) || 0;
+      const alreadyReceived = Number(item.received_quantity) || 0;
+      const remaining = Math.max(ordered - alreadyReceived, 0);
+      const incoming = Number(row.received_quantity) || 0;
+      if (incoming > remaining) {
+        throw ApiError.badRequest(
+          `Cannot receive more than the remaining quantity (${remaining}) for "${item.item_name || 'Item'}"`,
+        );
+      }
+      const received = Math.min(alreadyReceived + incoming, ordered);
       await item.update({ received_quantity: received }, { transaction: t });
       receivedRows.push({
         name: item.item_name || 'Item',
-        ordered: item.quantity,
+        ordered,
         received,
       });
     }
