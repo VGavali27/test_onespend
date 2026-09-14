@@ -307,7 +307,7 @@ export default function ExpenseDetail() {
   const startEditReceived = () => {
     const draft = {};
     (chainPo?.items || []).forEach((it) => {
-      draft[it.id] = Number(it.received_quantity) || 0;
+      draft[it.id] = 0; // admin enters how many are being received NOW (increment)
     });
     setReceivedDraft(draft);
   };
@@ -318,7 +318,7 @@ export default function ExpenseDetail() {
       const items = Object.entries(receivedDraft || {}).map(
         ([itemId, qty]) => ({
           procurement_item_id: Number(itemId),
-          received_quantity: Number(qty) || 0, // backend clamps to 0..ordered qty
+          received_quantity: Number(qty) || 0, // increment — backend adds to the existing total and rejects going over the remaining qty
         }),
       );
       await updateItemsReceived(id, items);
@@ -2613,7 +2613,9 @@ function DocFileRow({ doc, deletable, deleting, onDelete }) {
 }
 
 // Received-quantities editor — read-only table of ordered vs received, switching to
-// number inputs while `draft` is set. The backend clamps each entry to 0..ordered qty.
+// number inputs while `draft` is set. The input is an INCREMENT ("receiving now"),
+// capped at the remaining quantity (ordered − already received), so a partial
+// delivery can only be topped up by what's left.
 function ReceivedItemsEditor({ items, draft, saving, onChange, onStartEdit, onSave, onCancel }) {
   const editing = draft != null;
   const allReceived =
@@ -2672,53 +2674,81 @@ function ReceivedItemsEditor({ items, draft, saving, onChange, onStartEdit, onSa
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-gray-700">
                 <th className="px-3 py-2 font-semibold w-[45%]">Item</th>
-                <th className="px-3 py-2 font-semibold w-[20%] text-center">Ordered</th>
-                <th className="px-3 py-2 font-semibold w-[20%] text-center">Received</th>
+                <th className="px-3 py-2 font-semibold w-[15%] text-center">Ordered</th>
+                <th className="px-3 py-2 font-semibold w-[15%] text-center">Received</th>
+                {editing && (
+                  <th className="px-3 py-2 font-semibold w-[25%] text-center">
+                    Receiving now
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-3 py-2.5 font-medium text-slate-800 dark:text-slate-200 break-words">
-                    {item.name || item.item_name}
-                    {item.description && (
-                      <span className="block text-[11px] font-normal text-slate-400 truncate">
-                        {item.description}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-center text-slate-600 dark:text-slate-400 font-mono">
-                    {Number(item.quantity) || 0}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    {editing ? (
-                      <input
-                        type="number"
-                        min={0}
-                        max={Number(item.quantity) || 0}
-                        step="1"
-                        value={draft[item.id] ?? 0}
-                        onChange={(e) =>
-                          onChange(item.id, Math.max(Number(e.target.value) || 0, 0))
-                        }
-                        className="w-20 px-2 py-1 rounded-lg text-[13px] text-center text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
-                      />
-                    ) : (
+              {items.map((item) => {
+                const orderedQty = Number(item.quantity) || 0;
+                const receivedQty = Number(item.received_quantity) || 0;
+                const remaining = Math.max(orderedQty - receivedQty, 0);
+                return (
+                  <tr key={item.id}>
+                    <td className="px-3 py-2.5 font-medium text-slate-800 dark:text-slate-200 break-words">
+                      {item.name || item.item_name}
+                      {item.description && (
+                        <span className="block text-[11px] font-normal text-slate-400 truncate">
+                          {item.description}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-center text-slate-600 dark:text-slate-400 font-mono">
+                      {orderedQty}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
                       <span
                         className={`font-mono ${
-                          (Number(item.received_quantity) || 0) >= (Number(item.quantity) || 0)
+                          receivedQty >= orderedQty
                             ? "text-emerald-600 dark:text-emerald-400 font-bold"
-                            : Number(item.received_quantity) > 0
+                            : receivedQty > 0
                               ? "text-amber-600 dark:text-amber-400"
                               : "text-slate-400"
                         }`}
                       >
-                        {Number(item.received_quantity) || 0}
+                        {receivedQty}
                       </span>
+                    </td>
+                    {editing && (
+                      <td className="px-3 py-2.5 text-center">
+                        {remaining <= 0 ? (
+                          <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                            Fully received
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center gap-1.5">
+                            <input
+                              type="number"
+                              min={0}
+                              max={remaining}
+                              step="1"
+                              value={draft[item.id] ?? 0}
+                              onChange={(e) =>
+                                onChange(
+                                  item.id,
+                                  Math.min(
+                                    Math.max(Number(e.target.value) || 0, 0),
+                                    remaining,
+                                  ),
+                                )
+                              }
+                              className="w-16 px-2 py-1 rounded-lg text-[13px] text-center text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500"
+                            />
+                            <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                              of {remaining} left
+                            </span>
+                          </span>
+                        )}
+                      </td>
                     )}
-                  </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
