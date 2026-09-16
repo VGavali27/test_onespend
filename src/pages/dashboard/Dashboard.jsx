@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   Wallet, Clock, CheckCircle2, XCircle,
-  TrendingUp, Receipt, Plus, ChevronRight, PieChart, ArrowUpRight, ArrowDownRight, ShoppingCart, FileText,
+  TrendingUp, Receipt, Plus, PieChart, ArrowUpRight, ArrowDownRight, ShoppingCart, FileText,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { getDashboard } from '@/services/dashboardService';
+import { getNotificationCount } from '@/services/notificationService';
 import { formatCurrency, formatRelativeTime } from '@/utils/format';
 import { useToast } from '@/components/ui/Toast';
 
@@ -19,13 +21,7 @@ const ICON_MAP = {
   file: FileText,
 };
 
-// Roles that see specific quick actions
-const APPROVER_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR', 'PAYMENT_MGR', 'PAYMENT_JR', 'FINANCE_MGR', 'FINANCE_JR', 'TRAVEL_MGR', 'HOD', 'EMP_MGR'];
-const PROCUREMENT_ROLES = ['SUPER_ADMIN', 'CFO', 'ADMIN_MGR', 'ADMIN_JR'];
-const GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO'];
-const PAYMENT_ROLES = ['PAYMENT_MGR', 'PAYMENT_JR', 'FINANCE_MGR', 'FINANCE_JR', 'SUPER_ADMIN', 'CFO'];
-
-// Role persona — drives the welcome banner + quick actions shown to the user
+// Role persona — drives the welcome banner shown to the user
 const PERSONA = {
   employee:   { roles: ['EMPLOYEE'],                    key: 'employee',   primary: { label: 'Submit Expense', href: '/expenses/new', icon: 'plus' }, title: 'Employee Expense', subtitle: 'Here\'s your financial overview', accent: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/25 dark:text-indigo-400' },
   approver:   { roles: ['HOD', 'EMP_MGR', 'TRAVEL_MGR', 'FINANCE_MGR', 'FINANCE_JR'], key: 'approver', primary: { label: 'My Approvals', href: '/expenses/assigned', icon: 'clock' }, title: 'Approver', subtitle: 'Here\'s the expenses awaiting your approval', accent: 'bg-amber-50 text-amber-600 dark:bg-amber-900/25 dark:text-amber-400' },
@@ -82,6 +78,7 @@ export default function Dashboard() {
   const toast = useToast();
   const [period, setPeriod] = useState('this_month');
   const [data, setData] = useState(null);
+  const [pending, setPending] = useState({ expenses: 0, procurement: 0, payments: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -89,7 +86,11 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const { data: res } = await getDashboard({ period });
+      const [dash, notif] = await Promise.all([
+        getDashboard({ period }),
+        getNotificationCount().catch(() => ({ data: { data: { expenses: 0, procurement: 0, payments: 0 } } })),
+      ]);
+      const { data: res } = dash;
       if (res.success && res.data) {
         setData(res.data);
       } else {
@@ -97,6 +98,12 @@ export default function Dashboard() {
         setError('Invalid response format');
         toast.error('Invalid response from server');
       }
+      const c = notif?.data?.data || {};
+      setPending({
+        expenses: Number(c.expenses) || 0,
+        procurement: Number(c.procurement) || 0,
+        payments: Number(c.payments) || 0,
+      });
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       const msg = err.response?.data?.message || err.message || 'Unknown error';
@@ -132,6 +139,53 @@ export default function Dashboard() {
       ))}
     </div>
   );
+
+  const PENDING_CARDS = [
+    { key: 'expenses', label: 'Expense Approvals', icon: 'clock', href: '/expenses/assigned', showAmount: true },
+    { key: 'procurement', label: 'Procurement Approvals', icon: 'cart', href: '/procurement/assigned' },
+    { key: 'payments', label: 'Payment Requests', icon: 'wallet', href: '/expenses/payments' },
+  ];
+
+  const renderPendingApprovals = () => {
+    const pendingAmount = data?.metrics?.pendingApproval?.amount || 0;
+    const cards = PENDING_CARDS.filter((c) => pending[c.key] > 0);
+    if (!cards.length) return null;
+    return (
+      <div className="space-y-2">
+        <h3 className="text-[13px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+          Needs your action
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {cards.map((c) => {
+            const Icon = getIcon(c.icon);
+            const count = pending[c.key];
+            return (
+              <Link
+                key={c.key}
+                to={c.href}
+                className="group bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 p-5 card-hover hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`w-10 h-10 rounded-lg ring-1 ${getRing('amber')} ${getAccent('amber')} flex items-center justify-center`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                    {count}
+                  </span>
+                </div>
+                <p className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">{c.label}</p>
+                {c.showAmount && pendingAmount > 0 && (
+                  <p className="text-[12px] font-medium text-amber-600 dark:text-amber-400 mt-1">
+                    {formatCurrency(pendingAmount)} pending
+                  </p>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   const renderStatCards = () => {
     if (!data?.metrics) return renderSkeleton();
@@ -362,60 +416,6 @@ export default function Dashboard() {
     );
   };
 
-  const renderQuickActions = () => {
-    const role = user?.role;
-    const isManager = APPROVER_ROLES.includes(role);
-    const isGlobal = GLOBAL_ROLES.includes(role);
-    const isProcurement = PROCUREMENT_ROLES.includes(role);
-    const isPayment = PAYMENT_ROLES.includes(role);
-
-    const actions = [
-      { ...persona.primary, primary: true },
-      ...(isManager || isGlobal ? [{ label: 'All Expenses', href: '/expenses/all', icon: 'receipt', primary: false }] : []),
-      ...(isProcurement ? [{ label: 'Procurement', href: '/procurement', icon: 'cart', primary: false }] : []),
-      ...(isPayment ? [{ label: 'Payment Requests', href: '/expenses/payments', icon: 'wallet', primary: false }] : role === 'EMPLOYEE' ? [] : []),
-    ];
-    // Employees additionally get a New-Expense shortcut next to their primary.
-    if (role === 'EMPLOYEE' && !actions.some((a) => a.href === '/expenses/new')) {
-      actions.push({ label: 'New Expense', href: '/expenses/new', icon: 'plus', primary: false });
-    }
-
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {actions.map((action) => {
-          const Icon = getIcon(action.icon);
-          return (
-            <button
-              key={action.href}
-              className={`group flex items-center gap-3.5 p-4 rounded-xl border transition-all card-hover text-left ${
-                action.primary
-                  ? 'bg-indigo-600 border-indigo-600 hover:bg-indigo-700'
-                  : 'bg-white dark:bg-gray-900 border-slate-200 dark:border-gray-700 hover:border-indigo-200 dark:hover:border-indigo-800'
-              }`}
-              onClick={() => window.location.href = action.href}
-            >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                action.primary ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400'
-              }`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <div>
-                <p className={`text-sm font-semibold ${action.primary ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{action.label}</p>
-                <p className={`text-xs ${action.primary ? 'text-indigo-100' : 'text-slate-400'}`}>
-                  {action.icon === 'clock' ? 'Review pending items' :
-                   action.icon === 'receipt' ? 'View all expenses' :
-                   action.icon === 'cart' ? 'Procurement pipeline' :
-                   action.icon === 'wallet' ? 'Process pending payments' : 'Create expense report'}
-                </p>
-              </div>
-              <ChevronRight className={`ml-auto h-4 w-4 ${action.primary ? 'text-indigo-200' : 'text-slate-300 dark:text-slate-600'}`} />
-            </button>
-          );
-        })}
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -484,8 +484,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick actions */}
-      {renderQuickActions()}
+      {/* Pending approvals */}
+      {renderPendingApprovals()}
 
       {/* Stat cards */}
       {renderStatCards()}

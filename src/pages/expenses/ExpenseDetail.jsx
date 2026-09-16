@@ -59,6 +59,7 @@ import {
   formatNumber,
   formatType,
 } from "@/utils/format";
+import { getInitials } from "@/utils/user";
 
 export default function ExpenseDetail() {
   const { id } = useParams();
@@ -69,6 +70,7 @@ export default function ExpenseDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewUser, setViewUser] = useState(null);
+  const [viewProcessor, setViewProcessor] = useState(null);
   const [acting, setActing] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // 'approve' | 'reject' | 'submit'
   const [remarks, setRemarks] = useState("");
@@ -475,6 +477,23 @@ export default function ExpenseDetail() {
             {expense.company?.name || "—"}
           </p>
         </div>
+        {submittedByName && (
+          <div className="w-full flex items-center gap-2 pt-2 mt-1 border-t border-slate-100 dark:border-gray-800">
+            <button
+              type="button"
+              onClick={() => setViewUser(expense.requestedByEmployment)}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              <span className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                {getInitials(submittedBy)}
+              </span>
+              {submittedByName}
+            </button>
+            <span className="text-[12px] text-slate-400">
+              · submitted {formatDate(expense.submitted_at)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Tabs — Overview [PI | PR | Quotations | PO] Approvals Payments.
@@ -1286,6 +1305,7 @@ export default function ExpenseDetail() {
                 summary={paymentSummary}
                 loading={loadingPayments}
                 onRecord={() => setShowPaymentModal(true)}
+                onViewProcessor={setViewProcessor}
               />
 
               {isCurrentHandler &&
@@ -1384,6 +1404,12 @@ export default function ExpenseDetail() {
       <UserDetailsModal
         employment={viewUser}
         onClose={() => setViewUser(null)}
+      />
+
+      <UserDetailsModal
+        employment={viewProcessor}
+        subtitle="Processed by"
+        onClose={() => setViewProcessor(null)}
       />
 
       {/* Confirm submit/approve/reject with optional remark and handover role selection */}
@@ -1628,7 +1654,7 @@ function PaymentStatusBadge({ status }) {
 // The unified payment block on an APPROVED (or PAID) expense: summary of final / advance /
 // paid / pending, the "Record Payment" action (expenses:pay only), and the payment trail
 // with uploaded proofs.
-function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, loading, onRecord }) {
+function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, loading, onRecord, onViewProcessor }) {
   const status = expense.status;
   // Advances apply only to reimbursement expenses — hide the stat for travel/procurement.
   const hasAdvance = Boolean(expense?.reimbursement);
@@ -1718,7 +1744,18 @@ function PaymentSection({ expense, canPay, isCurrentHandler, payments, summary, 
                   </div>
                   <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
                     {p.payment_method} · {formatDate(p.payment_date)}
-                    {p.processed_by && <span> · Processed by {p.processed_by}</span>}
+                    {p.processed_by && (
+                      <>
+                        {" · "}Processed by{" "}
+                        <button
+                          type="button"
+                          onClick={() => onViewProcessor?.(p.processed_by_employment)}
+                          className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                          {p.processed_by}
+                        </button>
+                      </>
+                    )}
                   </p>
                   {p.remarks && (
                     <p className="text-[12px] text-slate-400 mt-0.5">{p.remarks}</p>

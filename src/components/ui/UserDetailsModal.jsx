@@ -7,7 +7,7 @@ import { formatDate } from '@/utils/format';
  * with `user` and `company` included (as returned by the expense list — see
  * expense.repository listInclude).
  */
-export default function UserDetailsModal({ employment, onClose }) {
+export default function UserDetailsModal({ employment, onClose, subtitle = "Submitted by" }) {
   const user = employment?.user;
   if (!employment || !user) return null;
 
@@ -25,7 +25,7 @@ export default function UserDetailsModal({ employment, onClose }) {
   ];
 
   return (
-    <Modal open onClose={onClose} title={name} subtitle="Submitted by" icon={UserRound} size="sm">
+    <Modal open onClose={onClose} title={name} subtitle={subtitle} icon={UserRound} size="sm">
       <div className="space-y-2.5">
         {rows.map(([label, value]) => (
           <div key={label} className="flex items-center justify-between gap-4 border-b border-slate-100 dark:border-gray-800 pb-2 last:border-0 last:pb-0">

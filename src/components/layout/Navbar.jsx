@@ -161,6 +161,15 @@ export default function Navbar({ title }) {
                                 {n.ref} {n.status ? `· ${n.status}` : ''}
                                 {n.amount ? ` · ₹${n.amount}` : ''}
                               </p>
+                              {n.from && (
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                  Received from <span className="font-medium text-gray-600 dark:text-gray-300">{n.from}</span>
+                                  {n.fromRole ? ` (${n.fromRole})` : ''}
+                                </p>
+                              )}
+                              {n.remarks && (
+                                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 truncate italic">“{n.remarks}”</p>
+                              )}
                               <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.at)}</p>
                             </div>
                           </div>
