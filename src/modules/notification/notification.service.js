@@ -5,9 +5,9 @@ import * as expenseRepository from '../expense/expense.repository.js';
 import * as procurementRepository from '../procurement/procurement.repository.js';
 import { getEmploymentIdsByUser, getActiveCompanyIdsByUser } from '../user_employment/user_employment.service.js';
 import { decrypt } from '../../utils/encryption.js';
-import { EXPENSE_GLOBAL_ROLES, EXPENSE_MANAGER_ROLES } from '../expense/expense.service.js';
+import { EXPENSE_GLOBAL_ROLES } from '../expense/expense.service.js';
 
-const { Role, Expense, ExpenseHandover, ProcurementHandover } = db;
+const { Role, User, UserEmployment, ExpenseHandover, ProcurementHandover } = db;
 
 // Roles that see every company's procurement documents (mirrors procurement.service.js)
 const PROCUREMENT_GLOBAL_ROLES = ['SUPER_ADMIN', 'CFO'];
@@ -44,6 +44,8 @@ const getAssignedExpenseRows = async (user, roleId) => {
     kind: 'expense',
     module: 'expense',
     uuid: r.uuid,
+    docType: 'EXPENSE',
+    docId: r.id,
     ref: r.expense_number,
     title: r.title,
     status: mapStatus(r.status),
@@ -76,6 +78,8 @@ const getAssignedProcurementRows = async (user, roleId) => {
     kind: 'procurement',
     module: 'procurement',
     uuid: r.uuid,
+    docType: r.request_type,
+    docId: r.id,
     ref: r.document_number,
     title: r.title,
     status: mapStatus(r.status),
@@ -103,6 +107,8 @@ const getPaymentRows = async (user, roleId) => {
     kind: 'expense',
     module: 'payment',
     uuid: r.uuid,
+    docType: 'EXPENSE',
+    docId: r.id,
     ref: r.expense_number,
     title: r.title,
     status: mapStatus(r.payment_status),
@@ -112,115 +118,91 @@ const getPaymentRows = async (user, roleId) => {
   }));
 };
 
-// ── Activity feed: recent handovers that involve the logged-in user ──
-// Mirrors the "Assigned/Approvals" visibility scoping. Includes rows where:
-//   - the action was directed at the user's role (to_role_id = my role), OR
-//   - the document creator is the user (an approval/reject that affects their request).
-// Which header table a procurement handover belongs to is resolved via the repository
-// so we can build a correct deep link.
-const getActivityRows = async (user, roleId) => {
-  const isExpenseGlobal = EXPENSE_GLOBAL_ROLES.includes(user.roleCode);
-  const isExpenseManager = EXPENSE_MANAGER_ROLES.includes(user.roleCode);
-  const isProcGlobal = PROCUREMENT_GLOBAL_ROLES.includes(user.roleCode);
-  const isProcManager = PROCUREMENT_MANAGER_ROLES.includes(user.roleCode);
-
-  const companyIds = await getActiveCompanyIdsByUser(user.userId);
-
-  // Expense handovers — activity only makes sense for manager roles (or global).
-  let expenseActivity = [];
-  if (isExpenseGlobal || isExpenseManager) {
-    const scope = isExpenseGlobal ? {} : companyIds.length ? { company_id: { [Op.in]: companyIds } } : null;
-    if (scope !== null) {
-      const rows = await ExpenseHandover.findAll({
-        where: {
-          to_role_id: roleId,
-        },
-        include: [
-          {
-            model: Expense,
-            as: 'expense',
-            where: { ...scope, status: { [Op.ne]: 'DRAFT' } },
-            required: true,
-          },
-          { model: Role, as: 'fromRole', attributes: ['name'] },
-          { model: Role, as: 'toRole', attributes: ['name'] },
-        ],
-        order: [['created_at', 'DESC']],
-        limit: 30,
-      });
-      expenseActivity = rows.map((h) => {
-        const exp = h.expense;
-        return {
-          bundle: 'activity',
-          kind: 'expense',
-          module: 'expense',
-          ref: exp.expense_number,
-          title: exp.title,
-          status: `${h.action_type} ${mapStatus(exp.status)}`,
-          amount: formatAmount(exp.estimated_amount ?? exp.final_amount),
-          at: h.created_at ?? h.createdAt,
-          actionType: h.action_type,
-          fromRole: h.fromRole?.name,
-          toRole: h.toRole?.name,
-          link: `/expenses/${exp.uuid}`,
-        };
-      });
-    }
-  }
-
-  // Procurement handovers — resolved per parent type for correct links.
-  let procurementActivity = [];
-  if (isProcGlobal || isProcManager) {
-    const rows = await ProcurementHandover.findAll({
-        where: { to_role_id: roleId },
-        include: [
-          { model: Role, as: 'fromRole', attributes: ['name'] },
-          { model: Role, as: 'toRole', attributes: ['name'] },
-        ],
-        order: [['created_at', 'DESC']],
-        limit: 30,
-      });
-      procurementActivity = await Promise.all(rows.map(async (h) => {
-        const parent = await parseProcurementParent(h, companyIds);
-        if (!parent) return null;
-        if (companyIds.length && !companyIds.includes(parent.company_id)) return null;
-        return {
-          bundle: 'activity',
-          kind: 'procurement',
-          module: 'procurement',
-          ref: parent.document_number,
-          title: parent.title,
-          status: `${h.action_type} ${mapStatus(parent.status)}`,
-          amount: h.amount_at_step != null ? formatAmount(h.amount_at_step) : formatAmount(parent.grand_total),
-          at: h.created_at ?? h.createdAt,
-          actionType: h.action_type,
-          fromRole: h.fromRole?.name,
-          toRole: h.toRole?.name,
-          link: `/procurement/${parent.uuid}`,
-        };
-      }));
-      procurementActivity = (await procurementActivity).filter(Boolean);
-  }
-
-  return [...expenseActivity, ...procurementActivity];
+// ── Handover context for pending items ──
+// The bell shows ONLY what is currently pending at the user's role (expense /
+// procurement approvals + payment requests). For each pending document we attach
+// the LATEST handover that routed it into the user's role — that gives:
+//   from      → the person (action_by) who sent it
+//   fromRole  → the role it came from
+//   remarks   → the comment they left
+const handoverActor = (h) => {
+  const u = h?.actionBy?.user;
+  if (!u) return null;
+  return [u.first_name, u.middle_name, u.last_name].filter(Boolean).join(' ') || u.email || null;
 };
 
-// Resolve which procurement header a handover belongs to (pi_id / pr_id / po_id).
-const parseProcurementParent = async (handover, companyIds) => {
-  const { ProcurementIntention, ProcurementRequest, ProcurementOrder, Company } = db;
-  for (const [model, col] of [
-    [ProcurementIntention, 'pi_id'],
-    [ProcurementRequest, 'pr_id'],
-    [ProcurementOrder, 'po_id'],
-  ]) {
-    const id = handover[col];
-    if (!id) continue;
-    const parent = await model.findByPk(id, {
-      include: [{ model: Company, as: 'company', attributes: ['id'] }],
-    });
-    if (parent) return parent;
+// Latest expense_handover per expense_id where the document landed in `roleId`.
+const buildExpenseHandoverMap = async (items, roleId) => {
+  const ids = [...new Set(items.map((n) => n.docId).filter(Boolean))];
+  if (!ids.length) return new Map();
+  const handovers = await ExpenseHandover.findAll({
+    where: { to_role_id: roleId, expense_id: { [Op.in]: ids } },
+    attributes: ['expense_id', 'remarks', 'created_at'],
+    include: [
+      { model: Role, as: 'fromRole', attributes: ['name'] },
+      {
+        model: UserEmployment,
+        as: 'actionBy',
+        include: [{ model: User, as: 'user', attributes: ['first_name', 'middle_name', 'last_name', 'email'] }],
+      },
+    ],
+    order: [['created_at', 'DESC']],
+  });
+  const latest = new Map();
+  for (const h of handovers) {
+    if (!latest.has(h.expense_id)) latest.set(h.expense_id, h);
   }
-  return null;
+  return latest;
+};
+
+// Latest procurement_handover per pending PI/PR/PO (keyed `PI:<id>` / `PR:<id>` / `PO:<id>`)
+// that landed in `roleId`.
+const buildProcurementHandoverMap = async (items, roleId) => {
+  const rows = items.filter((n) => n.docType && n.docId != null);
+  const or = [];
+  for (const type of ['PI', 'PR', 'PO']) {
+    const ids = rows.filter((n) => n.docType === type).map((n) => n.docId);
+    if (ids.length) or.push({ [`${type.toLowerCase()}_id`]: { [Op.in]: ids } });
+  }
+  if (!or.length) return new Map();
+  const handovers = await ProcurementHandover.findAll({
+    where: { to_role_id: roleId, [Op.or]: or },
+    attributes: ['id', 'pi_id', 'pr_id', 'po_id', 'remarks', 'created_at'],
+    include: [
+      { model: Role, as: 'fromRole', attributes: ['name'] },
+      {
+        model: UserEmployment,
+        as: 'actionBy',
+        include: [{ model: User, as: 'user', attributes: ['first_name', 'middle_name', 'last_name', 'email'] }],
+      },
+    ],
+    order: [['created_at', 'DESC']],
+  });
+  const latest = new Map();
+  for (const h of handovers) {
+    const key = h.pi_id != null ? `PI:${h.pi_id}` : h.pr_id != null ? `PR:${h.pr_id}` : h.po_id != null ? `PO:${h.po_id}` : null;
+    if (key && !latest.has(key)) latest.set(key, h);
+  }
+  return latest;
+};
+
+const applyHandoverInfo = (item, expenseMap, procurementMap) => {
+  const out = { ...item };
+  const { docType, docId } = out;
+  delete out.docType;
+  delete out.docId;
+  const h =
+    docType === 'EXPENSE'
+      ? expenseMap.get(docId) ?? null
+      : docType
+        ? procurementMap.get(`${docType}:${docId}`) ?? null
+        : null;
+  if (h) {
+    out.from = handoverActor(h);
+    out.fromRole = h.fromRole?.name ?? null;
+    out.remarks = h.remarks ?? null;
+  }
+  return out;
 };
 
 // ── Public: bell badge count ──
@@ -245,29 +227,44 @@ export const getNotificationCount = async (user) => {
   return counts;
 };
 
-// ── Public: merged dropdown feed (newest first) ──
+// ── Public: merged dropdown feed (newest first) — pending items only ──
 export const getNotifications = async (user, params = {}) => {
   const role = await roleRepository.findByCode(user.roleCode);
   if (!role) return [];
 
   const limit = Math.min(50, Math.max(1, Number(params.limit) || 20));
-  const type = params.type;
   const scope = params.scope;
 
-  const slices = await Promise.all([
+  // Only what is CURRENTLY pending at the user's role — no history.
+  const [assignedExpense, assignedProcurement, payments] = await Promise.all([
     getAssignedExpenseRows(user, role.id),
     getAssignedProcurementRows(user, role.id),
     getPaymentRows(user, role.id),
-    getActivityRows(user, role.id),
   ]);
-  const [assignedExpense, assignedProcurement, payments, activity] = slices;
 
-  let feed = [...assignedExpense, ...assignedProcurement, ...payments, ...activity];
-  if (type === 'assigned') feed = [...assignedExpense, ...assignedProcurement, ...payments];
-  if (type === 'activity') feed = activity;
+  const [expenseMap, procurementMap] = await Promise.all([
+    buildExpenseHandoverMap([...assignedExpense, ...payments], role.id),
+    buildProcurementHandoverMap(assignedProcurement, role.id),
+  ]);
+
+  let feed = [
+    ...assignedExpense.map((n) => applyHandoverInfo(n, expenseMap, procurementMap)),
+    ...assignedProcurement.map((n) => applyHandoverInfo(n, expenseMap, procurementMap)),
+    ...payments.map((n) => applyHandoverInfo(n, expenseMap, procurementMap)),
+  ];
   if (scope === 'expense') feed = feed.filter((n) => n.module === 'expense');
   if (scope === 'procurement') feed = feed.filter((n) => n.module === 'procurement');
 
   feed.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
+
+  // Each pending document appears exactly once across the three feeds — this is
+  // just a safety net, not the history-collapsing pass it used to be.
+  const seen = new Set();
+  feed = feed.filter((n) => {
+    if (!n.link || seen.has(n.link)) return false;
+    seen.add(n.link);
+    return true;
+  });
+
   return feed.slice(0, limit);
 };

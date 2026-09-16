@@ -1351,7 +1351,7 @@ export const getPayments = async (uuid, user) => {
     where: { expense_id: expense.id },
     include: [
       { model: db.ExpensePaymentProof, as: 'proofs' },
-      { model: db.UserEmployment, as: 'processedByEmployment', include: [{ model: db.User, as: 'user' }] },
+      { model: db.UserEmployment, as: 'processedByEmployment', include: [{ model: db.User, as: 'user' }, { model: db.Company, as: 'company', attributes: ['uuid', 'name'] }] },
     ],
     order: [['payment_date', 'ASC']],
   });
@@ -1371,6 +1371,14 @@ export const getPayments = async (uuid, user) => {
       reference_number: p.reference_number,
       remarks: p.remarks,
       processed_by: u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : null,
+      processed_by_employment: u ? {
+        user: { first_name: u.first_name, middle_name: u.middle_name, last_name: u.last_name, email: u.email, mobile: u.mobile },
+        company: p.processedByEmployment?.company ?? null,
+        employee_code: p.processedByEmployment?.employee_code ?? null,
+        designation: p.processedByEmployment?.designation ?? null,
+        employment_type: p.processedByEmployment?.employment_type ?? null,
+        joining_date: p.processedByEmployment?.joining_date ?? null,
+      } : null,
       proofs: (p.proofs || []).map(pr => ({
         uuid: pr.uuid,
         file_path: pr.file_path,
