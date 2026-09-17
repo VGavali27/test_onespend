@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { withErrorFocus } from '@/utils/formFocus';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UserRound, KeyRound, Briefcase, Plus, Trash2, Loader2, Eye, EyeOff } from 'lucide-react';
 import { getCompanyOptions, getDepartmentOptions } from '@/services/masterService';
@@ -95,7 +96,7 @@ export default function UserForm({
     load();
   }, []);
 
-  const handleFormSubmit = handleSubmit(async (values) => {
+  const handleFormSubmit = withErrorFocus(handleSubmit)(async (values) => {
     setSubmitError(null);
     const payload = {
       first_name: values.first_name.trim(),

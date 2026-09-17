@@ -87,6 +87,9 @@ export const expenseFormSchema = z
     category: z.string().min(1, 'Category is required'),
     title: z.string().trim().min(3, 'Title is required (min 3 characters)').max(255, 'At most 255 characters'),
     company: z.string().min(1, 'Company is required'),
+    // Optional 3rd-person target (user uuid) when the expense is raised for another
+    // employee. Empty/absent = for the requester (current behaviour).
+    beneficiary_user_uuid: z.string().optional(),
     remarks: z.string(),
 
     travel: z.object({
@@ -121,7 +124,10 @@ export const expenseFormSchema = z
       }
     }
     if (val.module === 'reimbursement') {
-      if (!val.reimbursement.advance_date) addIssue(ctx, ['reimbursement', 'advance_date'], 'Advance date is required');
+      // Advance date is needed only when an advance was actually received.
+      if (Number(val.reimbursement.advance_amount) > 0 && !val.reimbursement.advance_date) {
+        addIssue(ctx, ['reimbursement', 'advance_date'], 'Advance date is required when an advance is received');
+      }
       val.reimbursement.items.forEach((it, i) => {
         if (!it.expense_date) addIssue(ctx, ['reimbursement', 'items', i, 'expense_date'], 'Date is required');
       });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
+import { withErrorFocus } from '@/utils/formFocus';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Shield, Loader2 } from 'lucide-react';
 import { roleFormSchema } from '@/validations/roleSchema';
@@ -33,7 +34,7 @@ export default function RoleForm({
     mode: 'onBlur',
   });
 
-  const handleFormSubmit = handleSubmit(async (values) => {
+  const handleFormSubmit = withErrorFocus(handleSubmit)(async (values) => {
     setSubmitError(null);
     const payload = {
       name: values.name.trim(),

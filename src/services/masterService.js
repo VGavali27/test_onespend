@@ -24,3 +24,8 @@ export const getMyPermissions = () => api.get('/users/me/permissions');
 export const getCompanyOptions = () => api.get('/companies/options');
 export const getDepartmentOptions = () => api.get('/departments/options');
 export const getGroupOptions = () => api.get('/groups/options');
+
+// ── Active employments for the "Expense is for another employee" picker ──
+// Optional companyUuid scopes the list to one company. Gate: expenses:create_others.
+export const getEmploymentOptions = (params = {}, config) =>
+  api.get('/user-employments/options', { params, ...config });

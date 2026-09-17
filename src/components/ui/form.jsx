@@ -44,16 +44,25 @@ export function FormSection({ icon: Icon, title, subtitle, children }) {
   );
 }
 
-// Labeled field with inline validation error
-export function FormField({ label, required, error, children }) {
-  return (
-    <label className="block">
+// Labeled field with inline validation error.
+// `plain` renders a div instead of a <label> — needed when the field contains
+// interactive controls (e.g. buttons) because clicking empty label space would
+// re-dispatch a click to the first labelable control inside it.
+export function FormField({ label, required, error, hint, plain, children }) {
+  const cls = 'block';
+  const inner = (
+    <>
       <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1.5">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </span>
       {children}
-      {error && <p className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</p>}
-    </label>
+      {error ? (
+        <p className="text-[12px] text-red-600 dark:text-red-400 mt-1">{error}</p>
+      ) : (
+        hint && <p className="text-[12px] text-gray-400 dark:text-gray-500 mt-1">{hint}</p>
+      )}
+    </>
   );
+  return plain ? <div className={cls}>{inner}</div> : <label className={cls}>{inner}</label>;
 }

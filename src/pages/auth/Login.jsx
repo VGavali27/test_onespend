@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { withErrorFocus } from '@/utils/formFocus';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/context/AuthContext';
 import { Wallet, Loader2, Eye, EyeOff, Sparkles, Shield } from 'lucide-react';
@@ -21,7 +22,7 @@ export default function Login() {
     mode: 'onBlur',
   });
 
-  const handleFormSubmit = handleSubmit(async (values) => {
+  const handleFormSubmit = withErrorFocus(handleSubmit)(async (values) => {
     setError('');
     try {
       await login(values.email, values.password);

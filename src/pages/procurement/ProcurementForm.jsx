@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
+import { withErrorFocus } from '@/utils/formFocus';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ShoppingCart, Truck, Plus, Trash2, Loader2 } from 'lucide-react';
 import { inputClassFor, FormSection, FormField } from '@/components/ui/form';
@@ -81,7 +82,7 @@ export default function ProcurementForm({
     load();
   }, []);
 
-  const handleFormSubmit = handleSubmit(async (values) => {
+  const handleFormSubmit = withErrorFocus(handleSubmit)(async (values) => {
     setSubmitError(null);
     const payload = {
       title: values.title.trim(),

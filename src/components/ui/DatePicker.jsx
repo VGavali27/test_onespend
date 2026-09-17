@@ -65,7 +65,7 @@ export function DateField({ control, name, label, required, error, ...pickerProp
         control={control}
         name={name}
         render={({ field }) => (
-          <DatePicker value={field.value} onChange={field.onChange} error={error} {...pickerProps} />
+          <DatePicker {...field} error={error} {...pickerProps} />
         )}
       />
     </FormField>

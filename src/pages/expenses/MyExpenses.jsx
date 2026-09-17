@@ -94,13 +94,16 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
       cell: ({ row }) => {
         const r = row.original;
         const companyName = r.company?.name || '—';
-        if (actionMode !== 'all' && actionMode !== 'assigned') return companyName;
         const emp = r.requestedByEmployment;
         const u = emp?.user;
         const name = u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : null;
+        const benEmp = r.beneficiaryEmployment;
+        const bu = benEmp?.user;
+        const benName = bu ? [bu.first_name, bu.last_name].filter(Boolean).join(' ') || bu.email : null;
+        const showSubmitter = actionMode === 'all' || actionMode === 'assigned';
         return (
           <div className="min-w-0">
-            {name ? (
+            {showSubmitter && (name ? (
               <button
                 type="button"
                 onClick={() => setViewUser(emp)}
@@ -111,8 +114,18 @@ export default function MyExpenses({ title = 'My Expenses', fetchList = getMyExp
               </button>
             ) : (
               <p className="text-[13px] font-medium text-slate-800 dark:text-slate-200">—</p>
-            )}
+            ))}
             <p className="text-[12px] text-slate-400 truncate">{companyName}</p>
+            {benName && (
+              <button
+                type="button"
+                onClick={() => setViewUser(benEmp)}
+                className="block max-w-full truncate text-[12px] font-medium text-indigo-600/80 dark:text-indigo-400/80 hover:underline"
+                title="View user details"
+              >
+                For: {benName}
+              </button>
+            )}
           </div>
         );
       },

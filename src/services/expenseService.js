@@ -164,6 +164,7 @@ export const normalizeExpense = (e) => {
     status: e.status,
     canEdit: e.canEdit === true, // DRAFT + owned by the logged-in user
     requestedByEmployment: e.requestedByEmployment || null,
+    beneficiaryEmployment: e.beneficiaryEmployment || null,
     submitted_at: e.submitted_at,
     estimated_amount: num(e.estimated_amount),
     final_amount: num(e.final_amount),

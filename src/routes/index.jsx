@@ -75,6 +75,8 @@ const ViewCategory = lazy(() => import('@/pages/finance/categories/ViewCategory'
 const PaymentsReport = lazy(() => import('@/pages/finance/PaymentsReport'));
 const ExpenseNetReport = lazy(() => import('@/pages/finance/ExpenseNetReport'));
 
+const AdvanceUIOptions = lazy(() => import('@/pages/dev/AdvanceUIOptions'));
+
 // Shown briefly while a lazily-loaded page chunk downloads
 function PageLoader() {
   return (
@@ -164,6 +166,9 @@ export default function AppRoutes() {
 
           <Route path="reports/payments" element={<PermissionGuard permission="payments:reports"><PaymentsReport /></PermissionGuard>} />
           <Route path="reports/expense-net" element={<PermissionGuard permission="payments:reports"><ExpenseNetReport /></PermissionGuard>} />
+
+          {/* Dev-only showcase: reimbursement advance control variants */}
+          <Route path="dev/advance-ui" element={<PermissionGuard permission="*"><AdvanceUIOptions /></PermissionGuard>} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

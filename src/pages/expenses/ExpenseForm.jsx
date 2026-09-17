@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
+import { withErrorFocus } from '@/utils/formFocus';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Wallet, Plane, MapPin, BedDouble, Coins, Bus, MoreHorizontal,
@@ -7,13 +8,15 @@ import {
 } from 'lucide-react';
 import { expenseFormSchema } from '@/validations/expenseSchema';
 import { inputClassFor, FormSection, FormField, SelectInput } from '@/components/ui/form';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { DateField } from '@/components/ui/DatePicker';
 import { nullIfEmpty } from '@/utils/format';
 import { applyServerErrorsDetailed } from '@/utils/formErrors';
 import { useToast } from '@/components/ui/Toast';
 import { getCategoryOptions } from '@/services/financeService';
-import { getMyProfile } from '@/services/masterService';
+import { getMyProfile, getEmploymentOptions } from '@/services/masterService';
 import { uploadImage } from '@/services/uploadService';
+import { useAuth } from '@/context/AuthContext';
 
 const PAYMENT_METHODS = ['CASH', 'CARD', 'UPI', 'NETBANKING', 'OTHER'];
 
@@ -22,6 +25,7 @@ const emptyForm = {
   category: '',
   title: '',
   company: '',
+  beneficiary_user_uuid: '', // 3rd-person target; '' = for the requester
   remarks: '',
   travel: {
     travel_type: 'DOMESTIC',
@@ -105,6 +109,18 @@ export default function ExpenseForm({
   const [submitError, setSubmitError] = useState(null);
   const toast = useToast();
 
+  // 3rd-person ("Expense is for") picker — available only when the role can create
+  // expenses on behalf of others, and only on create (the backend never changes
+  // the beneficiary on PUT).
+  const { hasPermission } = useAuth();
+  const canCreateForOthers = !isEdit && hasPermission('expenses:create_others');
+  const [forOther, setForOther] = useState(false);
+  const [employeeOptions, setEmployeeOptions] = useState([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+  // Advance block visibility — a full opt-in block rather than a lone date field.
+  // Seeded from the existing advance on edit, so a submitted claim opens expanded.
+  const [showAdvance, setShowAdvance] = useState(() => Boolean(Number(initialValues?.reimbursement?.advance_amount || 0) > 0));
+
   const {
     register,
     control,
@@ -120,17 +136,59 @@ export default function ExpenseForm({
     mode: 'onBlur',
   });
 
+  const selectedCompany = watch('company');
   const category = watch('category');
   const travelType = watch('travel.travel_type');
   const selectedCategory = categories.find((c) => c.uuid === category);
   const isTravel = selectedCategory?.module === 'travel';
   const isReimbursement = selectedCategory?.module === 'reimbursement';
+  const advanceAmount = watch('reimbursement.advance_amount');
+  const hasAdvance = Number(advanceAmount || 0) > 0;
 
   // Drive the hidden `module` field so the shared zod schema validates only the
   // fields relevant to the selected category (travel XOR reimbursement).
   useEffect(() => {
     setValue('module', selectedCategory?.module || '');
   }, [selectedCategory?.module, setValue]);
+
+  // Load the company's active employees for the "for another employee" picker.
+  useEffect(() => {
+    if (!forOther || !selectedCompany) {
+      setEmployeeOptions([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setEmployeesLoading(true);
+    getEmploymentOptions({ companyUuid: selectedCompany })
+      .then((res) => {
+        if (!cancelled) setEmployeeOptions(res.data?.data ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setEmployeeOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setEmployeesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [forOther, selectedCompany]);
+
+  // If the company changes, a previously picked beneficiary from another company
+  // no longer applies — reset the selection.
+  useEffect(() => {
+    if (forOther && selectedCompany) {
+      setValue('beneficiary_user_uuid', '', { shouldValidate: false });
+    }
+  }, [selectedCompany, forOther, setValue]);
+
+  // The advance date is required only when an advance was actually received —
+  // clear it whenever the advance amount is blank/zero.
+  useEffect(() => {
+    if (!(Number(advanceAmount || 0) > 0) && getValues('reimbursement.advance_date')) {
+      setValue('reimbursement.advance_date', '');
+    }
+  }, [advanceAmount, getValues, setValue]);
 
   useEffect(() => {
     const load = async () => {
@@ -181,10 +239,22 @@ export default function ExpenseForm({
     );
   };
 
-  const handleFormSubmit = handleSubmit(async (values) => {
+  const handleAdvanceToggle = (on) => {
+    setShowAdvance(on);
+    if (!on) {
+      setValue('reimbursement.advance_amount', '', { shouldValidate: false });
+      setValue('reimbursement.advance_date', '', { shouldValidate: false });
+    }
+  };
+
+  const handleFormSubmit = withErrorFocus(handleSubmit)(async (values) => {
     setSubmitError(null);
     if (!isEdit && !requestedByUserUuid) {
       setSubmitError('You must be signed in to create an expense.');
+      return;
+    }
+    if (forOther && !values.beneficiary_user_uuid) {
+      setSubmitError('Please select the employee this expense is for, or set it to Myself.');
       return;
     }
     const base = {
@@ -192,6 +262,10 @@ export default function ExpenseForm({
       company_uuid: values.company,
       // The creator is fixed at creation time — never changed on edit
       ...(isEdit ? {} : { requested_by_user_uuid: requestedByUserUuid }),
+      // Optional 3rd-person target ("for whom"); omitted for self-created expenses
+      ...(!isEdit && forOther && values.beneficiary_user_uuid
+        ? { beneficiary_user_uuid: values.beneficiary_user_uuid }
+        : {}),
       title: values.title.trim(),
       remarks: nullIfEmpty(values.remarks),
     };
@@ -213,9 +287,14 @@ export default function ExpenseForm({
       : isReimbursement
         ? {
             ...base,
-            advance_amount: values.reimbursement.advance_amount || null,
-            advance_date: values.reimbursement.advance_date || null,
-            payment_method: values.reimbursement.payment_method,
+            ...(Number(values.reimbursement.advance_amount || 0) > 0
+              ? {
+                  advance_amount: values.reimbursement.advance_amount,
+                  advance_date: values.reimbursement.advance_date || null,
+                  payment_method: values.reimbursement.payment_method,
+                  reimbursement_remarks: nullIfEmpty(values.reimbursement.remarks),
+                }
+              : {}),
             items: await Promise.all(values.reimbursement.items.map(async (it) => ({
               expense_date: it.expense_date || null,
               description: it.description.trim(),
@@ -292,6 +371,62 @@ export default function ExpenseForm({
                 )}
               />
             </FormField>
+            {canCreateForOthers && (
+              <div className="sm:col-span-2 xl:col-span-3">
+                <FormField label="Expense is for" plain error={errors.beneficiary_user_uuid?.message}>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                    <div className="inline-flex w-fit rounded-lg border border-slate-200 dark:border-gray-700 p-1 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForOther(false);
+                          setValue('beneficiary_user_uuid', '', { shouldValidate: false });
+                        }}
+                        className={`px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors ${!forOther
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        Myself
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForOther(true)}
+                        className={`px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors ${forOther
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        Another employee
+                      </button>
+                    </div>
+                    {forOther ? (
+                      <div className="w-full sm:max-w-md">
+                        <SearchableSelect
+                          name="beneficiary_user_uuid"
+                          value={watch('beneficiary_user_uuid')}
+                          onChange={(v) => setValue('beneficiary_user_uuid', v, { shouldValidate: true })}
+                          options={employeeOptions
+                            .filter((opt, i, arr) => arr.findIndex((o) => o.user_uuid === opt.user_uuid) === i)
+                            .map((opt) => ({
+                              value: opt.user_uuid,
+                              label: `${opt.name}${opt.employee_code ? ` (${opt.employee_code})` : ''}${opt.role_name ? ` · ${opt.role_name}` : ''}`,
+                            }))}
+                          placeholder="Select employee..."
+                          loading={employeesLoading}
+                          emptyText="No active employees for this company"
+                          error={!!errors.beneficiary_user_uuid}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-[12px] text-slate-400 flex items-center sm:pt-2">
+                        The expense is raised by you. Choose "Another employee" to record it for someone else.
+                      </p>
+                    )}
+                  </div>
+                </FormField>
+              </div>
+            )}
             <div className="sm:col-span-2 xl:col-span-3">
               <FormField label="Remarks" error={errors.remarks?.message}>
                 <textarea rows={2} className={inputClassFor(!!errors.remarks)} {...register('remarks')} placeholder="Optional remarks" />
@@ -444,24 +579,54 @@ export default function ExpenseForm({
           <>
             <FormSection icon={ReceiptText} title="Reimbursement" subtitle="Out-of-pocket expenses the employee is claiming back">
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                <FormField label="Advance received (₹)" error={errors.reimbursement?.advance_amount?.message}>
-                  <input type="number" className={inputClassFor(!!errors.reimbursement?.advance_amount)} {...register('reimbursement.advance_amount')} placeholder="0" />
-                </FormField>
-                <DateField control={control} name="reimbursement.advance_date" label="Advance date" required error={errors.reimbursement?.advance_date?.message} />
-                <FormField label="Payment method" error={errors.reimbursement?.payment_method?.message}>
-                  <Controller
-                    control={control}
-                    name="reimbursement.payment_method"
-                    render={({ field }) => (
-                      <SelectInput error={!!errors.reimbursement?.payment_method} {...field}>
-                        {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.charAt(0) + m.slice(1).toLowerCase()}</option>)}
-                      </SelectInput>
-                    )}
-                  />
-                </FormField>
-                <FieldIn label="Remarks">
-                  <input className={inputClassFor(false)} {...register('reimbursement.remarks')} placeholder="Optional remarks" />
-                </FieldIn>
+                <div className="sm:col-span-2 xl:col-span-4">
+                  <FormField label="Advance received" plain>
+                    <div className="inline-flex w-fit rounded-lg border border-slate-200 dark:border-gray-700 p-1 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleAdvanceToggle(false)}
+                        className={`px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors ${!showAdvance
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        No advance
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAdvanceToggle(true)}
+                        className={`px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors ${showAdvance
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        Received advance
+                      </button>
+                    </div>
+                  </FormField>
+                  {showAdvance && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-3">
+                      <FormField label="Advance received (₹)" error={errors.reimbursement?.advance_amount?.message}>
+                        <input type="number" className={inputClassFor(!!errors.reimbursement?.advance_amount)} {...register('reimbursement.advance_amount')} placeholder="0" />
+                      </FormField>
+                      <DateField control={control} name="reimbursement.advance_date" label="Advance date" required={hasAdvance} error={errors.reimbursement?.advance_date?.message} />
+                      <FormField label="Payment method" error={errors.reimbursement?.payment_method?.message}>
+                        <Controller
+                          control={control}
+                          name="reimbursement.payment_method"
+                          render={({ field }) => (
+                            <SelectInput error={!!errors.reimbursement?.payment_method} {...field}>
+                              {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.charAt(0) + m.slice(1).toLowerCase()}</option>)}
+                            </SelectInput>
+                          )}
+                        />
+                      </FormField>
+                      <FieldIn label="Remarks">
+                        <input className={inputClassFor(false)} {...register('reimbursement.remarks')} placeholder="Optional remarks" />
+                      </FieldIn>
+                    </div>
+                  )}
+                </div>
               </div>
             </FormSection>
 

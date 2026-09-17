@@ -420,6 +420,14 @@ export default function ExpenseDetail() {
         .join(" ") || submittedBy.email
     : null;
 
+  const beneficiaryEmployment = expense.beneficiaryEmployment;
+  const beneficiaryUser = beneficiaryEmployment?.user;
+  const beneficiaryName = beneficiaryUser
+    ? [beneficiaryUser.first_name, beneficiaryUser.last_name]
+        .filter(Boolean)
+        .join(" ") || beneficiaryUser.email
+    : null;
+
   // Top-level tabs — procurement stages (PI → PR → Quotations → PO) appear between
   // Overview and Approvals only for procurement-linked expenses.
   const tabs = [
@@ -494,6 +502,21 @@ export default function ExpenseDetail() {
             </span>
           </div>
         )}
+        {beneficiaryName && (
+          <div className="w-full flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-gray-800">
+            <span className="text-[12px] text-slate-400">For</span>
+            <button
+              type="button"
+              onClick={() => setViewUser(beneficiaryEmployment)}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+            >
+              <span className="w-5 h-5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                {getInitials(beneficiaryUser)}
+              </span>
+              {beneficiaryName}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs — Overview [PI | PR | Quotations | PO] Approvals Payments.
@@ -529,7 +552,9 @@ export default function ExpenseDetail() {
         <ExpenseContextCard
           expense={expense}
           submittedByName={submittedByName}
+          beneficiaryName={beneficiaryName}
           onViewUser={() => setViewUser(expense.requestedByEmployment)}
+          onViewBeneficiary={() => setViewUser(expense.beneficiaryEmployment)}
         />
 
         {travel ? (
@@ -2355,7 +2380,7 @@ function ProcurementItemsTable({ items }) {
 // Compact expense context card — shows the same expense-level details as the
 // Overview tab. Rendered above every procurement stage tab (PI / PR / Quotations)
 // so the expense's identity is never lost while comparing chain documents.
-function ExpenseContextCard({ expense, submittedByName, onViewUser }) {
+function ExpenseContextCard({ expense, submittedByName, beneficiaryName, onViewUser, onViewBeneficiary }) {
   return (
     <InfoCard icon={Wallet} title="Expense">
       <InfoRow label="Expense number" value={expense.expense_number} />
@@ -2378,6 +2403,21 @@ function ExpenseContextCard({ expense, submittedByName, onViewUser }) {
           )
         }
       />
+      {beneficiaryName && (
+        <InfoRow
+          label="For"
+          value={
+            <button
+              type="button"
+              onClick={onViewBeneficiary}
+              className="text-emerald-600 dark:text-emerald-400 hover:underline"
+              title="View user details"
+            >
+              {beneficiaryName}
+            </button>
+          }
+        />
+      )}
       <InfoRow label="Status" value={<StatusBadge status={expense.status} />} />
       <InfoRow
         label="Submitted"

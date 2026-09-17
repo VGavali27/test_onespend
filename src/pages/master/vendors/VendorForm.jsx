@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import { withErrorFocus } from '@/utils/formFocus';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Truck, Users, MapPin, Landmark, FileText, Paperclip, Plus, Trash2, Loader2, Tag } from 'lucide-react';
 import ImageUpload from '@/components/ui/ImageUpload';
@@ -83,7 +84,7 @@ export default function VendorForm({
     setValue('category_uuids', next, { shouldDirty: true });
   };
 
-  const handleFormSubmit = handleSubmit(async (values) => {
+  const handleFormSubmit = withErrorFocus(handleSubmit)(async (values) => {
     setSubmitError(null);
     const payload = {
       name: values.name.trim(),

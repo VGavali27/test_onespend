@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { withErrorFocus } from '@/utils/formFocus';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Tag, Loader2 } from 'lucide-react';
 import { vendorCategoryFormSchema } from '@/validations/vendorCategorySchema';
@@ -32,7 +33,7 @@ export default function VendorCategoryForm({
     mode: 'onBlur',
   });
 
-  const handleFormSubmit = handleSubmit(async (values) => {
+  const handleFormSubmit = withErrorFocus(handleSubmit)(async (values) => {
     setSubmitError(null);
     const payload = {
       name: values.name.trim(),
