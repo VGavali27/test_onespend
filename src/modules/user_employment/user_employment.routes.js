@@ -8,6 +8,8 @@ const router = Router();
 router.use(authMiddleware);
 // List all employments
 router.get('/', requirePermission('user_employments:read_all'), userEmploymentController.getAllEmployments);
+// Active employments for the "For employee" picker (3rd-person expense creation)
+router.get('/options', requirePermission('expenses:create_others'), userEmploymentController.getActiveEmploymentOptions);
 // List employments for a specific user by user UUID
 router.get('/by-user/:userUuid', requirePermission('user_employments:read'), userEmploymentController.getEmploymentsByUser);
 // Get a single employment by UUID

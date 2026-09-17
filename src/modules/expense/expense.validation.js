@@ -169,6 +169,11 @@ export const createExpenseSchema = Joi.object({
     'string.guid': 'User UUID must be a valid UUID',
     'any.required': 'User UUID is required',
   }),
+  // Optional "for whom" — the person the expense is raised FOR (3rd-person expense).
+  // Audit/display only; all transactions follow the requester. Omit/empty = for the requester.
+  beneficiary_user_uuid: Joi.string().uuid().allow(null, '').messages({
+    'string.guid': 'Beneficiary user UUID must be a valid UUID',
+  }),
   title: Joi.string().max(255).required().messages({
     'string.empty': 'Title is required',
     'string.max': 'Title must be at most 255 characters',
@@ -190,7 +195,8 @@ export const createExpenseSchema = Joi.object({
   // Reimbursement fields (optional — only used when category module is 'reimbursement')
   advance_amount: Joi.string().allow(null, ''),
   advance_date: Joi.date().iso().allow(null, ''),
-  payment_method: Joi.string().max(20),
+  payment_method: Joi.string().max(20).allow(null, ''),
+  reimbursement_remarks: Joi.string().allow(null, ''),
   items: Joi.array().items(reimbursementItemSchema).allow(null),
 });
 
@@ -224,7 +230,8 @@ export const updateExpenseSchema = Joi.object({
   // Reimbursement fields (used when the category module is 'reimbursement')
   advance_amount: Joi.string().allow(null, ''),
   advance_date: Joi.date().iso().allow(null, ''),
-  payment_method: Joi.string().max(20),
+  payment_method: Joi.string().max(20).allow(null, ''),
+  reimbursement_remarks: Joi.string().allow(null, ''),
   items: Joi.array().items(reimbursementItemSchema).allow(null),
 })
   .min(1)

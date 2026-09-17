@@ -33,7 +33,10 @@ export async function up({ context }) {
     const seq = String(index + 1).padStart(3, '0');
     employments.push({
       id: 200 + index,
-      uuid: `e1f2a3b4-c5d6-7890-efab-12345679${seq}`,
+      // ebaf<->efab flip keeps CFO uuids distinct from SUPER_ADMIN's (-0005 uses
+      // ...12345679### with the same ### per company) — identical uuids made the
+      // "For employee" picker render duplicate options.
+      uuid: `e1f2a3b4-c5d6-7890-ebaf-12345679${seq}`,
       user_id: 101,
       company_id: companyId,
       employee_code: `CFO-EMP-${seq}`,

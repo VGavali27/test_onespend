@@ -895,6 +895,17 @@ export async function up({ context }) {
       created_at: new Date(),
       updated_at: new Date(),
     },
+    {
+      id: 181,
+      uuid: 'f1a2b3c4-d5e6-7890-fabc-123456789082',
+      resource: 'expenses',
+      action: 'create_others',
+      permission_key: 'expenses:create_others',
+      description: 'Create expenses for another person (3rd-person)',
+      status: 'ACTIVE',
+      created_at: new Date(),
+      updated_at: new Date(),
+    },
   ]);
 }
 
@@ -902,7 +913,7 @@ export async function down({ context }) {
   return context.bulkDelete(
     'permissions',
     {
-      id: Array.from({ length: 81 }, (_, i) => 100 + i),
+      id: Array.from({ length: 82 }, (_, i) => 100 + i),
     },
     {},
   );

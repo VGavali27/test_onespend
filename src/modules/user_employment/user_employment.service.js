@@ -21,6 +21,30 @@ export const getByUuid = async (uuid) => {
   return employment;
 };
 
+// Active employments for the "For employee" picker (3rd-person expense creation).
+// Optional companyUuid restricts the list to the expense's company.
+// Returns lightweight { uuid, user_uuid, name, employee_code, role_id, role_name, company_id, company_uuid, company_name }.
+export const getActiveOptions = async (companyUuid = null) => {
+  let companyId = null;
+  if (companyUuid) {
+    const company = await companyRepository.findByUuid(companyUuid);
+    if (!company) throw ApiError.notFound('Referenced company not found');
+    companyId = company.id;
+  }
+  const rows = await userEmploymentRepository.findActiveOptions(companyId);
+  return rows.map((e) => ({
+    uuid: e.uuid,
+    user_uuid: e.user?.uuid ?? null,
+    name: [e.user?.first_name, e.user?.middle_name, e.user?.last_name].filter(Boolean).join(' ') || e.user?.email || '',
+    employee_code: e.employee_code,
+    role_id: e.user?.role?.id ?? null,
+    role_name: e.user?.role?.name ?? null,
+    company_id: e.company_id,
+    company_uuid: e.company?.uuid ?? null,
+    company_name: e.company?.name ?? null,
+  }));
+};
+
 // Create a new employment — resolves UUIDs to IDs, checks employee_code uniqueness
 export const create = async (data) => {
   const user = await User.findOne({ where: { uuid: data.user_uuid } });

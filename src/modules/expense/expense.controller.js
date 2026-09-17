@@ -63,7 +63,7 @@ export const getExpenseProcurementChain = async (req, res, next) => {
 // Create a new expense
 export const createExpense = async (req, res, next) => {
   try {
-    const expense = await expenseService.create(req.body);
+    const expense = await expenseService.create(req.user, req.body);
     return ApiResponse.created(res, expense, 'Expense created successfully');
   } catch (error) {
     next(error);

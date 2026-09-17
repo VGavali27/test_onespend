@@ -41,6 +41,15 @@ const listInclude = [
       { model: Company, as: 'company' },
     ],
   },
+  {
+    model: UserEmployment,
+    as: 'beneficiaryEmployment',
+    required: false,
+    include: [
+      { model: User, as: 'user' },
+      { model: Company, as: 'company' },
+    ],
+  },
 ];
 
 // Full nested graph used by the detail endpoint

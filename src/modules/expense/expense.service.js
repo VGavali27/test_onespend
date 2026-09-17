@@ -5,7 +5,7 @@ import * as procurementRepository from '../procurement/procurement.repository.js
 import db from '../../database/models/index.js';
 import ApiError from '../../utils/ApiError.js';
 import { decrypt, decryptResults } from '../../utils/encryption.js';
-import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser } from '../../modules/user_employment/user_employment.service.js';
+import { getEmploymentIdsByUser, getActiveCompanyIdsByUser, getActiveEmploymentByUser, getActiveEmploymentByUserAndCompany } from '../../modules/user_employment/user_employment.service.js';
 
 const {
   ExpenseCategory,
@@ -391,8 +391,16 @@ export const getProcurementChain = async (uuid, user) => {
   return { procurement_chain: chain };
 };
 
+// Permission lookup for service-level gates (mirrors requirePermission middleware).
+const userHasPermission = async (user, key) => {
+  const role = await db.Role.findByPk(user.roleId, {
+    include: [{ model: db.Permission, as: 'permissions', through: { attributes: [] } }],
+  });
+  return role?.permissions?.some((p) => p.permission_key === key) ?? false;
+};
+
 // Create an expense — handles nested module data based on category (travel, etc.)
-export const create = async (data) => {
+export const create = async (actor, data) => {
   const category = await ExpenseCategory.findOne({ where: { uuid: data.category_uuid } });
   if (!category) throw ApiError.notFound('Referenced expense category not found');
   const company = await companyRepository.findByUuid(data.company_uuid);
@@ -401,6 +409,27 @@ export const create = async (data) => {
   if (!user) throw ApiError.notFound('Referenced user not found');
   const employment = await getActiveEmploymentByUser(user.id);
   if (!employment) throw ApiError.notFound('No active employment found for the user');
+
+  // 3rd-person gating: raising an expense for another person (or on another user's
+  // behalf) requires the expenses:create_others permission. Self-expenses are untouched.
+  const isThirdParty =
+    user.id !== actor.userId ||
+    (data.beneficiary_user_uuid && data.beneficiary_user_uuid !== data.requested_by_user_uuid);
+  const canCreateForOthers = (await userHasPermission(actor, 'expenses:create_others')) ?? false;
+  if (isThirdParty && !canCreateForOthers) {
+    throw ApiError.forbidden('You do not have permission to create expenses for another person');
+  }
+
+  // Optional "for whom" — resolves to an active employment (prefer the expense's company).
+  let beneficiaryEmployment = null;
+  if (data.beneficiary_user_uuid) {
+    const beneficiaryUser = await User.findOne({ where: { uuid: data.beneficiary_user_uuid } });
+    if (!beneficiaryUser) throw ApiError.notFound('Referenced beneficiary user not found');
+    beneficiaryEmployment =
+      (await getActiveEmploymentByUserAndCompany(beneficiaryUser.id, company.id)) ||
+      (await getActiveEmploymentByUser(beneficiaryUser.id));
+    if (!beneficiaryEmployment) throw ApiError.notFound('No active employment found for the beneficiary');
+  }
 
   const expenseNumber = await generateExpenseNumber();
   const travelFields = {};
@@ -424,14 +453,15 @@ export const create = async (data) => {
   if (category.module === 'reimbursement') {
     reimbursementFields.advance_amount = data.advance_amount || null;
     reimbursementFields.advance_date = data.advance_date || null;
-    reimbursementFields.payment_method = data.payment_method || 'CASH';
-    reimbursementFields.remarks = data.remarks || null;
+    reimbursementFields.payment_method = data.payment_method || null;
+    reimbursementFields.remarks = data.reimbursement_remarks || null;
   }
 
   const {
     category_uuid,
     company_uuid,
     requested_by_user_uuid,
+    beneficiary_user_uuid,
     travel_type,
     purpose,
     travel_start_date,
@@ -446,6 +476,7 @@ export const create = async (data) => {
     advance_amount,
     advance_date,
     payment_method,
+    reimbursement_remarks,
     items,
     ...expenseData
   } = data;
@@ -471,6 +502,7 @@ export const create = async (data) => {
         category_id: category.id,
         company_id: company.id,
         requested_by_employment_id: employment.id,
+        beneficiary_employment_id: beneficiaryEmployment?.id ?? null,
         status: 'DRAFT',
       },
       { transaction: t },
@@ -573,6 +605,7 @@ export const update = async (uuid, user, data) => {
     advance_amount,
     advance_date,
     payment_method,
+    reimbursement_remarks,
     items,
     ...expenseData
   } = data;
@@ -681,7 +714,8 @@ export const update = async (uuid, user, data) => {
       const reFields = {};
       if (advance_amount !== undefined) reFields.advance_amount = advance_amount;
       if (advance_date !== undefined) reFields.advance_date = advance_date;
-      if (payment_method !== undefined) reFields.payment_method = payment_method || 'CASH';
+      if (payment_method !== undefined) reFields.payment_method = payment_method || null;
+      if (reimbursement_remarks !== undefined) reFields.remarks = reimbursement_remarks;
       if (reimbursement) {
         await reimbursement.update(reFields, { transaction: t });
       } else {

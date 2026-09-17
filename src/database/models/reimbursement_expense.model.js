@@ -13,7 +13,7 @@ export default (sequelize, DataTypes) => {
       expense_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false, unique: true },
       advance_amount: DataTypes.TEXT,
       advance_date: DataTypes.DATEONLY,
-      payment_method: { type: DataTypes.STRING(20), allowNull: false, defaultValue: 'CASH' },
+      payment_method: { type: DataTypes.STRING(20), allowNull: true, defaultValue: null },
       remarks: DataTypes.TEXT,
       created_by: DataTypes.BIGINT.UNSIGNED,
       updated_by: DataTypes.BIGINT.UNSIGNED,

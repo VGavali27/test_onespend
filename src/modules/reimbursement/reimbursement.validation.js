@@ -16,7 +16,7 @@ export const reimbursementItemSchema = Joi.object({
 export const updateReimbursementSchema = Joi.object({
   advance_amount: Joi.string().allow(null, ''),
   advance_date: Joi.date().iso().allow(null, ''),
-  payment_method: Joi.string().max(20),
+  payment_method: Joi.string().max(20).allow(null, ''),
   remarks: Joi.string().allow(null, ''),
   items: Joi.array().items(reimbursementItemSchema).allow(null),
 })

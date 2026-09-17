@@ -30,6 +30,7 @@ export default (sequelize, DataTypes) => {
       category_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       company_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
       requested_by_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: false },
+      beneficiary_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       current_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       current_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       estimated_amount: { type: DataTypes.TEXT, allowNull: true },
@@ -67,6 +68,7 @@ export default (sequelize, DataTypes) => {
     Expense.belongsTo(models.ExpenseCategory, { foreignKey: 'category_id', as: 'category' });
     Expense.belongsTo(models.Company, { foreignKey: 'company_id', as: 'company' });
     Expense.belongsTo(models.UserEmployment, { foreignKey: 'requested_by_employment_id', as: 'requestedByEmployment' });
+    Expense.belongsTo(models.UserEmployment, { foreignKey: 'beneficiary_employment_id', as: 'beneficiaryEmployment' });
     Expense.belongsTo(models.UserEmployment, { foreignKey: 'current_employment_id', as: 'currentEmployment' });
     Expense.belongsTo(models.Role, { foreignKey: 'current_role_id', as: 'currentRole' });
     Expense.hasOne(models.TravelExpense, { foreignKey: 'expense_id', as: 'travelExpense' });

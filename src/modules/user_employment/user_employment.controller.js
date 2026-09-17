@@ -30,6 +30,16 @@ export const getEmploymentByUuid = async (req, res, next) => {
   }
 };
 
+// Active employments for the "For employee" picker (3rd-person expense creation)
+export const getActiveEmploymentOptions = async (req, res, next) => {
+  try {
+    const employments = await userEmploymentService.getActiveOptions(req.query.companyUuid || null);
+    return ApiResponse.success(res, employments, 'Active employments fetched successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Create a new employment
 export const createEmployment = async (req, res, next) => {
   try {

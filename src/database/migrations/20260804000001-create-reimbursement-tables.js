@@ -23,7 +23,7 @@ export async function up(queryInterface, Sequelize) {
     expense_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
     advance_amount: { type: Sequelize.TEXT, allowNull: true },
     advance_date: { type: Sequelize.DATEONLY, allowNull: true },
-    payment_method: { type: Sequelize.STRING(20), allowNull: false, defaultValue: 'CASH' },
+    payment_method: { type: Sequelize.STRING(20), allowNull: true, defaultValue: null },
     remarks: { type: Sequelize.TEXT, allowNull: true },
     created_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     updated_by: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },

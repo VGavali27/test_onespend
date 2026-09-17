@@ -8,6 +8,9 @@ export async function up(queryInterface, Sequelize) {
     category_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
     company_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
     requested_by_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: false },
+    // Optional beneficiary the expense is raised FOR (3rd-person expenses) — audit/display
+    // only; all transactions follow the requester. Null = expense for the requester.
+    beneficiary_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     current_role_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     current_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     estimated_amount: { type: Sequelize.TEXT, allowNull: true },
@@ -33,6 +36,7 @@ export async function up(queryInterface, Sequelize) {
   });
   await queryInterface.addIndex('expenses', ['expense_number'], { unique: true, name: 'idx_exp_number' });
   await queryInterface.addIndex('expenses', ['category_id'], { name: 'idx_exp_category' });
+  await queryInterface.addIndex('expenses', ['beneficiary_employment_id'], { name: 'idx_exp_beneficiary_emp' });
   await queryInterface.addIndex('expenses', ['company_id'], { name: 'idx_exp_company' });
   await queryInterface.addIndex('expenses', ['status'], { name: 'idx_exp_status' });
   await queryInterface.addIndex('expenses', ['flow_position'], { name: 'idx_expenses_flow_position' });
@@ -59,6 +63,14 @@ export async function up(queryInterface, Sequelize) {
     references: { table: 'user_employments', field: 'id' },
     onUpdate: 'CASCADE',
     onDelete: 'RESTRICT',
+  });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['beneficiary_employment_id'],
+    type: 'foreign key',
+    name: 'fk_exp_beneficiary_emp',
+    references: { table: 'user_employments', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL',
   });
   await queryInterface.addConstraint('expenses', {
     fields: ['current_role_id'],

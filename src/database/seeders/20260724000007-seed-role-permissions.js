@@ -1,7 +1,7 @@
 /**
  * Seeder: Assign permissions to roles
  *
- * Permission IDs:  100-179 (80 permissions covering all modules)
+ * Permission IDs:  100-181 (82 permissions covering all modules)
  * Role IDs from 20260724000002-seed-roles:
  *   100 - SUPER_ADMIN
  *   101 - CFO
@@ -155,6 +155,10 @@ const rolePermissions = [
   // Payments report (180) — finance & CA visibility: SUPER_ADMIN/CFO/PAYMENT/FINANCE
   [100, 180], [101, 180], [102, 180], [103, 180],
   [104, 180], [105, 180],
+
+  // 3rd-person expense creation (181) — SUPER_ADMIN, CFO, all *_MGR roles, HOD, EMP_MGR
+  [100, 181], [101, 181], [102, 181], [104, 181],
+  [106, 181], [108, 181], [110, 181], [111, 181],
 ];
 
 export async function up({ context }) {
