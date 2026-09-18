@@ -25,6 +25,10 @@ export const resubmitExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/su
 export const approveExpense = (uuid, remarks, toRoleId) => api.post(`/expenses/${uuid}/approve`, { remarks, to_role_id: toRoleId });
 export const rejectExpense = (uuid, remarks) => api.post(`/expenses/${uuid}/reject`, { remarks });
 export const getHandoverRoles = (uuid) => api.get(`/expenses/${uuid}/handover-roles`);
+// FIXED-flow delegation (Model A): the step owner hands the expense to a junior;
+// the junior's approve routes it back to the owner.
+export const getDelegateRoles = (uuid) => api.get(`/expenses/${uuid}/delegate-roles`);
+export const delegateExpense = (uuid, toRoleId, remarks) => api.post(`/expenses/${uuid}/delegate`, { to_role_id: toRoleId, remarks });
 // Expense payments (unified for all expense types — only roles with expenses:pay can record)
 export const recordPayment = (uuid, payload) => api.post(`/expenses/${uuid}/payments`, payload);
 export const getPayments = (uuid) => api.get(`/expenses/${uuid}/payments`);
@@ -195,6 +199,12 @@ export const normalizeExpense = (e) => {
     // Position in the FIXED-flow approval ladder (from expense_flow_steps) — null
     // for travel/reimbursement expenses and once closed.
     flow_position: e.flow_position ?? null,
+    // FIXED-flow delegation: who owns the current step while a delegate holds the
+    // expense. Null when not delegated; the delegate's approve returns to this role.
+    delegatedFromRole: e.delegatedFromRole
+      ? { id: e.delegatedFromRole.id, name: e.delegatedFromRole.name, code: e.delegatedFromRole.code }
+      : null,
+    isDelegated: Boolean(e.delegated_from_role_id),
     travel,
     reimbursement,
     handovers: (e.handovers || []).map((h) => ({

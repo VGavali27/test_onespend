@@ -25,6 +25,8 @@ import {
   Printer,
   Trash2,
   PackageCheck,
+  UserPlus,
+  RotateCcw,
 } from "lucide-react";
 import {
   getExpenseById,
@@ -43,6 +45,8 @@ import {
   updateItemsReceived,
   addExpenseDocument,
   deleteExpenseDocument,
+  getDelegateRoles,
+  delegateExpense,
 } from "@/services/expenseService";
 import { uploadImage } from "@/services/uploadService";
 import PurchaseOrderPdfOverlay from "@/components/ui/PurchaseOrderPdf";
@@ -59,7 +63,6 @@ import {
   formatNumber,
   formatType,
 } from "@/utils/format";
-import { getInitials } from "@/utils/user";
 
 export default function ExpenseDetail() {
   const { id } = useParams();
@@ -77,6 +80,12 @@ export default function ExpenseDetail() {
   const [handoverRoles, setHandoverRoles] = useState([]);
   const [selectedHandoverRoleId, setSelectedHandoverRoleId] = useState(null);
   const [loadingHandoverRoles, setLoadingHandoverRoles] = useState(false);
+  // FIXED-flow delegation — the step owner hands the expense to a junior
+  const [showDelegateModal, setShowDelegateModal] = useState(false);
+  const [delegateRoles, setDelegateRoles] = useState([]);
+  const [selectedDelegateRoleId, setSelectedDelegateRoleId] = useState(null);
+  const [loadingDelegateRoles, setLoadingDelegateRoles] = useState(false);
+  const [actingDelegate, setActingDelegate] = useState(false);
   // Procurement chain state (loaded eagerly for procurement expenses)
   const [procurementChain, setProcurementChain] = useState(null);
   const [loadingChain, setLoadingChain] = useState(false);
@@ -196,6 +205,27 @@ export default function ExpenseDetail() {
 
   const isCurrentHandler = user?.role === expense?.currentRole?.code;
 
+  // A FIXED-flow (procurement) step owner can delegate their step to a junior.
+  // The delegate's approve returns the expense to the owner (isDelegated flag).
+  const canDelegate =
+    expense?.isProcurement &&
+    expense?.status === "SUBMITTED" &&
+    !expense?.isDelegated &&
+    (user?.role === "SUPER_ADMIN" || user?.role === expense?.currentRole?.code);
+
+  // The status action bar (submit / edit+resubmit / restart / approve-reject-delegate)
+  // is shown right under the header status strip so it's visible without opening the
+  // Approvals tab. Renders nothing when no action applies to the current user.
+  const showStatusActions =
+    (expense?.status === "DRAFT" && expense?.canEdit) ||
+    (expense?.status === "REJECTED" && expense?.canEdit) ||
+    (expense?.isProcurement &&
+      expense?.status === "REJECTED" &&
+      isProcAdmin &&
+      !expense?.canEdit) ||
+    (expense?.status === "SUBMITTED" &&
+      (user?.role === "SUPER_ADMIN" || user?.role === expense?.currentRole?.code));
+
   // ── Procurement fulfillment context ──
   const isProcurement = expense?.isProcurement === true;
   const isProcAdmin =
@@ -274,6 +304,38 @@ export default function ExpenseDetail() {
     }
     setConfirmAction("approve");
   }, [loadHandoverRoles, isFinalApprover, expense?.isProcurement]);
+
+  // Open the delegate modal and fetch the step owner's eligible delegate roles
+  const openDelegateModal = useCallback(async () => {
+    setShowDelegateModal(true);
+    setLoadingDelegateRoles(true);
+    try {
+      const { data } = await getDelegateRoles(id);
+      setDelegateRoles(data?.data ?? []);
+    } catch (e) {
+      console.error("Failed to load delegate roles:", e);
+      setDelegateRoles([]);
+    } finally {
+      setLoadingDelegateRoles(false);
+    }
+  }, [id]);
+
+  // Submit the delegation — the expense now sits with the junior role
+  const confirmDelegate = async () => {
+    setActingDelegate(true);
+    try {
+      await delegateExpense(id, selectedDelegateRoleId, remarks);
+      toast.success("Expense delegated");
+      setShowDelegateModal(false);
+      setSelectedDelegateRoleId(null);
+      setRemarks("");
+      loadExpense();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Delegation failed.");
+    } finally {
+      setActingDelegate(false);
+    }
+  };
 
   const runAction = async (key, actionRemarks) => {
     setActing(true);
@@ -490,11 +552,8 @@ export default function ExpenseDetail() {
             <button
               type="button"
               onClick={() => setViewUser(expense.requestedByEmployment)}
-              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+              className="text-[12px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
             >
-              <span className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                {getInitials(submittedBy)}
-              </span>
               {submittedByName}
             </button>
             <span className="text-[12px] text-slate-400">
@@ -508,16 +567,126 @@ export default function ExpenseDetail() {
             <button
               type="button"
               onClick={() => setViewUser(beneficiaryEmployment)}
-              className="inline-flex items-center gap-1.5 text-[12px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
+              className="text-[12px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
             >
-              <span className="w-5 h-5 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                {getInitials(beneficiaryUser)}
-              </span>
               {beneficiaryName}
             </button>
           </div>
         )}
       </div>
+
+      {/* Status action bar — below the header strip, independent of the active tab.
+          Submit / Edit+Resubmit / Restart / Approve+Reject+Delegate for the role that
+          currently holds the expense. */}
+      {showStatusActions && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm p-4 sm:p-5 space-y-3">
+          {expense.status === "DRAFT" && expense.canEdit && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
+                icon={Send}
+                label="Submit expense"
+                tone="primary"
+                disabled={acting}
+                onClick={() => setConfirmAction("submit")}
+              />
+              <span className="text-[12px] text-slate-400">
+                This expense is still a draft — submit it to send it to the first
+                approver.
+              </span>
+            </div>
+          )}
+
+          {expense.status === "REJECTED" && expense.canEdit && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
+                icon={Edit}
+                label="Edit expense"
+                tone="secondary"
+                disabled={acting}
+                onClick={() => navigate(`/expenses/${expense.uuid}/edit`)}
+              />
+              <ActionButton
+                icon={Loader2}
+                label="Resubmit for approval"
+                tone="primary"
+                disabled={acting}
+                onClick={() => setConfirmAction("resubmit")}
+              />
+              <span className="text-[12px] text-slate-400">
+                Expense was rejected — edit if needed, then resubmit to send it through the approval flow again.
+              </span>
+            </div>
+          )}
+
+          {isProcurement && expense.status === "REJECTED" && isProcAdmin && !expense.canEdit && (
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
+                icon={Loader2}
+                label="Restart approval flow"
+                tone="primary"
+                disabled={acting}
+                onClick={() => setConfirmAction("resubmit")}
+              />
+              <span className="text-[12px] text-slate-400">
+                Rejected by the procurement chain — as the procurement admin you can restart
+                the 7-step approval flow from the CFO.
+              </span>
+            </div>
+          )}
+
+          {expense.status === "SUBMITTED" &&
+            (user?.role === "SUPER_ADMIN" ||
+              user?.role === expense.currentRole?.code) && (
+              <>
+                {expense.isDelegated && (
+                  <div className="inline-flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-[12px] text-amber-800 dark:text-amber-300">
+                    <RotateCcw className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>
+                      This step is delegated to{" "}
+                      <strong>{expense.currentRole?.name || expense.currentRole?.code}</strong>.
+                      Your approve returns the expense to{" "}
+                      <strong>
+                        {expense.delegatedFromRole?.name || expense.delegatedFromRole?.code}
+                      </strong>{" "}
+                      — it does not advance the ladder.
+                    </span>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {canDelegate && (
+                    <ActionButton
+                      icon={UserPlus}
+                      label="Delegate"
+                      tone="default"
+                      disabled={acting}
+                      onClick={openDelegateModal}
+                    />
+                  )}
+                  <ActionButton
+                    icon={CheckCircle2}
+                    label="Approve"
+                    tone="success"
+                    disabled={acting}
+                    onClick={handleApproveClick}
+                  />
+                  <ActionButton
+                    icon={XCircle}
+                    label="Reject"
+                    tone="danger"
+                    disabled={acting}
+                    onClick={() => setConfirmAction("reject")}
+                  />
+                  {(expense.currentRole?.name || expense.currentRole?.code) && (
+                    <span className="text-[12px] text-slate-400">
+                      Current handler:{" "}
+                      {expense.currentRole.name || expense.currentRole.code}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+        </div>
+      )}
 
       {/* Tabs — Overview [PI | PR | Quotations | PO] Approvals Payments.
           flex-wrap (not overflow-x-auto) so the tab strip reflows to multiple rows
@@ -1211,90 +1380,10 @@ export default function ExpenseDetail() {
         </ProcurementStage>
       )}
 
-      {/* === Approvals tab: workflow actions + approval trail timeline === */}
+      {/* === Approvals tab: approval trail timeline (actions live in the header
+          status action bar above the tabs, so they are always visible) === */}
       {activeTab === "approvals" && (
         <>
-          {expense.status === "DRAFT" && expense.canEdit && (
-            <div className="flex flex-wrap items-center gap-2">
-              <ActionButton
-                icon={Send}
-                label="Submit expense"
-                tone="primary"
-                disabled={acting}
-                onClick={() => setConfirmAction("submit")}
-              />
-              <span className="text-[12px] text-slate-400">
-                This expense is still a draft — submit it to send it to the first
-                approver.
-              </span>
-            </div>
-          )}
-
-          {expense.status === "REJECTED" && expense.canEdit && (
-            <div className="flex flex-wrap items-center gap-2">
-              <ActionButton
-                icon={Edit}
-                label="Edit expense"
-                tone="secondary"
-                disabled={acting}
-                onClick={() => navigate(`/expenses/${expense.uuid}/edit`)}
-              />
-              <ActionButton
-                icon={Loader2}
-                label="Resubmit for approval"
-                tone="primary"
-                disabled={acting}
-                onClick={() => setConfirmAction("resubmit")}
-              />
-              <span className="text-[12px] text-slate-400">
-                Expense was rejected — edit if needed, then resubmit to send it through the approval flow again.
-              </span>
-            </div>
-          )}
-
-          {isProcurement && expense.status === "REJECTED" && isProcAdmin && !expense.canEdit && (
-            <div className="flex flex-wrap items-center gap-2">
-              <ActionButton
-                icon={Loader2}
-                label="Restart approval flow"
-                tone="primary"
-                disabled={acting}
-                onClick={() => setConfirmAction("resubmit")}
-              />
-              <span className="text-[12px] text-slate-400">
-                Rejected by the procurement chain — as the procurement admin you can restart
-                the 7-step approval flow from the CFO.
-              </span>
-            </div>
-          )}
-
-          {expense.status === "SUBMITTED" &&
-            (user?.role === "SUPER_ADMIN" ||
-              user?.role === expense.currentRole?.code) && (
-              <div className="flex flex-wrap items-center gap-2">
-                <ActionButton
-                  icon={CheckCircle2}
-                  label="Approve"
-                  tone="success"
-                  disabled={acting}
-                  onClick={handleApproveClick}
-                />
-                <ActionButton
-                  icon={XCircle}
-                  label="Reject"
-                  tone="danger"
-                  disabled={acting}
-                  onClick={() => setConfirmAction("reject")}
-                />
-                {(expense.currentRole?.name || expense.currentRole?.code) && (
-                  <span className="text-[12px] text-slate-400">
-                    Current handler:{" "}
-                    {expense.currentRole.name || expense.currentRole.code}
-                  </span>
-                )}
-              </div>
-            )}
-
           <ApprovalTrail
             handovers={[
               ...(procurementChain?.handovers || []).map((h) => ({
@@ -1473,11 +1562,13 @@ export default function ExpenseDetail() {
                 <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800">
                   <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                   <span className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
-                    {flowStep?.final
-                      ? "Final approval — the payment manager processes payment once all PO items are received."
-                      : nextFlowStep
-                        ? `Next step: ${nextFlowStep.label} (${nextFlowStep.role}).`
-                        : "This expense will continue routing through the approval chain."}
+                    {expense.isDelegated
+                      ? `Reviewing for ${expense.delegatedFromRole?.name || expense.delegatedFromRole?.code} — approving returns the expense to them. The ladder step does not advance.`
+                      : flowStep?.final
+                        ? "Final approval — the payment manager processes payment once all PO items are received."
+                        : nextFlowStep
+                          ? `Next step: ${nextFlowStep.label} (${nextFlowStep.role}).`
+                          : "This expense will continue routing through the approval chain."}
                   </span>
                 </div>
                 {flowStep?.role === "ADMIN_MGR" && (
@@ -1599,6 +1690,101 @@ export default function ExpenseDetail() {
                       : confirmAction === "reject"
                         ? "Reject"
                         : "Resubmit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delegate a FIXED-flow step to a junior role (Model A) */}
+      {showDelegateModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => {
+            setShowDelegateModal(false);
+            setSelectedDelegateRoleId(null);
+          }}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-xl border border-slate-200 dark:border-gray-700 shadow-xl p-5 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              Delegate this step
+            </h3>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400">
+              Hand this step to a junior role to review. Their approve returns the
+              expense to you — the ladder position does not advance.
+            </p>
+            {loadingDelegateRoles ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 text-indigo-500 animate-spin" />
+                <span className="ml-2 text-[12px] text-slate-400">
+                  Loading delegate roles...
+                </span>
+              </div>
+            ) : delegateRoles.length === 0 ? (
+              <p className="text-[12px] text-amber-600 dark:text-amber-400">
+                No valid delegate roles configured for this step.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                <label className="block text-[12px] font-medium text-slate-700 dark:text-slate-300">
+                  Who to delegate to <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedDelegateRoleId || ""}
+                  onChange={(e) =>
+                    setSelectedDelegateRoleId(
+                      e.target.value ? Number(e.target.value) : null,
+                    )
+                  }
+                  className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 cursor-pointer transition-colors"
+                  required
+                >
+                  <option value="">Select delegate role</option>
+                  {delegateRoles.map((role) => (
+                    <option key={role.roleId} value={role.roleId}>
+                      {role.roleName} ({role.roleCode})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Remarks (optional)"
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg text-[13px] text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDelegateModal(false);
+                  setSelectedDelegateRoleId(null);
+                }}
+                className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  actingDelegate ||
+                  loadingDelegateRoles ||
+                  delegateRoles.length === 0 ||
+                  !selectedDelegateRoleId
+                }
+                onClick={confirmDelegate}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+              >
+                {actingDelegate ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <UserPlus className="h-4 w-4" />
+                )}
+                {actingDelegate ? "Delegating..." : "Delegate step"}
               </button>
             </div>
           </div>
@@ -2221,6 +2407,8 @@ const ACTION_ICONS = {
   CONVERT_TO_EXPENSE: Wallet,
   RECEIVED: Inbox,
   ITEMS_RECEIVED: PackageCheck,
+  DELEGATE: UserPlus,
+  DELEGATE_RETURN: RotateCcw,
 };
 
 function ApprovalTrail({ handovers }) {
@@ -2260,7 +2448,10 @@ function ApprovalTrail({ handovers }) {
                           ? "bg-emerald-500"
                           : h.action_type === "ITEMS_RECEIVED"
                             ? "bg-amber-500"
-                            : "bg-indigo-500"
+                            : h.action_type === "DELEGATE" ||
+                                h.action_type === "DELEGATE_RETURN"
+                              ? "bg-violet-500"
+                              : "bg-indigo-500"
                     }`}
                   />
                   <div className="flex items-center gap-2">
