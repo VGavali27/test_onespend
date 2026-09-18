@@ -12,10 +12,37 @@
 // modules + the uuid prefix used for their rules (prefixes are unique across
 // modules so rule UUIDs never collide)
 const MODULES = [
-  { module: 'travel', prefix: 'd2e3f4a5-b6c7-8901-cdef-12345678' },
-  { module: 'reimbursement', prefix: 'd3e4f5a6-b7c8-9012-cdef-12345678' },
-  { module: 'payment', prefix: 'd4e5f6a7-b8c9-0123-cdef-12345678' },
+  { module: 'travel', prefix: 'd2e3f4a5-b6c7-8901-cdef-12345678', build: buildRules },
+  { module: 'reimbursement', prefix: 'd3e4f5a6-b7c8-9012-cdef-12345678', build: buildRules },
+  { module: 'payment', prefix: 'd4e5f6a7-b8c9-0123-cdef-12345678', build: buildRules },
+  { module: 'expense_delegation', prefix: 'e1e2f3a4-b5c6-7890-cdef-12345678', build: buildDelegationRules },
 ];
+
+// Delegation MGR → JR edges for FIXED-flow expense steps: a step owner can
+// temporarily hand their step to a junior; the junior's approve routes it back.
+function buildDelegationRules(module, prefix) {
+  const rows = [];
+  let ruleSeq = 0;
+  const addRule = (fromRoleId, toRoleId) => {
+    ruleSeq += 1;
+    rows.push({
+      uuid: `${prefix}${String(ruleSeq).padStart(3, '0')}`,
+      module,
+      from_role_id: fromRoleId,
+      to_role_id: toRoleId,
+      status: 'ACTIVE',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+  };
+
+  addRule(106, 107); // ADMIN_MGR → ADMIN_JR
+  addRule(104, 105); // FINANCE_MGR → FINANCE_JR
+  addRule(102, 103); // PAYMENT_MGR → PAYMENT_JR
+  addRule(101, 104); // CFO → FINANCE_MGR (CFO holds non-final ladder steps 1 and 4)
+
+  return rows;
+}
 
 function buildRules(module, prefix) {
   const rows = [];
@@ -65,8 +92,8 @@ function buildRules(module, prefix) {
 }
 
 export async function up({ context }) {
-  for (const { module, prefix } of MODULES) {
-    await context.bulkInsert('role_handover_rules', buildRules(module, prefix));
+  for (const { module, prefix, build } of MODULES) {
+    await context.bulkInsert('role_handover_rules', build(module, prefix));
   }
 }
 

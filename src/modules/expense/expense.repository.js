@@ -32,6 +32,7 @@ const listInclude = [
   ]},
   { model: Company, as: 'company' },
   { model: Role, as: 'currentRole' },
+  { model: Role, as: 'delegatedFromRole', required: false },
   { model: TravelExpense, as: 'travelExpense', required: false }, // for date filtering on travel dates
   {
     model: UserEmployment,

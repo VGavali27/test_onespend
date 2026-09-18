@@ -121,6 +121,27 @@ export const getHandoverRoles = async (req, res, next) => {
   }
 };
 
+// Get valid FIXED-flow delegate roles for the current step owner of an expense
+export const getDelegateRoles = async (req, res, next) => {
+  try {
+    const roles = await expenseService.getValidDelegateRoles(req.params.uuid);
+    return ApiResponse.success(res, roles, 'Valid delegate roles fetched');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delegate a FIXED-flow expense step to a junior role (Model A)
+export const delegateExpense = async (req, res, next) => {
+  try {
+    const toRoleId = req.body?.to_role_id ? Number(req.body.to_role_id) : null;
+    const expense = await expenseService.delegate(req.params.uuid, req.user, toRoleId, req.body?.remarks);
+    return ApiResponse.success(res, expense, 'Expense delegated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const rejectExpense = async (req, res, next) => {
   try {
     const expense = await expenseService.reject(req.params.uuid, req.user, req.body?.remarks);

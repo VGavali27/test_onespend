@@ -351,10 +351,14 @@ export const getByUuid = async (uuid, user, decrypt = false) => {
     getEmploymentIdsByUser(user.userId),
     getActiveCompanyIdsByUser(user.userId),
   ]);
+  const role = await roleRepository.findByCode(user.roleCode);
   const visible =
     EXPENSE_GLOBAL_ROLES.includes(user.roleCode) ||
     employmentIds.includes(expense.requested_by_employment_id) ||
-    companyIds.includes(expense.company_id);
+    companyIds.includes(expense.company_id) ||
+    // The current handler must always be able to open the expense they're
+    // reviewing — e.g. a delegated step held by a junior in another company.
+    expense.current_role_id === role?.id;
 
   if (!visible) throw ApiError.notFound('Expense not found');
 
@@ -374,10 +378,12 @@ export const getProcurementChain = async (uuid, user) => {
     getEmploymentIdsByUser(user.userId),
     getActiveCompanyIdsByUser(user.userId),
   ]);
+  const role = await roleRepository.findByCode(user.roleCode);
   const visible =
     EXPENSE_GLOBAL_ROLES.includes(user.roleCode) ||
     employmentIds.includes(expense.requested_by_employment_id) ||
-    companyIds.includes(expense.company_id);
+    companyIds.includes(expense.company_id) ||
+    expense.current_role_id === role?.id;
   if (!visible) throw ApiError.notFound('Expense not found');
 
   // Check if this expense has a linked procurement order (via expense_id on PO)
@@ -906,6 +912,7 @@ export const submit = async (uuid, user, remarks) => {
         status: 'SUBMITTED',
         current_role_id: firstReceiver,
         current_employment_id: null,
+        delegated_from_role_id: null,
         submitted_at: new Date(),
         // FIXED-flow resubmits restart the ordered ladder at step 1.
         ...(category?.flow_mode === 'FIXED' ? { flow_position: 1 } : {}),
@@ -953,14 +960,36 @@ const approveFixedFlow = async (expense, user, remarks, actorRole, actorEmployme
     throw ApiError.conflict('No approval flow is configured for this expense category');
   }
   const step = steps.find((s) => s.position === (expense.flow_position || 1)) ?? steps[steps.length - 1];
-  const handlerRole = await findRoleByCode(step.roleCode);
 
-  if (user.roleCode !== 'SUPER_ADMIN' && expense.current_role_id !== handlerRole?.id) {
+  const fromRole = expense.current_role_id;
+  // While an expense is delegated, the current handler is the delegate (whose
+  // role ≠ the step owner). Gate on the actor being the CURRENT handler, not
+  // the step handler, so the delegate's approve is allowed.
+  if (user.roleCode !== 'SUPER_ADMIN' && fromRole !== actorRole?.id) {
     throw ApiError.forbidden('Only the current handler can approve this expense');
   }
-  const fromRole = expense.current_role_id;
 
   return sequelize.transaction(async (t) => {
+    // Delegation window (Model A): the step owner handed the expense to a
+    // delegate. The delegate's approve RETURNS the expense to the owner —
+    // flow_position stays put and the owner's next approve advances the ladder.
+    if (expense.delegated_from_role_id != null) {
+      const ownerRoleId = expense.delegated_from_role_id;
+      await expense.update(
+        {
+          current_role_id: ownerRoleId,
+          current_employment_id: null,
+          delegated_from_role_id: null,
+        },
+        { transaction: t },
+      );
+      await logExpenseHandover({
+        expenseId: expense.id, fromRoleId: fromRole, toRoleId: ownerRoleId,
+        employmentId: actorEmployment?.id, actionType: 'DELEGATE_RETURN', remarks, t,
+      });
+      return expenseRepository.findByUuid(expense.uuid, t);
+    }
+
     if (step.final) {
       if (!(await allProcurementItemsReceived(expense.id))) {
         throw ApiError.badRequest('All PO items must be marked as received before final approval');
@@ -1156,6 +1185,103 @@ export const getValidHandoverRoles = async (uuid) => {
   }));
 };
 
+// ── FIXED-flow delegation (Model A) ──
+// A procurement step owner (e.g. ADMIN_MGR) can temporarily hand their step to a
+// junior role (e.g. ADMIN_JR) via a role_handover_rules row with module
+// 'expense_delegation'. The delegate's approve only RETURNS the expense to the
+// owner (delegated_from_role_id → current_role_id); flow_position never moves
+// while delegated. Nested delegation is blocked, and the final ladder step
+// cannot be delegated.
+
+const delegateFixedFlowModule = 'expense_delegation';
+
+// Get the candidate delegate roles for the current FIXED-flow handler of an
+// expense. Returns [] for HANDOVER categories, delegated expenses, and the
+// final ladder step.
+export const getValidDelegateRoles = async (uuid) => {
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+  if (expense.status !== 'SUBMITTED') throw ApiError.badRequest('This expense is not pending approval');
+  if (expense.delegated_from_role_id != null) return [];
+
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+  if (!category || category.flow_mode !== 'FIXED') return [];
+
+  const steps = await getActiveFlowSteps(expense.category_id);
+  const step = steps.find((s) => s.position === (expense.flow_position || 1));
+  if (!step || step.final) return [];
+
+  const fromRoleId = expense.current_role_id;
+  if (!fromRoleId) return [];
+
+  const rules = await RoleHandoverRule.findAll({
+    where: { module: delegateFixedFlowModule, from_role_id: fromRoleId, status: 'ACTIVE' },
+    include: [{ model: db.Role, as: 'toRole', attributes: ['id', 'uuid', 'name', 'code'] }],
+    order: [['created_at', 'ASC']],
+  });
+
+  return rules.map((r) => ({
+    roleId: r.toRole?.id,
+    roleUuid: r.toRole?.uuid,
+    roleName: r.toRole?.name,
+    roleCode: r.toRole?.code,
+  }));
+};
+
+// Delegate a SUBMITTED FIXED-flow expense to a junior role. The actor must be
+// the current step owner (or SUPER_ADMIN). The final step cannot be delegated.
+export const delegate = async (uuid, user, toRoleId, remarks) => {
+  if (!toRoleId) throw ApiError.badRequest('A delegate target role is required');
+
+  const expense = await expenseRepository.findByUuid(uuid);
+  if (!expense) throw ApiError.notFound('Expense not found');
+  if (expense.status !== 'SUBMITTED') throw ApiError.badRequest('This expense is not pending approval');
+  if (expense.delegated_from_role_id != null) {
+    throw ApiError.badRequest('This expense is already delegated — return it before delegating again');
+  }
+
+  const category = await ExpenseCategory.findByPk(expense.category_id);
+  if (!category || category.flow_mode !== 'FIXED') {
+    throw ApiError.badRequest('Delegation is only supported for the fixed approval flow');
+  }
+
+  const steps = await getActiveFlowSteps(expense.category_id);
+  const step = steps.find((s) => s.position === (expense.flow_position || 1));
+  if (step?.final) throw ApiError.badRequest('The final approval step cannot be delegated');
+
+  const actorRole = await findRoleByCode(user.roleCode);
+  const fromRole = expense.current_role_id;
+  if (user.roleCode !== 'SUPER_ADMIN' && fromRole !== actorRole?.id) {
+    throw ApiError.forbidden('Only the current handler can delegate this expense');
+  }
+
+  // The hop from the step owner to the delegate must be an ACTIVE
+  // 'expense_delegation' rule.
+  await requireHandoverRule(fromRole, toRoleId, delegateFixedFlowModule);
+
+  const actorEmployment = await getActiveEmploymentByUser(user.userId);
+  const delegateRole = await db.Role.findByPk(toRoleId);
+
+  return sequelize.transaction(async (t) => {
+    await expense.update(
+      {
+        current_role_id: toRoleId,
+        current_employment_id: null,
+        // Remember who owns this step so the delegate's approve routes back.
+        delegated_from_role_id: fromRole,
+      },
+      { transaction: t },
+    );
+    await logExpenseHandover({
+      expenseId: expense.id, fromRoleId: fromRole, toRoleId,
+      employmentId: actorEmployment?.id, actionType: 'DELEGATE',
+      remarks: remarks ?? (delegateRole?.name ? `Delegated to ${delegateRole.name}` : null),
+      t,
+    });
+    return expenseRepository.findByUuid(uuid, t);
+  });
+};
+
 // Reject a SUBMITTED expense — closes it as REJECTED and clears the handler.
 export const reject = async (uuid, user, remarks) => {
   const expense = await expenseRepository.findByUuid(uuid);
@@ -1188,6 +1314,7 @@ export const reject = async (uuid, user, remarks) => {
         current_role_id: procurementAdmin?.id ?? null,
         current_employment_id: null,
         flow_position: category?.module === 'procurement' ? null : expense.flow_position,
+        delegated_from_role_id: null,
         closed_at: new Date(),
       },
       { transaction: t },

@@ -13,6 +13,9 @@ export async function up(queryInterface, Sequelize) {
     beneficiary_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     current_role_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     current_employment_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
+    // FIXED-flow delegation: set to the step owner's role id while a delegate
+    // holds the expense — their approve returns the expense to this role.
+    delegated_from_role_id: { type: Sequelize.BIGINT.UNSIGNED, allowNull: true },
     estimated_amount: { type: Sequelize.TEXT, allowNull: true },
     final_amount: { type: Sequelize.TEXT, allowNull: true },
     advance_amount: { type: Sequelize.TEXT, allowNull: true, defaultValue: '0' },
@@ -76,6 +79,14 @@ export async function up(queryInterface, Sequelize) {
     fields: ['current_role_id'],
     type: 'foreign key',
     name: 'fk_exp_current_role_id',
+    references: { table: 'roles', field: 'id' },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL',
+  });
+  await queryInterface.addConstraint('expenses', {
+    fields: ['delegated_from_role_id'],
+    type: 'foreign key',
+    name: 'fk_exp_delegated_from_role_id',
     references: { table: 'roles', field: 'id' },
     onUpdate: 'CASCADE',
     onDelete: 'SET NULL',

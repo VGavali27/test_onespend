@@ -15,6 +15,10 @@ router.get('/my', expenseController.getMyExpenses);
 router.get('/my-payments', requirePermission('expenses:read'), expenseController.getMyPaymentRequests);
 // Get valid handover target roles for an expense (for the current handler)
 router.get('/:uuid/handover-roles', expenseController.getHandoverRoles);
+// FIXED-flow delegation: candidate delegate roles for the current step owner
+router.get('/:uuid/delegate-roles', requirePermission('expenses:approve'), expenseController.getDelegateRoles);
+// Delegate a FIXED-flow step to a junior role (delegate's approve returns it)
+router.post('/:uuid/delegate', requirePermission('expenses:approve'), validate(actionSchema), expenseController.delegateExpense);
 // Lazy-load the source procurement chain for a procurement-linked expense
 router.get('/:uuid/procurement-chain', expenseController.getExpenseProcurementChain);
 // Get a single expense by UUID (visibility-checked)

@@ -33,6 +33,9 @@ export default (sequelize, DataTypes) => {
       beneficiary_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       current_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       current_employment_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
+      // FIXED-flow delegation: set to the step owner's role id while the current
+      // handler is a delegate (their approve returns the expense to this role).
+      delegated_from_role_id: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true },
       estimated_amount: { type: DataTypes.TEXT, allowNull: true },
       final_amount: { type: DataTypes.TEXT, allowNull: true },
       advance_amount: { type: DataTypes.TEXT, allowNull: true, defaultValue: '0' },
@@ -71,6 +74,7 @@ export default (sequelize, DataTypes) => {
     Expense.belongsTo(models.UserEmployment, { foreignKey: 'beneficiary_employment_id', as: 'beneficiaryEmployment' });
     Expense.belongsTo(models.UserEmployment, { foreignKey: 'current_employment_id', as: 'currentEmployment' });
     Expense.belongsTo(models.Role, { foreignKey: 'current_role_id', as: 'currentRole' });
+    Expense.belongsTo(models.Role, { foreignKey: 'delegated_from_role_id', as: 'delegatedFromRole' });
     Expense.hasOne(models.TravelExpense, { foreignKey: 'expense_id', as: 'travelExpense' });
     Expense.hasOne(models.ReimbursementExpense, { foreignKey: 'expense_id', as: 'reimbursementExpense' });
     Expense.hasOne(models.ProcurementOrder, { foreignKey: 'expense_id', as: 'procurementOrder' });
